@@ -1,0 +1,6 @@
+// Icon
+APP_ICON ICON icon.ico
+
+// Bitmaps
+IMAGE BITMAP image.bmp
+FONT BITMAP font.bmp

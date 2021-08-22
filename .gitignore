@@ -1,0 +1,12 @@
+/build/*
+.vs
+*.aps
+*.res
+*.exe
+*.obj
+*.map
+*.pdb
+*.log
+*.tlog
+*.exe.recipe
+*.vcxproj.FileListAbsolute.txt
