@@ -1,9 +1,16 @@
 
 #include <intrin.h>
 
-typedef struct
+typedef union
 {
-    f32 x, y, z;
+    struct { f32 x, y; };
+    struct { f32 u, v; };
+} vec2;
+
+typedef union
+{
+    struct { f32 x, y, z; };
+    struct { f32 r, g, b; };
 } vec3;
 
 #define MATH_PI 3.14159265358979323846f

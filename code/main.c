@@ -87,7 +87,7 @@ void Win32_DeleteBitmap(struct bitmap);
 
 global bool GlobalFocus;
 global bool GlobalRunning;
-global struct bitmap GlobalBackbuffer;
+global bitmap GlobalBackbuffer;
 
 #define _AMD64_
 #include <windef.h>
@@ -99,8 +99,8 @@ global struct bitmap GlobalBackbuffer;
 #include <dsound.h>
 
 typedef struct {
-  BITMAPINFOHEADER bmiHeader;
-  RGBQUAD          bmiColors[256];
+    BITMAPINFOHEADER bmiHeader;
+    RGBQUAD          bmiColors[256];
 } BITMAPINFO_AND_PALETTE;
 
 global HWND GlobalWindow;
@@ -263,14 +263,14 @@ void Win32_DisplayBitmap(HDC DeviceContext)
                   DIB_RGB_COLORS, SRCCOPY);
 }
 
-struct bitmap Win32_LoadBitmap(const char* Name)
+bitmap Win32_LoadBitmap(const char* Name)
 {
     HBITMAP hImage = LoadImageA(GetModuleHandle(0), Name, IMAGE_BITMAP, 0, 0, LR_CREATEDIBSECTION);
-    if (!hImage) return (struct bitmap){ 0 };
+    if (!hImage) return (bitmap){ 0 };
 
     BITMAP Image;
     GetObject(hImage, sizeof(BITMAP), &Image);
-    Image.bmBits = malloc(Image.bmWidth * Image.bmHeight * BYTES_PER_PIXEL);
+    bitmap Bitmap = Bitmap_Create(Image.bmWidth, Image.bmHeight);
 
     BITMAPINFO_AND_PALETTE BitmapInfo = {
         .bmiHeader = {
@@ -284,23 +284,11 @@ struct bitmap Win32_LoadBitmap(const char* Name)
     };
 
     HDC DeviceContext = GetDC(GlobalWindow);
-    GetDIBits(DeviceContext, hImage, 0, Image.bmHeight, Image.bmBits, (BITMAPINFO *)&BitmapInfo, DIB_RGB_COLORS);
+    GetDIBits(DeviceContext, hImage, 0, Bitmap.Height, Bitmap.Pixels, (BITMAPINFO *)&BitmapInfo, DIB_RGB_COLORS);
     ReleaseDC(GlobalWindow, DeviceContext);
     DeleteObject(hImage);
 
-    return (struct bitmap) {
-        .Width = Image.bmWidth,
-        .Height = Image.bmHeight,
-        .Pitch = Image.bmWidth,
-        .Flags = BITMAP_ONHEAP,
-        .Pixels = Image.bmBits
-    };
-}
-
-void Win32_DeleteBitmap(struct bitmap Bitmap)
-{
-    if (Bitmap.Flags & BITMAP_ONHEAP)
-        free(Bitmap.Pixels);
+    return Bitmap;
 }
 
 u64 Win32_GetTime(void)
@@ -438,9 +426,9 @@ int WINAPI CALLBACK WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR 
     u64 TargetTimePerFrameCarry = TargetTimePerFrame + PerfCountFrequency.QuadPart % 60;
     u64 LastTime = Win32_GetTime();
 
-    struct input Input = { 0 };
-    struct game *Game = malloc(sizeof(struct game));
-    memset(Game, 0, sizeof(struct game));
+    input Input = { 0 };
+    game *Game = malloc(sizeof(game));
+    memset(Game, 0, sizeof(game));
     Game_Init(Game);
 
     GlobalRunning = true;

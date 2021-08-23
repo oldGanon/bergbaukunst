@@ -1,18 +1,18 @@
 
-struct camera
+typedef struct camera
 {
     vec3 Position;
     f32 Yaw, Pitch;
     f32 SinYaw, CosYaw;
     f32 SinPitch, CosPitch;
-};
+} camera;
 
-void Camera_SetPosition(struct camera *Camera, vec3 Position)
+void Camera_SetPosition(camera *Camera, vec3 Position)
 {
     Camera->Position = Position;
 }
 
-void Camera_SetRotation(struct camera *Camera, f32 Yaw, f32 Pitch)
+void Camera_SetRotation(camera *Camera, f32 Yaw, f32 Pitch)
 {
     Camera->Yaw = Modulo(Yaw, 2*MATH_PI);
     Camera->Pitch = Modulo(Pitch, 2*MATH_PI);
@@ -22,7 +22,7 @@ void Camera_SetRotation(struct camera *Camera, f32 Yaw, f32 Pitch)
     Camera->CosPitch = Cos(Camera->Pitch);
 }
 
-vec3 Camera_Forward(const struct camera Camera)
+vec3 Camera_Forward(const camera Camera)
 {
     vec3 Forward = { 0 };
     
@@ -33,7 +33,7 @@ vec3 Camera_Forward(const struct camera Camera)
     return Forward;
 }
 
-vec3 CameraToScreen(const struct bitmap Screen, vec3 Position)
+vec3 CameraToScreen(const bitmap Screen, vec3 Position)
 {
     f32 Width = Screen.Width * 0.5f;
     f32 Height = Screen.Height * 0.5f;
@@ -44,7 +44,7 @@ vec3 CameraToScreen(const struct bitmap Screen, vec3 Position)
     return Position;
 }
 
-vec3 WorldToCamera(const struct camera Camera, vec3 Position)
+vec3 WorldToCamera(const camera Camera, vec3 Position)
 {
     Position.x -= Camera.Position.x;
     Position.y -= Camera.Position.y;

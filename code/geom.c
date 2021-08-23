@@ -1,27 +1,27 @@
 
-struct point
+typedef struct point
 {
     f32 x, y;
-};
+} point;
 
-struct line
+typedef struct line
 {
     struct point a, b;
-};
+} line;
 
-struct triangle
+typedef struct triangle
 {
     struct point a, b, c;
-};
+} triangle;
 
-struct rect
+typedef struct rect
 {
     f32 x, y, w, h;
-};
+} rect;
 
 
 
-bool Line_Clip(struct line *Line, const struct rect Rect)
+bool Line_Clip(line *Line, const rect Rect)
 {
     f32 invdx = 1.0f / (Line->b.x - Line->a.x);
     f32 invdy = 1.0f / (Line->b.y - Line->a.y);
@@ -37,8 +37,8 @@ bool Line_Clip(struct line *Line, const struct rect Rect)
     if ((tmax < 0) || (tmin > tmax) || (1 < tmin))
         return false;
     
-    struct point a = Line->a;
-    struct point b = Line->b;
+    point a = Line->a;
+    point b = Line->b;
     
     if (0 < tmin)
     {
@@ -55,13 +55,13 @@ bool Line_Clip(struct line *Line, const struct rect Rect)
     return true;
 }
 
-inline struct triangle Triangle_SortX(struct triangle Triangle)
+inline triangle Triangle_SortX(triangle Triangle)
 {
     if (Triangle.a.x > Triangle.b.x)
     {
         if (Triangle.b.x > Triangle.c.x)
         {// c b a
-            struct point T = Triangle.a;
+            point T = Triangle.a;
             Triangle.a = Triangle.c;
             Triangle.c = T;
         }
@@ -69,14 +69,14 @@ inline struct triangle Triangle_SortX(struct triangle Triangle)
         {
             if (Triangle.a.x > Triangle.c.x)
             {// b c a
-                struct point T = Triangle.a;
+                point T = Triangle.a;
                 Triangle.a = Triangle.b;
                 Triangle.b = Triangle.c;
                 Triangle.c = T;
             }
             else
             {// b a c
-                struct point T = Triangle.a;
+                point T = Triangle.a;
                 Triangle.a = Triangle.b;
                 Triangle.b = T;
             }
@@ -88,14 +88,14 @@ inline struct triangle Triangle_SortX(struct triangle Triangle)
         {
             if (Triangle.a.x > Triangle.c.x)
             {// c a b
-                struct point T = Triangle.c;
+                point T = Triangle.c;
                 Triangle.c = Triangle.b;
                 Triangle.b = Triangle.a;
                 Triangle.a = T;
             }
             else
             {// a c b
-                struct point T = Triangle.b;
+                point T = Triangle.b;
                 Triangle.b = Triangle.c;
                 Triangle.c = T;                
             }
@@ -105,13 +105,13 @@ inline struct triangle Triangle_SortX(struct triangle Triangle)
     return Triangle;
 }
 
-inline struct triangle Triangle_SortY(struct triangle Triangle)
+inline triangle Triangle_SortY(triangle Triangle)
 {
     if (Triangle.a.y > Triangle.b.y)
     {
         if (Triangle.b.y > Triangle.c.y)
         {// c b a
-            struct point T = Triangle.a;
+            point T = Triangle.a;
             Triangle.a = Triangle.c;
             Triangle.c = T;
         }
@@ -119,14 +119,14 @@ inline struct triangle Triangle_SortY(struct triangle Triangle)
         {
             if (Triangle.a.y > Triangle.c.y)
             {// b c a
-                struct point T = Triangle.a;
+                point T = Triangle.a;
                 Triangle.a = Triangle.b;
                 Triangle.b = Triangle.c;
                 Triangle.c = T;
             }
             else
             {// b a c
-                struct point T = Triangle.a;
+                point T = Triangle.a;
                 Triangle.a = Triangle.b;
                 Triangle.b = T;
             }
@@ -138,14 +138,14 @@ inline struct triangle Triangle_SortY(struct triangle Triangle)
         {
             if (Triangle.a.y > Triangle.c.y)
             {// c a b
-                struct point T = Triangle.c;
+                point T = Triangle.c;
                 Triangle.c = Triangle.b;
                 Triangle.b = Triangle.a;
                 Triangle.a = T;
             }
             else
             {// a c b
-                struct point T = Triangle.b;
+                point T = Triangle.b;
                 Triangle.b = Triangle.c;
                 Triangle.c = T;                
             }
@@ -155,13 +155,13 @@ inline struct triangle Triangle_SortY(struct triangle Triangle)
     return Triangle;
 }
 
-inline struct triangle Triangle_SortY2(struct triangle Order, struct triangle Values)
+inline triangle Triangle_SortY2(triangle Order, triangle Values)
 {
     if (Order.a.y > Order.b.y)
     {
         if (Order.b.y > Order.c.y)
         {// c b a
-            struct point T = Values.a;
+            point T = Values.a;
             Values.a = Values.c;
             Values.c = T;
         }
@@ -169,14 +169,14 @@ inline struct triangle Triangle_SortY2(struct triangle Order, struct triangle Va
         {
             if (Order.a.y > Order.c.y)
             {// b c a
-                struct point T = Values.a;
+                point T = Values.a;
                 Values.a = Values.b;
                 Values.b = Values.c;
                 Values.c = T;
             }
             else
             {// b a c
-                struct point T = Values.a;
+                point T = Values.a;
                 Values.a = Values.b;
                 Values.b = T;
             }
@@ -188,14 +188,14 @@ inline struct triangle Triangle_SortY2(struct triangle Order, struct triangle Va
         {
             if (Order.a.y > Order.c.y)
             {// c a b
-                struct point T = Values.c;
+                point T = Values.c;
                 Values.c = Values.b;
                 Values.b = Values.a;
                 Values.a = T;
             }
             else
             {// a c b
-                struct point T = Values.b;
+                point T = Values.b;
                 Values.b = Values.c;
                 Values.c = T;                
             }
@@ -205,7 +205,7 @@ inline struct triangle Triangle_SortY2(struct triangle Order, struct triangle Va
     return Values;
 }
 
-i32 Triangle_Clip(const struct triangle Triangle, const struct rect Rect, struct triangle *Out)
+i32 Triangle_Clip(const triangle Triangle, const rect Rect, triangle *Out)
 {
     i32 TriangleCount = 0;
     Out[TriangleCount++] = Triangle;
@@ -223,22 +223,22 @@ i32 Triangle_Clip(const struct triangle Triangle, const struct rect Rect, struct
         {
             case 0: continue;
             
-            case 4: Out[i] = (struct triangle) { .a = Out[i].b, .b = Out[i].c, .c = Out[i].a };
-            case 2: Out[i] = (struct triangle) { .a = Out[i].b, .b = Out[i].c, .c = Out[i].a };
+            case 4: Out[i] = (triangle) { .a = Out[i].b, .b = Out[i].c, .c = Out[i].a };
+            case 2: Out[i] = (triangle) { .a = Out[i].b, .b = Out[i].c, .c = Out[i].a };
             case 1:
             {
-                struct point ab = { .x = x, .y = Lerp(Out[i].a.y, Out[i].b.y, (x - Out[i].a.x) / (Out[i].b.x - Out[i].a.x)) };
-                struct point ac = { .x = x, .y = Lerp(Out[i].a.y, Out[i].c.y, (x - Out[i].a.x) / (Out[i].c.x - Out[i].a.x)) };
-                Out[TriangleCount++] = (struct triangle) { .a = Out[i].c, .b = ac, .c = ab };
+                point ab = { .x = x, .y = Lerp(Out[i].a.y, Out[i].b.y, (x - Out[i].a.x) / (Out[i].b.x - Out[i].a.x)) };
+                point ac = { .x = x, .y = Lerp(Out[i].a.y, Out[i].c.y, (x - Out[i].a.x) / (Out[i].c.x - Out[i].a.x)) };
+                Out[TriangleCount++] = (triangle) { .a = Out[i].c, .b = ac, .c = ab };
                 Out[i].a = ab;
             } break;
             
-            case 6: Out[i] = (struct triangle) { .a = Out[i].c, .b = Out[i].a, .c = Out[i].b };
-            case 5: Out[i] = (struct triangle) { .a = Out[i].c, .b = Out[i].a, .c = Out[i].b };
+            case 6: Out[i] = (triangle) { .a = Out[i].c, .b = Out[i].a, .c = Out[i].b };
+            case 5: Out[i] = (triangle) { .a = Out[i].c, .b = Out[i].a, .c = Out[i].b };
             case 3:
             {
-                Out[i].a = (struct point) { .x = x, .y = Lerp(Out[i].a.y, Out[i].c.y, (x - Out[i].a.x) / (Out[i].c.x - Out[i].a.x)) };
-                Out[i].b = (struct point) { .x = x, .y = Lerp(Out[i].b.y, Out[i].c.y, (x - Out[i].b.x) / (Out[i].c.x - Out[i].b.x)) };
+                Out[i].a = (point) { .x = x, .y = Lerp(Out[i].a.y, Out[i].c.y, (x - Out[i].a.x) / (Out[i].c.x - Out[i].a.x)) };
+                Out[i].b = (point) { .x = x, .y = Lerp(Out[i].b.y, Out[i].c.y, (x - Out[i].b.x) / (Out[i].c.x - Out[i].b.x)) };
             } break;
             
             case 7: Out[i] = Out[--TriangleCount]; continue;
@@ -258,22 +258,22 @@ i32 Triangle_Clip(const struct triangle Triangle, const struct rect Rect, struct
         {
             case 0: continue;
             
-            case 4: Out[i] = (struct triangle) { .a = Out[i].b, .b = Out[i].c, .c = Out[i].a };
-            case 2: Out[i] = (struct triangle) { .a = Out[i].b, .b = Out[i].c, .c = Out[i].a };
+            case 4: Out[i] = (triangle) { .a = Out[i].b, .b = Out[i].c, .c = Out[i].a };
+            case 2: Out[i] = (triangle) { .a = Out[i].b, .b = Out[i].c, .c = Out[i].a };
             case 1:
             {
-                struct point ab = { .x = x, .y = Lerp(Out[i].a.y, Out[i].b.y, (x - Out[i].a.x) / (Out[i].b.x - Out[i].a.x)) };
-                struct point ac = { .x = x, .y = Lerp(Out[i].a.y, Out[i].c.y, (x - Out[i].a.x) / (Out[i].c.x - Out[i].a.x)) };
-                Out[TriangleCount++] = (struct triangle) { .a = Out[i].c, .b = ac, .c = ab };
+                point ab = { .x = x, .y = Lerp(Out[i].a.y, Out[i].b.y, (x - Out[i].a.x) / (Out[i].b.x - Out[i].a.x)) };
+                point ac = { .x = x, .y = Lerp(Out[i].a.y, Out[i].c.y, (x - Out[i].a.x) / (Out[i].c.x - Out[i].a.x)) };
+                Out[TriangleCount++] = (triangle) { .a = Out[i].c, .b = ac, .c = ab };
                 Out[i].a = ab;
             } break;
             
-            case 6: Out[i] = (struct triangle) { .a = Out[i].c, .b = Out[i].a, .c = Out[i].b };
-            case 5: Out[i] = (struct triangle) { .a = Out[i].c, .b = Out[i].a, .c = Out[i].b };
+            case 6: Out[i] = (triangle) { .a = Out[i].c, .b = Out[i].a, .c = Out[i].b };
+            case 5: Out[i] = (triangle) { .a = Out[i].c, .b = Out[i].a, .c = Out[i].b };
             case 3:
             {
-                Out[i].a = (struct point) { .x = x, .y = Lerp(Out[i].a.y, Out[i].c.y, (x - Out[i].a.x) / (Out[i].c.x - Out[i].a.x)) };
-                Out[i].b = (struct point) { .x = x, .y = Lerp(Out[i].b.y, Out[i].c.y, (x - Out[i].b.x) / (Out[i].c.x - Out[i].b.x)) };
+                Out[i].a = (point) { .x = x, .y = Lerp(Out[i].a.y, Out[i].c.y, (x - Out[i].a.x) / (Out[i].c.x - Out[i].a.x)) };
+                Out[i].b = (point) { .x = x, .y = Lerp(Out[i].b.y, Out[i].c.y, (x - Out[i].b.x) / (Out[i].c.x - Out[i].b.x)) };
             } break;
             
             case 7: Out[i] = Out[--TriangleCount]; continue;
@@ -293,22 +293,22 @@ i32 Triangle_Clip(const struct triangle Triangle, const struct rect Rect, struct
         {
             case 0: continue;
             
-            case 4: Out[i] = (struct triangle) { .a = Out[i].b, .b = Out[i].c, .c = Out[i].a };
-            case 2: Out[i] = (struct triangle) { .a = Out[i].b, .b = Out[i].c, .c = Out[i].a };
+            case 4: Out[i] = (triangle) { .a = Out[i].b, .b = Out[i].c, .c = Out[i].a };
+            case 2: Out[i] = (triangle) { .a = Out[i].b, .b = Out[i].c, .c = Out[i].a };
             case 1:
             {
-                struct point ab = { .x = Lerp(Out[i].a.x, Out[i].b.x, (y - Out[i].a.y) / (Out[i].b.y - Out[i].a.y)), .y = y };
-                struct point ac = { .x = Lerp(Out[i].a.x, Out[i].c.x, (y - Out[i].a.y) / (Out[i].c.y - Out[i].a.y)), .y = y };
-                Out[TriangleCount++] = (struct triangle) { .a = Out[i].c, .b = ac, .c = ab };
+                point ab = { .x = Lerp(Out[i].a.x, Out[i].b.x, (y - Out[i].a.y) / (Out[i].b.y - Out[i].a.y)), .y = y };
+                point ac = { .x = Lerp(Out[i].a.x, Out[i].c.x, (y - Out[i].a.y) / (Out[i].c.y - Out[i].a.y)), .y = y };
+                Out[TriangleCount++] = (triangle) { .a = Out[i].c, .b = ac, .c = ab };
                 Out[i].a = ab;
             } break;
             
-            case 6: Out[i] = (struct triangle) { .a = Out[i].c, .b = Out[i].a, .c = Out[i].b };
-            case 5: Out[i] = (struct triangle) { .a = Out[i].c, .b = Out[i].a, .c = Out[i].b };
+            case 6: Out[i] = (triangle) { .a = Out[i].c, .b = Out[i].a, .c = Out[i].b };
+            case 5: Out[i] = (triangle) { .a = Out[i].c, .b = Out[i].a, .c = Out[i].b };
             case 3:
             {
-                Out[i].a = (struct point) { .x = Lerp(Out[i].a.x, Out[i].c.x, (y - Out[i].a.y) / (Out[i].c.y - Out[i].a.y)), .y = y };
-                Out[i].b = (struct point) { .x = Lerp(Out[i].b.x, Out[i].c.x, (y - Out[i].b.y) / (Out[i].c.y - Out[i].b.y)), .y = y };
+                Out[i].a = (point) { .x = Lerp(Out[i].a.x, Out[i].c.x, (y - Out[i].a.y) / (Out[i].c.y - Out[i].a.y)), .y = y };
+                Out[i].b = (point) { .x = Lerp(Out[i].b.x, Out[i].c.x, (y - Out[i].b.y) / (Out[i].c.y - Out[i].b.y)), .y = y };
             } break;
             
             case 7: Out[i] = Out[--TriangleCount]; continue;
@@ -328,22 +328,22 @@ i32 Triangle_Clip(const struct triangle Triangle, const struct rect Rect, struct
         {
             case 0: continue;
             
-            case 4: Out[i] = (struct triangle) { .a = Out[i].b, .b = Out[i].c, .c = Out[i].a };
-            case 2: Out[i] = (struct triangle) { .a = Out[i].b, .b = Out[i].c, .c = Out[i].a };
+            case 4: Out[i] = (triangle) { .a = Out[i].b, .b = Out[i].c, .c = Out[i].a };
+            case 2: Out[i] = (triangle) { .a = Out[i].b, .b = Out[i].c, .c = Out[i].a };
             case 1:
             {
-                struct point ab = { .x = Lerp(Out[i].a.x, Out[i].b.x, (y - Out[i].a.y) / (Out[i].b.y - Out[i].a.y)), .y = y };
-                struct point ac = { .x = Lerp(Out[i].a.x, Out[i].c.x, (y - Out[i].a.y) / (Out[i].c.y - Out[i].a.y)), .y = y };
-                Out[TriangleCount++] = (struct triangle) { .a = Out[i].c, .b = ac, .c = ab };
+                point ab = { .x = Lerp(Out[i].a.x, Out[i].b.x, (y - Out[i].a.y) / (Out[i].b.y - Out[i].a.y)), .y = y };
+                point ac = { .x = Lerp(Out[i].a.x, Out[i].c.x, (y - Out[i].a.y) / (Out[i].c.y - Out[i].a.y)), .y = y };
+                Out[TriangleCount++] = (triangle) { .a = Out[i].c, .b = ac, .c = ab };
                 Out[i].a = ab;
             } break;
             
-            case 6: Out[i] = (struct triangle) { .a = Out[i].c, .b = Out[i].a, .c = Out[i].b };
-            case 5: Out[i] = (struct triangle) { .a = Out[i].c, .b = Out[i].a, .c = Out[i].b };
+            case 6: Out[i] = (triangle) { .a = Out[i].c, .b = Out[i].a, .c = Out[i].b };
+            case 5: Out[i] = (triangle) { .a = Out[i].c, .b = Out[i].a, .c = Out[i].b };
             case 3:
             {
-                Out[i].a = (struct point) { .x = Lerp(Out[i].a.x, Out[i].c.x, (y - Out[i].a.y) / (Out[i].c.y - Out[i].a.y)), .y = y };
-                Out[i].b = (struct point) { .x = Lerp(Out[i].b.x, Out[i].c.x, (y - Out[i].b.y) / (Out[i].c.y - Out[i].b.y)), .y = y };
+                Out[i].a = (point) { .x = Lerp(Out[i].a.x, Out[i].c.x, (y - Out[i].a.y) / (Out[i].c.y - Out[i].a.y)), .y = y };
+                Out[i].b = (point) { .x = Lerp(Out[i].b.x, Out[i].c.x, (y - Out[i].b.y) / (Out[i].c.y - Out[i].b.y)), .y = y };
             } break;
             
             case 7: Out[i] = Out[--TriangleCount]; continue;
