@@ -38,14 +38,14 @@ void Game_Init( game *Game)
 void Game_Update(game *Game, const input Input)
 {
     camera* Camera = &Game->Camera;
+
     Camera_SetRotation(Camera, Camera->Yaw + 0.025f, Camera->Pitch);
     vec3 Forward = Camera_Forward(*Camera);
-    Forward.x = -1.5f * Forward.x;
-    Forward.y = -1.5f * Forward.y;
-    Forward.z = -1.5f * Forward.z;
+    Forward.x = -4.0f * Forward.x;
+    Forward.y = -4.0f * Forward.y;
+    Forward.z = -4.0f * Forward.z;
     Camera_SetPosition(Camera, Forward);
 }
-
 void Game_Draw(const game *Game, bitmap Buffer)
 {
     Bitmap_Clear(Buffer, COLOR_SKYBLUE);
@@ -53,10 +53,26 @@ void Game_Draw(const game *Game, bitmap Buffer)
     bitmap GrasTop = Bitmap_Section(Game->Image, 0, 0, 16, 16);
     bitmap GrasSide = Bitmap_Section(Game->Image, 16, 0, 16, 16);
     bitmap GrasBottom = Bitmap_Section(Game->Image, 32, 0, 16, 16);
-    Draw_GrasBlock(Game->Camera, Buffer, GrasTop, GrasSide, GrasBottom);
+
+    i32 len = 5;
+    vec3* blockoffsets = malloc(len * sizeof(vec3));
+    *blockoffsets = (vec3){1,0,1};
+    *(blockoffsets+1) = (vec3){0,0,0};
+    *(blockoffsets+2) = (vec3){ 0,0,1 };
+    *(blockoffsets+3) = (vec3){ 0,1,0 };
+
+    SortBlockDistances(Game->Camera, blockoffsets, len);
+
+    for (int i = 0; i < len; i++)
+    {
+        Draw_GrasBlock(Game->Camera, Buffer, GrasTop, GrasSide, GrasBottom,blockoffsets[i]);
+    }
+
+    free(blockoffsets);
 
     Draw_String(Buffer, Game->Font, COLOR_WHITE, 32, 32, "ASFIDJH\nasdasd");
     
+
 /*
     Bitmap_Clear(Buffer, COLOR_HEX(0xC0FFEE));
     Bitmap_SetPixel(Buffer, COLOR_HEX(0xDEAD), 10, 10);
