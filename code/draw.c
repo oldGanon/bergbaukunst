@@ -11,7 +11,7 @@ typedef struct color
 #define COLOR_RED         (color){  48 }
 #define COLOR_PINK        (color){  64 }
 #define COLOR_DARKBROWN   (color){  80 }
-#define COLOR_BROEN       (color){  96 }
+#define COLOR_BROWN       (color){  96 }
 #define COLOR_ORANGE      (color){ 112 }
 #define COLOR_YELLOW      (color){ 128 }
 #define COLOR_DARKGREEN   (color){ 144 }
