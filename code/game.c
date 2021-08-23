@@ -37,12 +37,13 @@ void Game_Init( game *Game)
 
 void Game_Update(game *Game, const input Input)
 {
-    Camera_SetRotation(&Game->Camera, Game->Camera.Yaw + 0.025f, Game->Camera.Pitch);
-    vec3 Forward = Camera_Forward(Game->Camera);
+    camera* Camera = &Game->Camera;
+    Camera_SetRotation(Camera, Camera->Yaw + 0.025f, Camera->Pitch);
+    vec3 Forward = Camera_Forward(*Camera);
     Forward.x = -1.5f * Forward.x;
     Forward.y = -1.5f * Forward.y;
     Forward.z = -1.5f * Forward.z;
-    Camera_SetPosition(&Game->Camera, Forward);
+    Camera_SetPosition(Camera, Forward);
 }
 
 void Game_Draw(const game *Game, bitmap Buffer)
