@@ -59,14 +59,14 @@ void Draw_LineInt(bitmap Target, color Color, i32 X0, i32 Y0, i32 X1, i32 Y1);
 void Draw_TriangleInt(bitmap Target, color Color, i32 X0, i32 Y0, i32 X1, i32 Y1, i32 X2, i32 Y2);
 void Draw_RectInt(bitmap Target, color Color, i32 X, i32 Y, i32 W, i32 H);
 
-void Draw_Bitmap(bitmap Target, bitmap Bitmap, i32 X, i32 Y);
-void Draw_String(bitmap Target, bitmap Font, color Color, i32 X, i32 Y, const char *String);
+void Draw_Bitmap(bitmap Target, const bitmap Bitmap, i32 X, i32 Y);
+void Draw_String(bitmap Target, const bitmap Font, color Color, i32 X, i32 Y, const char *String);
 
 void Draw_TriangleVerts(bitmap Target, color Color, vertex A, vertex B, vertex C);
-void Draw_TriangleTexturedVerts(bitmap Target, bitmap Texture, vertex A, vertex B, vertex C);
+void Draw_TriangleTexturedVerts(bitmap Target, const bitmap Texture, vertex A, vertex B, vertex C);
 
 void Draw_QuadVerts(bitmap Target, color Color, vertex A, vertex B, vertex C, vertex D);
-void Draw_QuadTexturedVerts(bitmap Target, bitmap Texture, vertex A, vertex B, vertex C, vertex D);
+void Draw_QuadTexturedVerts(bitmap Target, const bitmap Texture, vertex A, vertex B, vertex C, vertex D);
 
 
 #define Draw_Point(BUFFER, COLOR, X, ...) _Generic((X), \
@@ -100,14 +100,13 @@ void Draw_QuadTexturedVerts(bitmap Target, bitmap Texture, vertex A, vertex B, v
         i8: Draw_TriangleInt, i16: Draw_TriangleInt, i32: Draw_TriangleInt, i64: Draw_TriangleInt, \
         u8: Draw_TriangleInt, u16: Draw_TriangleInt, u32: Draw_TriangleInt, u64: Draw_TriangleInt \
     ), \
-    bitmap: _Generic((X), \
-        vertex: Draw_TriangleTexturedVerts \
-    ) \
+    bitmap: Draw_TriangleTexturedVerts, \
+    const bitmap: Draw_TriangleTexturedVerts \
 )(BUFFER, COLOR, X, __VA_ARGS__)
 
 
 #define Draw_QuadColor(BUFFER, COLOR, X, ...) _Generic((X), \
-    vertex: Draw_QuadVerts \
+    vertex: Draw_QuadVerts, \
 )(BUFFER, COLOR, X, __VA_ARGS__)
 
 #define Draw_QuadTextured(BUFFER, COLOR, X, ...) _Generic((X), \
@@ -115,12 +114,9 @@ void Draw_QuadTexturedVerts(bitmap Target, bitmap Texture, vertex A, vertex B, v
 )(BUFFER, COLOR, X, __VA_ARGS__)
 
 #define Draw_Quad(BUFFER, COLOR, X, ...) _Generic((COLOR), \
-    color:  _Generic((X), \
-        vertex: Draw_QuadVerts\
-    ), \
-    bitmap: _Generic((X), \
-        vertex: Draw_QuadTexturedVerts \
-    ) \
+    color: Draw_QuadVerts, \
+    bitmap: Draw_QuadTexturedVerts, \
+    const bitmap: Draw_QuadTexturedVerts \
 )(BUFFER, COLOR, X, __VA_ARGS__)
 
 
@@ -422,14 +418,14 @@ void Draw_RectInt(bitmap Target, color Color, i32 X, i32 Y, i32 W, i32 H)
 
 
 
-void Draw_Bitmap(bitmap Target, bitmap Bitmap, i32 X, i32 Y)
+void Draw_Bitmap(bitmap Target, const bitmap Bitmap, i32 X, i32 Y)
 {
     bitmap Src = Bitmap_Section(Bitmap,-X,-Y, Target.Width, Target.Height);
     bitmap Dst = Bitmap_Section(Target, X, Y, Bitmap.Width, Bitmap.Height);
     Bitmap_Blit(Dst, Src);
 }
 
-void Draw_String(bitmap Target, bitmap Font, color Color, i32 X, i32 Y, const char *String)
+void Draw_String(bitmap Target, const bitmap Font, color Color, i32 X, i32 Y, const char *String)
 {
     i32 XX = X;
     i32 CW = Font.Width / 8;
