@@ -31,7 +31,7 @@ void Game_Init( game *Game)
     Game->Image = Win32_LoadBitmap("IMAGE");
     Game->Font = Win32_LoadBitmap("FONT");
 
-    Camera_SetPosition(&Game->Camera, (vec3) { 0,0,-1.0f });
+    Camera_SetPosition(&Game->Camera, (vec3) { 0,1.0f,-1.0f });
     Camera_SetRotation(&Game->Camera, 0.0f, -0.78539816339f * 0.75f);
 }
 
@@ -39,12 +39,48 @@ void Game_Update(game *Game, const input Input)
 {
     camera* Camera = &Game->Camera;
 
-    Camera_SetRotation(Camera, Camera->Yaw + 0.025f, Camera->Pitch);
+    Camera_SetRotation(Camera, Camera->Yaw , Camera->Pitch);
+
     vec3 Forward = Camera_Forward(*Camera);
-    Forward.x = -1.5f * Forward.x;
-    Forward.y = -1.5f * Forward.y;
-    Forward.z = -1.5f * Forward.z;
-    Camera_SetPosition(Camera, Forward);
+    vec3 OldCameraPosition = Camera->Position;
+    vec3 NewCameraPosition = Camera->Position;
+
+    f32 Speed = 0.1f;
+    f32 TurnSpeed = 0.02f;
+
+    if (Input.MoveUp) {
+        NewCameraPosition.x += Forward.x * Speed;
+        NewCameraPosition.y += Forward.y * Speed;
+        NewCameraPosition.z += Forward.z * Speed;
+    }
+    if (Input.MoveDown) {
+        NewCameraPosition.x -= Forward.x * Speed;
+        NewCameraPosition.y -= Forward.y * Speed;
+        NewCameraPosition.z -= Forward.z * Speed;
+    }
+    if (Input.MoveRight) {
+        NewCameraPosition.x += Forward.z * Speed;
+        NewCameraPosition.z += -Forward.x * Speed;
+    }
+    if (Input.MoveLeft) {
+        NewCameraPosition.x += -Forward.z * Speed;
+        NewCameraPosition.z += Forward.x * Speed;
+    }
+    if (Input.LookUp) {
+        Camera->Pitch += TurnSpeed;
+    }
+    if (Input.LookDown) {
+        Camera->Pitch -= TurnSpeed;
+    }
+    if (Input.LookRight) {
+        Camera->Yaw += TurnSpeed;
+    }
+    if (Input.LookLeft) {
+        Camera->Yaw -= TurnSpeed;
+    }
+
+
+    Camera_SetPosition(Camera, NewCameraPosition);
 }
 void Game_Draw(const game *Game, bitmap Buffer)
 {
@@ -54,20 +90,36 @@ void Game_Draw(const game *Game, bitmap Buffer)
     bitmap GrasSide = Bitmap_Section(Game->Image, 16, 0, 16, 16);
     bitmap GrasBottom = Bitmap_Section(Game->Image, 32, 0, 16, 16);
 
-    vec3 BlockOffsets[] = {
-        { 1, 0, 1 },
-        { 0, 0, 0 },
-        { 0, 0, 1 },
-        { 0, 1, 0 },
-    };
-    i32 BlockOffsetsCount = sizeof(BlockOffsets) / sizeof(BlockOffsets[0]);
+    world_chunk* TestChunk = Game->World.Region.Chunks;
 
-    SortBlockDistances(Game->Camera, BlockOffsets, BlockOffsetsCount);
+    vec3 Offsets[16][16] = { 0 };
 
-    for (i32 i = 0; i < BlockOffsetsCount; i++)
+    for (i32 x = 0; x < 16; x++)
     {
-        Draw_GrasBlock(Game->Camera, Buffer, GrasTop, GrasSide, GrasBottom, BlockOffsets[i]);
+        for (i32 z = 0; z < 16; z++)
+        {
+            TestChunk->Blocks[x][z]->Position = (vec3){x,0,z};
+        }
     }
+
+    for (i32 x = 0; x < 16; x++)
+    {
+        for (i32 z = 0; z < 16; z++)
+        {
+            Offsets[x][z] = TestChunk->Blocks[x][z]->Position;
+        }
+    }
+
+    SortBlockDistances(Game->Camera, Offsets, 256);
+
+    for (i32 x = 0; x < 16; x++)
+    {
+        for (i32 z = 0; z < 16; z++)
+        {
+            Draw_GrasBlock(Game->Camera, Buffer, GrasTop, GrasSide, GrasBottom, Offsets[x][z]);
+        }
+    }
+
 
     Draw_String(Buffer, Game->Font, COLOR_WHITE, 32, 32, "ASFIDJH\nasdasd");
     

@@ -1,7 +1,12 @@
 
+typedef struct Block
+{
+    vec3 Position;
+}Block;
+
 typedef struct world_chunk
 {
-    u8 Blocks[16][16][256];
+    Block Blocks[16][16][256];
 } world_chunk;
 
 typedef struct world_region
@@ -14,10 +19,11 @@ typedef struct entity
     f32 x, y, z;
 } entity;
 
+
+
 typedef struct world
 {
     entity Entities[256];
-
     world_region Region;
 } world;
 
@@ -42,7 +48,7 @@ void Draw_GrasBlock(const camera Camera, const bitmap Target,
     vertex V1 = { .TexCoord.u = 16.0f, .TexCoord.v =  0.0f };
     vertex V2 = { .TexCoord.u = 16.0f, .TexCoord.v = 16.0f };
     vertex V3 = { .TexCoord.u =  0.0f, .TexCoord.v = 16.0f };
-
+    
     V0.Position = Corners[2];
     V1.Position = Corners[3];
     V2.Position = Corners[7];
