@@ -733,10 +733,6 @@ inline void Draw__TriangleTexturedVerts3DInternal(bitmap Target, const bitmap Te
 
 inline void Draw__TriangleVerts2D(bitmap Target, const color Color, vertex A, vertex B, vertex C, rect Clip)
 {
-    f32 miny = Clip.y;
-    f32 maxy = Clip.y + Clip.h;
-    if ((A.Position.y > maxy) || (C.Position.y < miny)) return;
-
     const f32 invdy02 = 1.0f / (C.Position.y - A.Position.y);
     const f32 dx02_dy = (C.Position.x - A.Position.x) * invdy02;
 
@@ -756,7 +752,7 @@ inline void Draw__TriangleVerts2D(bitmap Target, const color Color, vertex A, ve
     }
 
     // top triangle
-    if (B.Position.y < maxy)
+    if (B.Position.y < Clip.y + Clip.h)
     {
         const f32 invdy12 = 1.0f / (C.Position.y - B.Position.y);
         const f32 dx12_dy = (C.Position.x - B.Position.x) * invdy12;
@@ -775,16 +771,12 @@ inline void Draw__TriangleVerts2D(bitmap Target, const color Color, vertex A, ve
 
 inline void Draw__TriangleVerts3D(bitmap Target, const color Color, vertex A, vertex B, vertex C, const rect Clip)
 {
-    f32 miny = Clip.y;
-    f32 maxy = Clip.y + Clip.h;
-    if ((A.Position.y > maxy) || (C.Position.y < miny)) return;
-
     const f32 d1_dy02 = 1.0f / (C.Position.y - A.Position.y);
     const f32 dx02_dy = (C.Position.x - A.Position.x) * d1_dy02;
     const f32 d1_dyz02 = (1.0f / C.Position.z - 1.0f / A.Position.z) * d1_dy02;
 
     // bottom triangle
-    if (B.Position.y > miny)
+    if (B.Position.y > Clip.y)
     {
         const f32 d1_dy01 = 1.0f / (B.Position.y - A.Position.y);
         const f32 dx01_dy = (B.Position.x - A.Position.x) * d1_dy01;
@@ -804,7 +796,7 @@ inline void Draw__TriangleVerts3D(bitmap Target, const color Color, vertex A, ve
     }
 
     // top triangle
-    if (B.Position.y < maxy)
+    if (B.Position.y < Clip.y + Clip.h)
     {
         const f32 d1_dy12 = 1.0f / (C.Position.y - B.Position.y);
         const f32 dx12_dy = (C.Position.x - B.Position.x) * d1_dy12;
@@ -830,17 +822,13 @@ inline void Draw__TriangleVerts3D(bitmap Target, const color Color, vertex A, ve
 
 inline void Draw__TriangleTexturedVerts2D(bitmap Target, const bitmap Texture, vertex A, vertex B, vertex C, const rect Clip)
 {
-    f32 miny = Clip.y;
-    f32 maxy = Clip.y + Clip.h;
-    if ((A.Position.y > maxy) || (C.Position.y < miny)) return;
-
     const f32 invdy02 = 1.0f / (C.Position.y - A.Position.y);
     const f32 dx02dy = (C.Position.x - A.Position.x) * invdy02;
     const f32 du02dy = (C.TexCoord.u - A.TexCoord.u) * invdy02;
     const f32 dv02dy = (C.TexCoord.v - A.TexCoord.v) * invdy02;
 
     // bottom triangle
-    if (B.Position.y > miny)
+    if (B.Position.y > Clip.y)
     {
         const f32 invdy01 = 1.0f / (B.Position.y - A.Position.y);
         const f32 dx01dy = (B.Position.x - A.Position.x) * invdy01;
@@ -864,7 +852,7 @@ inline void Draw__TriangleTexturedVerts2D(bitmap Target, const bitmap Texture, v
     }
 
     // top triangle
-    if (B.Position.y < maxy)
+    if (B.Position.y < Clip.y + Clip.h)
     {
         const f32 invdy12 = 1.0f / (C.Position.y - B.Position.y);
         const f32 dx12dy = (C.Position.x - B.Position.x) * invdy12;
@@ -893,10 +881,6 @@ inline void Draw__TriangleTexturedVerts2D(bitmap Target, const bitmap Texture, v
 
 inline void Draw__TriangleTexturedVerts3D(bitmap Target, const bitmap Texture, vertex A, vertex B, vertex C, const rect Clip)
 {
-    f32 miny = Clip.y;
-    f32 maxy = Clip.y + Clip.h;
-    if ((A.Position.y > maxy) || (C.Position.y < miny)) return;
-
     const f32 d1_dy02 = 1.0f / (C.Position.y - A.Position.y);
     const f32 dx02_dy = (C.Position.x - A.Position.x) * d1_dy02;
     const f32 d1_dyz02 = (1.0f / C.Position.z - 1.0f / A.Position.z) * d1_dy02;
@@ -904,7 +888,7 @@ inline void Draw__TriangleTexturedVerts3D(bitmap Target, const bitmap Texture, v
     const f32 dv02_dyz02 = (C.TexCoord.v / C.Position.z - A.TexCoord.v / A.Position.z) * d1_dy02;
 
     // bottom triangle
-    if (B.Position.y > miny)
+    if (B.Position.y > Clip.y)
     {
         const f32 d1_dy01 = 1.0f / (B.Position.y - A.Position.y);
         const f32 dx01_dy = (B.Position.x - A.Position.x) * d1_dy01;
@@ -932,7 +916,7 @@ inline void Draw__TriangleTexturedVerts3D(bitmap Target, const bitmap Texture, v
     }
 
     // top triangle
-    if (B.Position.y < maxy)
+    if (B.Position.y < Clip.y + Clip.h)
     {
         const f32 d1_dy12 = 1.0f / (C.Position.y - B.Position.y);
         const f32 dx12_dy = (C.Position.x - B.Position.x) * d1_dy12;
@@ -966,21 +950,34 @@ inline void Draw__TriangleTexturedVerts3D(bitmap Target, const bitmap Texture, v
     }
 }
 
-inline bool Draw__PrepareTriangleVerts(vertex *A, vertex *B, vertex *C)
+inline bool Draw__TriangleVisible(vertex A, vertex B, vertex C, rect Clip)
 {
     // triangle winding order
-    f32 Cross = (B->Position.x - A->Position.x) * (C->Position.y - A->Position.y) - 
-                (B->Position.y - A->Position.y) * (C->Position.x - A->Position.x);
+    f32 Cross = (B.Position.x - A.Position.x) * (C.Position.y - A.Position.y) - 
+                (B.Position.y - A.Position.y) * (C.Position.x - A.Position.x);
     if (Cross < 0.0f) return false;
 
-    // move pixel center
-    A->Position.x -= 0.5f;
-    A->Position.y -= 0.5f;
-    B->Position.x -= 0.5f;
-    B->Position.y -= 0.5f;
-    C->Position.x -= 0.5f;
-    C->Position.y -= 0.5f;
+    // triangle offscreen left
+    if (Max(Max(A.Position.x, B.Position.x), C.Position.x) < Clip.x)
+        return false;
+    
+    // triangle offscreen right
+    if (Min(Min(A.Position.x, B.Position.x), C.Position.x) > Clip.x + Clip.w)
+        return false;
 
+     // triangle offscreen bottom
+    if (Max(Max(A.Position.y, B.Position.y), C.Position.y) < Clip.y)
+        return false;
+
+    // triangle offscreen top
+    if (Min(Min(A.Position.y, B.Position.y), C.Position.y) > Clip.y + Clip.h)
+        return false;
+
+    return true;
+}
+
+inline void Draw__PrepareTriangleVerts(vertex *A, vertex *B, vertex *C)
+{
     // sort vertices vertically
     if (A->Position.y > B->Position.y)
     {
@@ -1000,7 +997,13 @@ inline bool Draw__PrepareTriangleVerts(vertex *A, vertex *B, vertex *C)
         }
     }
 
-    return true;
+    // move pixel center
+    A->Position.x -= 0.5f;
+    A->Position.y -= 0.5f;
+    B->Position.x -= 0.5f;
+    B->Position.y -= 0.5f;
+    C->Position.x -= 0.5f;
+    C->Position.y -= 0.5f;
 }
 
 inline bool Draw__TriangleClipZ(vertex A, vertex B, vertex C)
@@ -1017,7 +1020,9 @@ void Draw_TriangleVerts(bitmap Target, const color Color, vertex A, vertex B, ve
 {
     rect Clip = (rect){ .x = 0.0f, .y = 0.0f, .w = (f32)Target.Width, .h = (f32)Target.Height };
 
-    if (!Draw__PrepareTriangleVerts(&A, &B, &C)) return;
+    if (!Draw__TriangleVisible(A, B, C, Clip)) return;
+    
+    Draw__PrepareTriangleVerts(&A, &B, &C);
 
     if ((A.Position.z == B.Position.z) && (B.Position.z  == C.Position.z) && (A.Position.z >= 0.0f))
     {
@@ -1034,7 +1039,9 @@ void Draw_TriangleTexturedVerts(bitmap Target, const bitmap Texture, vertex A, v
 {
     rect Clip = (rect){ .x = 0.0f, .y = 0.0f, .w = (f32)Target.Width, .h = (f32)Target.Height };
 
-    if (!Draw__PrepareTriangleVerts(&A, &B, &C)) return;
+    if (!Draw__TriangleVisible(A, B, C, Clip)) return;
+    
+    Draw__PrepareTriangleVerts(&A, &B, &C);
 
     if ((A.Position.z == B.Position.z) && (B.Position.z  == C.Position.z) && (A.Position.z >= 0.0f))
     {

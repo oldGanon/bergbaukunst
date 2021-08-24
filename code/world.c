@@ -22,17 +22,17 @@ typedef struct world
 } world;
 
 void Draw_GrasBlock(const camera Camera, const bitmap Target, 
-                    const bitmap Top, const bitmap Side, const bitmap Bottom,const vec3 point_middle)
+                    const bitmap Top, const bitmap Side, const bitmap Bottom,const vec3 BlockCenter)
 {
     vec3 Corners[8] = {
-        { .x = -0.5f+point_middle.x, .y = -0.5f + point_middle.y, .z = -0.5f + point_middle.z },
-        { .x = +0.5f + point_middle.x, .y = -0.5f + point_middle.y, .z = -0.5f + point_middle.z},
-        { .x = -0.5f + point_middle.x, .y = +0.5f + point_middle.y, .z = -0.5f + point_middle.z},
-        { .x = +0.5f + point_middle.x, .y = +0.5f + point_middle.y, .z = -0.5f + point_middle.z},
-        { .x = -0.5f + point_middle.x, .y = -0.5f + point_middle.y, .z = +0.5f + point_middle.z},
-        { .x = +0.5f + point_middle.x, .y = -0.5f + point_middle.y, .z = +0.5f + point_middle.z},
-        { .x = -0.5f + point_middle.x, .y = +0.5f + point_middle.y, .z = +0.5f + point_middle.z},
-        { .x = +0.5f + point_middle.x, .y = +0.5f + point_middle.y, .z = +0.5f + point_middle.z},
+        { .x = -0.5f + BlockCenter.x, .y = -0.5f + BlockCenter.y, .z = -0.5f + BlockCenter.z },
+        { .x = +0.5f + BlockCenter.x, .y = -0.5f + BlockCenter.y, .z = -0.5f + BlockCenter.z },
+        { .x = -0.5f + BlockCenter.x, .y = +0.5f + BlockCenter.y, .z = -0.5f + BlockCenter.z },
+        { .x = +0.5f + BlockCenter.x, .y = +0.5f + BlockCenter.y, .z = -0.5f + BlockCenter.z },
+        { .x = -0.5f + BlockCenter.x, .y = -0.5f + BlockCenter.y, .z = +0.5f + BlockCenter.z },
+        { .x = +0.5f + BlockCenter.x, .y = -0.5f + BlockCenter.y, .z = +0.5f + BlockCenter.z },
+        { .x = -0.5f + BlockCenter.x, .y = +0.5f + BlockCenter.y, .z = +0.5f + BlockCenter.z },
+        { .x = +0.5f + BlockCenter.x, .y = +0.5f + BlockCenter.y, .z = +0.5f + BlockCenter.z },
     };
 
     for (u32 i = 0; i < 8; ++i)
