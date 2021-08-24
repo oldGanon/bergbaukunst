@@ -80,32 +80,39 @@ void Draw_GrasBlock(const camera Camera, const bitmap Target,
     Draw_Quad(Target, Bottom, V0, V1, V2, V3);
 }
 
-void SortBlockDistances(camera cam,vec3* offsets,i32 len) 
+void SortBlockDistances(camera Cammera, vec3 *Offsets, i32 Length) 
 {
-    f32* distance = malloc(sizeof(f32) * len);
+    f32 *DistancesSquared = malloc(sizeof(f32) * Length);
 
-    for (int i = 0; i < len; i++)
+    for (i32 i = 0; i < Length; i++)
     {
-        vec3 campos = { cam.Position.x, cam.Position.y,cam.Position.z };
-        vec3 playertoblockvec = { (*(offsets+i)).x - campos.x,(*(offsets + i)).y - campos.y, (*(offsets + i)).z - campos.z };
-        distance[i] = playertoblockvec.x * playertoblockvec.x + playertoblockvec.y * playertoblockvec.y + playertoblockvec.z * playertoblockvec.z;
+        vec3 PlayerToBlock = {
+            Offsets[i].x - Cammera.Position.x,
+            Offsets[i].y - Cammera.Position.y,
+            Offsets[i].z - Cammera.Position.z
+        };
+        DistancesSquared[i] = PlayerToBlock.x * PlayerToBlock.x + 
+                              PlayerToBlock.y * PlayerToBlock.y +
+                              PlayerToBlock.z * PlayerToBlock.z;
     }
-    for (int j = 0; j <= len-1; j++)
+
+    for (i32 j = 0; j <= Length - 1; j++)
     {
-        for (int i = 0; i <= len - 1; i++)
+        for (i32 i = 0; i <= Length - 1; i++)
         {
-            f32 dis = *(distance + i);
-            if (*(distance+i) < *(distance+i+1))
+            f32 Distance = DistancesSquared[i];
+            if (DistancesSquared[i] < DistancesSquared[i+1])
             {
-                f32 temp = *(distance + i);
-                *(distance + i) = *(distance + i+1);
-                *(distance + i+1) = temp;
-                vec3 temp2 = *(offsets+i);
-                *(offsets + i) = *(offsets + i+1);
-                *(offsets + i+1) = temp2;
+                f32 TempDistance = DistancesSquared[i];
+                DistancesSquared[i] = DistancesSquared[i+1];
+                DistancesSquared[i+1] = TempDistance;
+
+                vec3 TempOffset = Offsets[i];
+                Offsets[i] = Offsets[i+1];
+                Offsets[i+1] = TempOffset;
             }
         }
     }
-    free(distance);
 
+    free(DistancesSquared);
 }

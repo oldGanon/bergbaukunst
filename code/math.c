@@ -40,6 +40,7 @@ inline f32 Sign(f32 n)   { return _mm_cvtss_f32(_mm_or_ps(_mm_and_ps(_mm_set_ss(
 inline f32 Negate(f32 n) { return _mm_cvtss_f32(_mm_xor_ps(_mm_set_ss(n), _mm_set_ss(-0.0f))); }
 inline f32 Min(f32 A, f32 B) { return _mm_cvtss_f32(_mm_min_ps(_mm_set_ss(A), _mm_set_ss(B))); }
 inline f32 Max(f32 A, f32 B) { return _mm_cvtss_f32(_mm_max_ps(_mm_set_ss(A), _mm_set_ss(B))); }
+inline f32 Sqrt(f32 n) { return _mm_cvtss_f32(_mm_sqrt_ps(_mm_set_ss(n)));}
 inline f32 Clamp(f32 A, f32 min, f32 max) { return Min(Max(A, min), max); }
 inline f32 Lerp(f32 A, f32 B, f32 t) { return (1.0f-t)*A + t*B; }
 inline f32 Fract(f32 n) { return n - Floor(n); }
