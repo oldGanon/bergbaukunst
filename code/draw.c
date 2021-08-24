@@ -444,6 +444,17 @@ void Draw_String(bitmap Target, const bitmap Font, color Color, i32 X, i32 Y, co
 
 
 
+inline vertex Vertex_Lerp(vertex A, vertex B, f32 t)
+{
+    A.Position.x = Lerp(A.Position.x, B.Position.x, t);
+    A.Position.y = Lerp(A.Position.y, B.Position.y, t);
+    A.Position.z = Lerp(A.Position.z, B.Position.z, t);
+    A.TexCoord.x = Lerp(A.TexCoord.x, B.TexCoord.x, t);
+    A.TexCoord.y = Lerp(A.TexCoord.y, B.TexCoord.y, t);
+    A.Shadow = Lerp(A.Shadow, B.Shadow, t);
+    return A;
+}
+
 // struct tri_grad
 // {
 //     f32 t, dt_dy;
@@ -574,6 +585,9 @@ inline void Draw__TriangleTexturedVerts2DInternal(bitmap Target, const bitmap Te
     const f32 maxx = Clip.x + Clip.w;
     const f32 maxy = Clip.y + Clip.h;
 
+    const i32 umask = Texture.Width - 1;
+    const i32 vmask = Texture.Height - 1;
+
     const f32 invdx = 1.0f / (dx1_dy - dx0_dy);
     const f32 du_dx = (du1_dy - du0_dy) * invdx;
     const f32 dv_dx = (dv1_dy - dv0_dy) * invdx;
@@ -620,8 +634,8 @@ inline void Draw__TriangleTexturedVerts2DInternal(bitmap Target, const bitmap Te
         
         while (width-- > 0)
         {
-            const i32 iu = Floor_toInt(u);
-            const i32 iv = Floor_toInt(v);
+            const i32 iu = Floor_toInt(u) & umask;
+            const i32 iv = Floor_toInt(v) & vmask;
             color Color = *(Texture.Pixels + Texture.Pitch * iv + iu);
             if (Color.Value) *Dst = Color;
 
@@ -1006,32 +1020,94 @@ inline void Draw__PrepareTriangleVerts(vertex *A, vertex *B, vertex *C)
     C->Position.y -= 0.5f;
 }
 
-inline bool Draw__TriangleClipZ(vertex A, vertex B, vertex C)
+inline u32 Draw__TriangleClipZ(vertex *V)
 {
-    // TODO: proper clipping
+#if 1
+#define CAMERA_NEAR 0.0001f
+    vertex T;
+    u32 Z = ((V[0].Position.z < CAMERA_NEAR) ? 1 : 0) |
+            ((V[1].Position.z < CAMERA_NEAR) ? 2 : 0) |
+            ((V[2].Position.z < CAMERA_NEAR) ? 4 : 0);
+    switch (Z)
+    {
+        case 0: return 1;
+        
+        case 4: T = V[0]; V[0] = V[1]; V[1] = V[2]; V[2] = T;
+        case 2: T = V[0]; V[0] = V[1]; V[1] = V[2]; V[2] = T;
+        case 1:
+        {
+            f32 t01 = (CAMERA_NEAR - V[0].Position.z) / (V[1].Position.z - V[0].Position.z);
+            f32 t02 = (CAMERA_NEAR - V[0].Position.z) / (V[2].Position.z - V[0].Position.z);
+            vertex V01 = Vertex_Lerp(V[0], V[1], t01);
+            vertex V02 = Vertex_Lerp(V[0], V[2], t02);
+            V[0] = V01; V[3] = V[2]; V[4] = V02; V[5] = V01;
+            return 2;
+        }
+        
+        case 3: T = V[0]; V[0] = V[1]; V[1] = V[2]; V[2] = T;
+        case 5: T = V[0]; V[0] = V[1]; V[1] = V[2]; V[2] = T;
+        case 6:
+        {
+            f32 t01 = (CAMERA_NEAR - V[0].Position.z) / (V[1].Position.z - V[0].Position.z);
+            f32 t02 = (CAMERA_NEAR - V[0].Position.z) / (V[2].Position.z - V[0].Position.z);
+            V[1] = Vertex_Lerp(V[0], V[1], t01);
+            V[2] = Vertex_Lerp(V[0], V[2], t02);
+            return 1;
+        }
+        
+        case 7: return 0;
+    }
+    return 0;
+#else
 
     if (A.Position.z <= 0 || B.Position.z <= 0 || C.Position.z <= 0)
-        return false;
+        return 0;
 
-    return true;
+    Out[0] = A;
+    Out[1] = B;
+    Out[2] = C;
+
+    return 1;
+#endif
+}
+
+inline vec3 Draw__PerspectiveDivide(bitmap Target, vec3 Position)
+{
+    f32 HalfWidth = Target.Width * 0.5f;
+    f32 HalfHeight = Target.Height * 0.5f;
+    Position.x = (Position.x - HalfWidth) / Position.z + HalfWidth;
+    Position.y = (Position.y - HalfHeight) / Position.z + HalfHeight;
+    return Position;
 }
 
 void Draw_TriangleVerts(bitmap Target, const color Color, vertex A, vertex B, vertex C)
 {
     rect Clip = (rect){ .x = 0.0f, .y = 0.0f, .w = (f32)Target.Width, .h = (f32)Target.Height };
 
-    if (!Draw__TriangleVisible(A, B, C, Clip)) return;
-    
-    Draw__PrepareTriangleVerts(&A, &B, &C);
 
-    if ((A.Position.z == B.Position.z) && (B.Position.z  == C.Position.z) && (A.Position.z >= 0.0f))
+    if ((A.Position.z == B.Position.z) && (B.Position.z == C.Position.z))
     {
+        if (A.Position.z < 0.0f) return;
+
+        if (!Draw__TriangleVisible(A, B, C, Clip)) return;
+        Draw__PrepareTriangleVerts(&A, &B, &C);
         Draw__TriangleVerts2D(Target, Color, A, B, C, Clip);
     }
     else
     {
-        if (!Draw__TriangleClipZ(A, B, C)) return;
-        Draw__TriangleVerts3D(Target, Color, A, B, C, Clip);
+        vertex Vertices[6] = { A, B, C };
+        u32 TriangleCount = Draw__TriangleClipZ(Vertices);
+        for (u32 i = 0; i < TriangleCount; ++i)
+        {
+            vertex *V = Vertices + (i * 3);
+            V[0].Position = Draw__PerspectiveDivide(Target, V[0].Position);
+            V[1].Position = Draw__PerspectiveDivide(Target, V[1].Position);
+            V[2].Position = Draw__PerspectiveDivide(Target, V[2].Position);
+
+            if (!Draw__TriangleVisible(V[0], V[1], V[2], Clip)) return;
+            Draw__PrepareTriangleVerts(&V[0], &V[1], &V[2]);
+            Draw__TriangleVerts3D(Target, Color, V[0], V[1], V[2], Clip);
+        }
     }
 }
 
@@ -1039,18 +1115,29 @@ void Draw_TriangleTexturedVerts(bitmap Target, const bitmap Texture, vertex A, v
 {
     rect Clip = (rect){ .x = 0.0f, .y = 0.0f, .w = (f32)Target.Width, .h = (f32)Target.Height };
 
-    if (!Draw__TriangleVisible(A, B, C, Clip)) return;
-    
-    Draw__PrepareTriangleVerts(&A, &B, &C);
-
-    if ((A.Position.z == B.Position.z) && (B.Position.z  == C.Position.z) && (A.Position.z >= 0.0f))
+    if ((A.Position.z == B.Position.z) && (B.Position.z == C.Position.z))
     {
+        if (A.Position.z < 0.0f) return;
+        
+        if (!Draw__TriangleVisible(A, B, C, Clip)) return;
+        Draw__PrepareTriangleVerts(&A, &B, &C);
         Draw__TriangleTexturedVerts2D(Target, Texture, A, B, C, Clip);
     }
     else
     {
-        if (!Draw__TriangleClipZ(A, B, C)) return;
-        Draw__TriangleTexturedVerts3D(Target, Texture, A, B, C, Clip);
+        vertex Vertices[6] = { A, B, C };
+        u32 TriangleCount = Draw__TriangleClipZ(Vertices);
+        for (u32 i = 0; i < TriangleCount; ++i)
+        {
+            vertex *V = Vertices + (i * 3);
+            V[0].Position = Draw__PerspectiveDivide(Target, V[0].Position);
+            V[1].Position = Draw__PerspectiveDivide(Target, V[1].Position);
+            V[2].Position = Draw__PerspectiveDivide(Target, V[2].Position);
+
+            if (!Draw__TriangleVisible(V[0], V[1], V[2], Clip)) return;
+            Draw__PrepareTriangleVerts(&V[0], &V[1], &V[2]);
+            Draw__TriangleTexturedVerts3D(Target, Texture, V[0], V[1], V[2], Clip);
+        }
     }
 }
 

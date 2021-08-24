@@ -35,11 +35,11 @@ vec3 Camera_Forward(const camera Camera)
 
 vec3 CameraToScreen(const bitmap Screen, vec3 Position)
 {
-    f32 Width = Screen.Width * 0.5f;
-    f32 Height = Screen.Height * 0.5f;
-    f32 MinDim = Min(Width, Height);
-    Position.x = (Position.x / Position.z) * MinDim + Width;
-    Position.y = (Position.y / Position.z) * MinDim + Height;
+    f32 HalfWidth = Screen.Width * 0.5f;
+    f32 HalfHeight = Screen.Height * 0.5f;
+    f32 MinDim = Min(HalfWidth, HalfHeight);
+    Position.x = Position.x * MinDim + HalfWidth;
+    Position.y = Position.y * MinDim + HalfHeight;
 
     return Position;
 }
