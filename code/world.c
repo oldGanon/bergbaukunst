@@ -28,7 +28,7 @@ typedef struct world
 } world;
 
 void Draw_GrasBlock(const camera Camera, const bitmap Target, 
-                    const bitmap Top, const bitmap Side, const bitmap Bottom,const vec3 BlockCenter)
+                    const bitmap Top, const bitmap Side, const bitmap Bottom, const vec3 BlockCenter)
 {
     vec3 Corners[8] = {
         { .x = -0.5f + BlockCenter.x, .y = -0.5f + BlockCenter.y, .z = -0.5f + BlockCenter.z },

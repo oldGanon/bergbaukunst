@@ -26,13 +26,22 @@ typedef struct input
     u8 LookRight;
 } input;
 
-void Game_Init( game *Game)
+void Game_Init(game *Game)
 {
     Game->Image = Win32_LoadBitmap("IMAGE");
     Game->Font = Win32_LoadBitmap("FONT");
 
     Camera_SetPosition(&Game->Camera, (vec3) { 0,1.0f,-1.0f });
     Camera_SetRotation(&Game->Camera, 0.0f, -0.78539816339f * 0.75f);
+
+    world_chunk* TestChunk = &Game->World.Region.Chunks[0][0];
+    for (i32 x = 0; x < 16; x++)
+    {
+        for (i32 z = 0; z < 16; z++)
+        {
+            TestChunk->Blocks[x][z]->Position = (vec3){ (f32)x, 0, (f32)z };
+        }
+    }
 }
 
 void Game_Update(game *Game, const input Input)
@@ -42,7 +51,7 @@ void Game_Update(game *Game, const input Input)
     Camera_SetRotation(Camera, Camera->Yaw , Camera->Pitch);
 
     vec3 Forward = Camera_Forward(*Camera);
-    vec3 OldCameraPosition = Camera->Position;
+    vec3 Right = Camera_Right(*Camera);
     vec3 NewCameraPosition = Camera->Position;
 
     f32 Speed = 0.1f;
@@ -59,12 +68,12 @@ void Game_Update(game *Game, const input Input)
         NewCameraPosition.z -= Forward.z * Speed;
     }
     if (Input.MoveRight) {
-        NewCameraPosition.x += Forward.z * Speed;
-        NewCameraPosition.z += -Forward.x * Speed;
+        NewCameraPosition.x += Right.x * Speed;
+        NewCameraPosition.z += Right.z * Speed;
     }
     if (Input.MoveLeft) {
-        NewCameraPosition.x += -Forward.z * Speed;
-        NewCameraPosition.z += Forward.x * Speed;
+        NewCameraPosition.x -= Right.x * Speed;
+        NewCameraPosition.z -= Right.z * Speed;
     }
     if (Input.LookUp) {
         Camera->Pitch += TurnSpeed;
@@ -90,36 +99,21 @@ void Game_Draw(const game *Game, bitmap Buffer)
     bitmap GrasSide = Bitmap_Section(Game->Image, 16, 0, 16, 16);
     bitmap GrasBottom = Bitmap_Section(Game->Image, 32, 0, 16, 16);
 
-    world_chunk* TestChunk = Game->World.Region.Chunks;
-
-    vec3 Offsets[16][16] = { 0 };
-
+    vec3 Offsets[256] = { 0 };
     for (i32 x = 0; x < 16; x++)
     {
         for (i32 z = 0; z < 16; z++)
         {
-            TestChunk->Blocks[x][z]->Position = (vec3){x,0,z};
-        }
-    }
-
-    for (i32 x = 0; x < 16; x++)
-    {
-        for (i32 z = 0; z < 16; z++)
-        {
-            Offsets[x][z] = TestChunk->Blocks[x][z]->Position;
+            Offsets[16 * x + z] = Game->World.Region.Chunks[0][0].Blocks[x][z][0].Position;
         }
     }
 
     SortBlockDistances(Game->Camera, Offsets, 256);
 
-    for (i32 x = 0; x < 16; x++)
+    for (i32 i = 0; i < 256; i++)
     {
-        for (i32 z = 0; z < 16; z++)
-        {
-            Draw_GrasBlock(Game->Camera, Buffer, GrasTop, GrasSide, GrasBottom, Offsets[x][z]);
-        }
+        Draw_GrasBlock(Game->Camera, Buffer, GrasTop, GrasSide, GrasBottom, Offsets[i]);
     }
-
 
     Draw_String(Buffer, Game->Font, COLOR_WHITE, 32, 32, "ASFIDJH\nasdasd");
     

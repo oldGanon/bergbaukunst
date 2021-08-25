@@ -24,13 +24,19 @@ void Camera_SetRotation(camera *Camera, f32 Yaw, f32 Pitch)
 
 vec3 Camera_Forward(const camera Camera)
 {
-    vec3 Forward = { 0 };
-    
-    Forward.x = Camera.SinYaw * Camera.CosPitch;
-    Forward.y = Camera.SinPitch;
-    Forward.z = Camera.CosPitch * Camera.CosYaw;
+    return (vec3) {
+        .x = Camera.SinYaw * Camera.CosPitch,
+        .y = Camera.SinPitch,
+        .z = Camera.CosPitch * Camera.CosYaw,
+    };
+}
 
-    return Forward;
+vec3 Camera_Right(const camera Camera)
+{
+    return (vec3) {
+        .x = Camera.CosYaw,
+        .z = -Camera.SinYaw,
+    };
 }
 
 vec3 CameraToScreen(const bitmap Screen, vec3 Position)
