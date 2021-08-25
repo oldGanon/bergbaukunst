@@ -176,7 +176,7 @@
       <RemoveUnreferencedCodeData />
       <CompileAs>CompileAsC</CompileAs>
       <UseFullPaths />
-      <CallingConvention />
+      <CallingConvention>FastCall</CallingConvention>
       <PrecompiledHeaderFile />
       <PrecompiledHeaderOutputFile />
       <ErrorReporting />
@@ -185,8 +185,7 @@
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
       <DisableSpecificWarnings>4100;4189;4201;4505;5105;6387;26451;28251</DisableSpecificWarnings>
       <RuntimeTypeInfo>false</RuntimeTypeInfo>
-      <AdditionalOptions>
-      </AdditionalOptions>
+      <AdditionalOptions>-Gs9999999</AdditionalOptions>
       <LanguageStandard>
       </LanguageStandard>
       <LanguageStandard_C>stdc11</LanguageStandard_C>
@@ -255,7 +254,7 @@
       <RemoveUnreferencedCodeData />
       <CompileAs>CompileAsC</CompileAs>
       <UseFullPaths />
-      <CallingConvention />
+      <CallingConvention>FastCall</CallingConvention>
       <PrecompiledHeaderFile />
       <PrecompiledHeaderOutputFile />
       <ErrorReporting />
@@ -264,8 +263,7 @@
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <DisableSpecificWarnings>4100;4189;4201;4505;5105;6387;26451;28251</DisableSpecificWarnings>
       <RuntimeTypeInfo>false</RuntimeTypeInfo>
-      <AdditionalOptions>
-      </AdditionalOptions>
+      <AdditionalOptions>-Gs9999999</AdditionalOptions>
       <LanguageStandard>
       </LanguageStandard>
       <LanguageStandard_C>stdc11</LanguageStandard_C>
