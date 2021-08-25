@@ -1022,8 +1022,7 @@ inline void Draw__PrepareTriangleVerts(vertex *A, vertex *B, vertex *C)
 
 inline u32 Draw__TriangleClipZ(vertex *V)
 {
-#if 1
-#define CAMERA_NEAR 0.0001f
+#define CAMERA_NEAR 0.1f
     vertex T;
     u32 Z = ((V[0].Position.z < CAMERA_NEAR) ? 1 : 0) |
             ((V[1].Position.z < CAMERA_NEAR) ? 2 : 0) |
@@ -1058,17 +1057,6 @@ inline u32 Draw__TriangleClipZ(vertex *V)
         case 7: return 0;
     }
     return 0;
-#else
-
-    if (A.Position.z <= 0 || B.Position.z <= 0 || C.Position.z <= 0)
-        return 0;
-
-    Out[0] = A;
-    Out[1] = B;
-    Out[2] = C;
-
-    return 1;
-#endif
 }
 
 inline vec3 Draw__PerspectiveDivide(bitmap Target, vec3 Position)
@@ -1084,10 +1072,15 @@ void Draw_TriangleVerts(bitmap Target, const color Color, vertex A, vertex B, ve
 {
     rect Clip = (rect){ .x = 0.0f, .y = 0.0f, .w = (f32)Target.Width, .h = (f32)Target.Height };
 
-
     if ((A.Position.z == B.Position.z) && (B.Position.z == C.Position.z))
     {
         if (A.Position.z < 0.0f) return;
+        if (A.Position.z > 0.0f)
+        {
+            A.Position = Draw__PerspectiveDivide(Target, A.Position);
+            B.Position = Draw__PerspectiveDivide(Target, B.Position);
+            C.Position = Draw__PerspectiveDivide(Target, C.Position);
+        }
 
         if (!Draw__TriangleVisible(A, B, C, Clip)) return;
         Draw__PrepareTriangleVerts(&A, &B, &C);
@@ -1118,7 +1111,13 @@ void Draw_TriangleTexturedVerts(bitmap Target, const bitmap Texture, vertex A, v
     if ((A.Position.z == B.Position.z) && (B.Position.z == C.Position.z))
     {
         if (A.Position.z < 0.0f) return;
-        
+        if (A.Position.z > 0.0f)
+        {
+            A.Position = Draw__PerspectiveDivide(Target, A.Position);
+            B.Position = Draw__PerspectiveDivide(Target, B.Position);
+            C.Position = Draw__PerspectiveDivide(Target, C.Position);
+        }
+
         if (!Draw__TriangleVisible(A, B, C, Clip)) return;
         Draw__PrepareTriangleVerts(&A, &B, &C);
         Draw__TriangleTexturedVerts2D(Target, Texture, A, B, C, Clip);

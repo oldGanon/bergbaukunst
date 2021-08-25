@@ -24,6 +24,10 @@ typedef size_t index;
 
 #include <stdbool.h>
 
+#define alignas _Alignas
+
+#define static_assert _Static_assert
+
 #if defined(_DEBUG)
   #define assert(x) do{if(!(x)){__debugbreak();}}while(0)
 #else

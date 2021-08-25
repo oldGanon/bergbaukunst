@@ -15,19 +15,27 @@ void Camera_SetPosition(camera *Camera, vec3 Position)
 void Camera_SetRotation(camera *Camera, f32 Yaw, f32 Pitch)
 {
     Camera->Yaw = Modulo(Yaw, 2*MATH_PI);
-    Camera->Pitch = Modulo(Pitch, 2*MATH_PI);
+    Camera->Pitch = Clamp(Pitch, -0.5f*MATH_PI, 0.5f*MATH_PI);
     Camera->SinYaw = Sin(Camera->Yaw);
     Camera->CosYaw = Cos(Camera->Yaw);
     Camera->SinPitch = Sin(Camera->Pitch);
     Camera->CosPitch = Cos(Camera->Pitch);
 }
 
-vec3 Camera_Forward(const camera Camera)
+vec3 Camera_Direction(const camera Camera)
 {
     return (vec3) {
         .x = Camera.SinYaw * Camera.CosPitch,
         .y = Camera.SinPitch,
         .z = Camera.CosPitch * Camera.CosYaw,
+    };
+}
+
+vec3 Camera_Forward(const camera Camera)
+{
+    return (vec3) {
+        .x = Camera.SinYaw,
+        .z = Camera.CosYaw,
     };
 }
 

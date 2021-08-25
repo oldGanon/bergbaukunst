@@ -9,6 +9,7 @@ typedef union
 
 typedef union
 {
+    alignas(16) f32 E[4];
     struct { f32 x, y, z; };
     struct { f32 r, g, b; };
 } vec3;
@@ -75,3 +76,10 @@ f32 Cos(f32 x)
     x3 = x3 * x2 - 3.1415926444234477f;
     return (x - 1.0f) * (x + 1.0f) * x3 * x;
 }
+
+
+
+inline vec3 Vec3_Add(vec3 A, vec3 B) { _mm_store_ps(A.E, _mm_add_ps(_mm_load_ps(A.E), _mm_load_ps(B.E))); return A; }
+inline vec3 Vec3_Sub(vec3 A, vec3 B) { _mm_store_ps(A.E, _mm_sub_ps(_mm_load_ps(A.E), _mm_load_ps(B.E))); return A; }
+inline vec3 Vec3_Mul(vec3 A, vec3 B) { _mm_store_ps(A.E, _mm_mul_ps(_mm_load_ps(A.E), _mm_load_ps(B.E))); return A; }
+inline vec3 Vec3_Div(vec3 A, vec3 B) { _mm_store_ps(A.E, _mm_div_ps(_mm_load_ps(A.E), _mm_load_ps(B.E))); return A; }
