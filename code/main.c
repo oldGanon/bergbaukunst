@@ -295,6 +295,37 @@ bitmap Win32_LoadBitmap(const char* Name)
     return Bitmap;
 }
 
+void Win32_LoadPalette(const char* Name)
+{
+    HBITMAP hImage = LoadImageA(GetModuleHandle(0), Name, IMAGE_BITMAP, 0, 0, LR_CREATEDIBSECTION);
+    if (!hImage) return;
+
+    BITMAP Image;
+    GetObject(hImage, sizeof(BITMAP), &Image);
+
+    if (Image.bmWidth == 16 && Image.bmWidth == 16)
+    {
+        BITMAPINFO_AND_PALETTE BitmapInfo = {
+            .bmiHeader = {
+                .biSize = sizeof(BITMAPINFOHEADER),
+                .biWidth = 16,
+                .biHeight = 16,
+                .biPlanes = 1,
+                .biBitCount = BYTES_PER_PIXEL << 3,
+                .biCompression = BI_RGB
+            }
+        };
+
+        u8 Bitmap[256];
+        HDC DeviceContext = GetDC(GlobalWindow);
+        GetDIBits(DeviceContext, hImage, 0, 16, Bitmap, (BITMAPINFO*)&BitmapInfo, DIB_RGB_COLORS);
+        ReleaseDC(GlobalWindow, DeviceContext);
+        memcpy(GlobalBackbufferInfo.bmiColors, BitmapInfo.bmiColors, sizeof(RGBQUAD) * 256);
+    }
+    
+    DeleteObject(hImage);
+}
+
 u64 Win32_GetTime(void)
 {    
     LARGE_INTEGER Result;
@@ -400,26 +431,9 @@ int WINAPI CALLBACK WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR 
             .biPlanes = 1,
             .biBitCount = BYTES_PER_PIXEL << 3,
             .biCompression = BI_RGB
-        },
-        .bmiColors = {
-            [  0] = { 0x00, 0x00, 0x00 },
-            [ 16] = { 0x9D, 0x9D, 0x9D },
-            [ 32] = { 0xFF, 0xFF, 0xFF },
-            [ 48] = { 0x33, 0x26, 0xBE },
-            [ 64] = { 0x8B, 0x6F, 0xE0 },
-            [ 80] = { 0x2B, 0x3C, 0x49 },
-            [ 96] = { 0x22, 0x65, 0xa4 },
-            [112] = { 0x31, 0x89, 0xEB },
-            [128] = { 0x6B, 0xE2, 0xF7 },
-            [144] = { 0x4E, 0x84, 0x2F },
-            [160] = { 0x1A, 0x89, 0x44 },
-            [176] = { 0x27, 0xCE, 0xA3 },
-            [192] = { 0x32, 0x26, 0x1B },
-            [208] = { 0x84, 0x57, 0x00 },
-            [224] = { 0xF2, 0xA2, 0x31 },
-            [240] = { 0xEF, 0xDC, 0xB2 },
         }
     };
+    Win32_LoadPalette("PALETTE");
 
     DWORD AudioCursor = 0;
     Win32_InitDSound();
