@@ -110,9 +110,9 @@ void Game_Draw(const game *Game, bitmap Buffer)
 {
     Bitmap_Clear(Buffer, COLOR_SKYBLUE);
 
-    Chunk_SortQuadsInsertion(Game->Camera, &Game->World.Region.Chunks[0][0].ChunkQuads[0], Game->World.Region.Chunks[0][0].QuadCount);
-
-    Draw_QuadsChunk(Game->Camera, Buffer, Game->Image, &Game->World.Region.Chunks[0][0]);
+    const world_chunk *Chunk = &Game->World.Region.Chunks[0][0];
+    Chunk_SortQuadsInsertion(Game->Camera, &Chunk->ChunkQuads[0], Chunk->QuadCount);
+    Draw_QuadsChunk(Game->Camera, Buffer, Game->Image, Chunk);
 
     Draw_String(Buffer, Game->Font, COLOR_WHITE, 32, 32, "ASFIDJH\nasdasd");
 

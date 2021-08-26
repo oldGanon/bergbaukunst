@@ -279,7 +279,7 @@ void Chunk_SortQuadsBubble(const camera Camera, world_quad *Quads, const i32 Qua
     free(DistancesSquared);
 }
 
-void Chunk_SortQuadsInsertion(const camera Camera, world_quad *Quads,const i32 QuadCount)
+void Chunk_SortQuadsInsertion(const camera Camera, world_quad *Quads, const i32 QuadCount)
 {
     if (QuadCount == 0) return;
     f32* DistancesSquared = malloc(sizeof(f32) * QuadCount);
@@ -304,7 +304,7 @@ void Chunk_SortQuadsInsertion(const camera Camera, world_quad *Quads,const i32 Q
     free(DistancesSquared);
 }
 
-void DistanceSquaredQuad(const camera Camera, world_quad* Quads, const i32 QuadCount, f32 *Distance)
+void DistanceSquaredQuad(const camera Camera, world_quad *Quads, const i32 QuadCount, f32 *Distance)
 {
     for (i32 i = 0; i < QuadCount; i++)
     {
