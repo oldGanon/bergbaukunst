@@ -1,13 +1,21 @@
 
-typedef struct Block
+enum
 {
-    vec3 Position;
-    i8 Translucent;
-}Block;
+    BLOCK_ID_AIR = 0,
+    BLOCK_ID_GRAS = 1,
+} world_block_id;
+
+#define WORLD_CHUNK_WIDTH 16
+#define WORLD_CHUNK_HEIGHT 256
+
+typedef struct world_block
+{
+    u8 Id;
+} world_block;
 
 typedef struct world_chunk
 {
-    Block Blocks[16][16][256];
+    world_block Blocks[WORLD_CHUNK_WIDTH][WORLD_CHUNK_WIDTH][WORLD_CHUNK_HEIGHT];
 } world_chunk;
 
 typedef struct world_region
@@ -89,133 +97,40 @@ void Draw_GrasBlock(const camera Camera, const bitmap Target,
 }
 
 void Draw_EntireChunk(const camera Camera, const bitmap Target,
-                    const bitmap Top, const bitmap Side, const bitmap Bottom,world_chunk* Chunk) 
+                      const bitmap Top, const bitmap Side, const bitmap Bottom, const world_chunk* Chunk) 
 {
-    typedef struct SidesToBeDrawn
+    for (i32 x = 0; x < WORLD_CHUNK_WIDTH; x++)
     {
-        i8 Top;
-        i8 Front;
-        i8 Right;
-        i8 Back;
-        i8 Left;
-        i8 Bottom;
-    }SidesToBeDrawn;
-
-    SidesToBeDrawn Empty = { 0 };
-    SidesToBeDrawn Sides = { 0 };
-
-    for (i32 x = 0; x < 16; x++)
-    {
-        for (i32 z = 0; z < 16; z++)
+        for (i32 z = 0; z < WORLD_CHUNK_WIDTH; z++)
         {
-            for (i32 y = 0; y < 256; y++)
+            for (i32 y = 0; y < WORLD_CHUNK_HEIGHT; y++)
             {
-                Sides = Empty;
-                Block CurrentBlock = Chunk->Blocks[x][z][y];
+                world_block CurrentBlock = Chunk->Blocks[x][z][y];
                 
-                if (CurrentBlock.Translucent == 0) {
-
-                    vec3 BlockCenter = CurrentBlock.Position;
+                if (CurrentBlock.Id != BLOCK_ID_AIR)
+                {
+                    vec3 BlockCenter = (vec3){ (f32)x, (f32)y, (f32)z };
 
                     vec3 Corners[8] = {
-                    {.x = -0.5f + BlockCenter.x, .y = -0.5f + BlockCenter.y, .z = -0.5f + BlockCenter.z },
-                    {.x = +0.5f + BlockCenter.x, .y = -0.5f + BlockCenter.y, .z = -0.5f + BlockCenter.z },
-                    {.x = -0.5f + BlockCenter.x, .y = +0.5f + BlockCenter.y, .z = -0.5f + BlockCenter.z },
-                    {.x = +0.5f + BlockCenter.x, .y = +0.5f + BlockCenter.y, .z = -0.5f + BlockCenter.z },
-                    {.x = -0.5f + BlockCenter.x, .y = -0.5f + BlockCenter.y, .z = +0.5f + BlockCenter.z },
-                    {.x = +0.5f + BlockCenter.x, .y = -0.5f + BlockCenter.y, .z = +0.5f + BlockCenter.z },
-                    {.x = -0.5f + BlockCenter.x, .y = +0.5f + BlockCenter.y, .z = +0.5f + BlockCenter.z },
-                    {.x = +0.5f + BlockCenter.x, .y = +0.5f + BlockCenter.y, .z = +0.5f + BlockCenter.z },
+                        { .x = -0.5f + BlockCenter.x, .y = -0.5f + BlockCenter.y, .z = -0.5f + BlockCenter.z },
+                        { .x = +0.5f + BlockCenter.x, .y = -0.5f + BlockCenter.y, .z = -0.5f + BlockCenter.z },
+                        { .x = -0.5f + BlockCenter.x, .y = +0.5f + BlockCenter.y, .z = -0.5f + BlockCenter.z },
+                        { .x = +0.5f + BlockCenter.x, .y = +0.5f + BlockCenter.y, .z = -0.5f + BlockCenter.z },
+                        { .x = -0.5f + BlockCenter.x, .y = -0.5f + BlockCenter.y, .z = +0.5f + BlockCenter.z },
+                        { .x = +0.5f + BlockCenter.x, .y = -0.5f + BlockCenter.y, .z = +0.5f + BlockCenter.z },
+                        { .x = -0.5f + BlockCenter.x, .y = +0.5f + BlockCenter.y, .z = +0.5f + BlockCenter.z },
+                        { .x = +0.5f + BlockCenter.x, .y = +0.5f + BlockCenter.y, .z = +0.5f + BlockCenter.z },
                     };
 
                     for (u32 i = 0; i < 8; ++i)
                         Corners[i] = CameraToScreen(Target, WorldToCamera(Camera, Corners[i]));
 
-                    vertex V0 = { .TexCoord.u = 0.0f, .TexCoord.v = 0.0f };
-                    vertex V1 = { .TexCoord.u = 16.0f, .TexCoord.v = 0.0f };
+                    vertex V0 = { .TexCoord.u =  0.0f, .TexCoord.v =  0.0f };
+                    vertex V1 = { .TexCoord.u = 16.0f, .TexCoord.v =  0.0f };
                     vertex V2 = { .TexCoord.u = 16.0f, .TexCoord.v = 16.0f };
-                    vertex V3 = { .TexCoord.u = 0.0f, .TexCoord.v = 16.0f };
-                    
-                    i32 Block_x = (i32)CurrentBlock.Position.x%16;
-                    i32 Block_y = (i32)CurrentBlock.Position.y;
-                    i32 Block_z = (i32)CurrentBlock.Position.z%16;
+                    vertex V3 = { .TexCoord.u =  0.0f, .TexCoord.v = 16.0f };
 
-
-                    Block* Block_Top = &Chunk->Blocks[Block_x][Block_z][Block_y + 1];
-                    Block* Block_Front = &Chunk->Blocks[Block_x][Block_z - 1][Block_y];
-                    Block* Block_Right = &Chunk->Blocks[Block_x + 1][Block_z][Block_y];
-                    Block* Block_Back = &Chunk->Blocks[Block_x][Block_z + 1][Block_y];
-                    Block* Block_Left = &Chunk->Blocks[Block_x - 1][Block_z][Block_y];
-                    Block* Block_Bottom = &Chunk->Blocks[Block_x][Block_z][Block_y - 1];
-
-                    if (x > 0)
-                    {
-                        if (Block_Left->Translucent == 1)
-                        {
-                            Sides.Left = 1;
-                        }
-                    }
-                    else
-                    {
-                        Sides.Left = 1;
-                    }
-                    if (x < 15)
-                    {
-                        if (Block_Right->Translucent == 1) 
-                        {
-                            Sides.Right = 1;
-                        }
-                    }
-                    else
-                    {
-                        Sides.Right = 1;
-                    }
-                    if (z > 0)
-                    {
-                        if (Block_Front->Translucent == 1)
-                        {
-                            Sides.Front = 1;
-                        }
-                    }
-                    else
-                    {
-                        Sides.Front = 1;
-                    }
-                    if(z <15)
-                    {
-                        if(Block_Back->Translucent == 1)
-                        {
-                            Sides.Back = 1;
-                        }
-                    }
-                    else
-                    {
-                        Sides.Back = 1;
-                    }
-                    if (y > 0)
-                    {
-                        if(Block_Bottom->Translucent == 1)
-                        {
-                            Sides.Bottom = 1;
-                        }
-                    }
-                    else
-                    {
-                        Sides.Bottom = 1;
-                    }
-                    if(y < 255)
-                    {
-                        if (Block_Top->Translucent == 1) 
-                        {
-                            Sides.Top = 1;
-                        }
-                    }
-                    else
-                    {
-                        Sides.Top = 1;
-                    }
-
-                    if(Sides.Left == 1)
+                    if (x == 0 || (Chunk->Blocks[x - 1][z][y].Id == BLOCK_ID_AIR))
                     {
                         V0.Position = Corners[4];
                         V1.Position = Corners[0];
@@ -223,7 +138,8 @@ void Draw_EntireChunk(const camera Camera, const bitmap Target,
                         V3.Position = Corners[6];
                         Draw_Quad(Target, Side, V0, V1, V2, V3);
                     }
-                    if (Sides.Right == 1) 
+
+                    if ((x == WORLD_CHUNK_WIDTH - 1) || (Chunk->Blocks[x + 1][z][y].Id == BLOCK_ID_AIR))
                     {
                         V0.Position = Corners[1];
                         V1.Position = Corners[5];
@@ -231,7 +147,8 @@ void Draw_EntireChunk(const camera Camera, const bitmap Target,
                         V3.Position = Corners[3];
                         Draw_Quad(Target, Side, V0, V1, V2, V3);
                     }
-                    if (Sides.Front == 1) 
+
+                    if (z == 0 || (Chunk->Blocks[x][z - 1][y].Id == BLOCK_ID_AIR))
                     {
                         V0.Position = Corners[0];
                         V1.Position = Corners[1];
@@ -239,7 +156,8 @@ void Draw_EntireChunk(const camera Camera, const bitmap Target,
                         V3.Position = Corners[2];
                         Draw_Quad(Target, Side, V0, V1, V2, V3);
                     }
-                    if (Sides.Back == 1) 
+
+                    if((z == WORLD_CHUNK_WIDTH - 1) || (Chunk->Blocks[x][z + 1][y].Id == BLOCK_ID_AIR))
                     {
                         V0.Position = Corners[5];
                         V1.Position = Corners[4];
@@ -247,7 +165,8 @@ void Draw_EntireChunk(const camera Camera, const bitmap Target,
                         V3.Position = Corners[7];
                         Draw_Quad(Target, Side, V0, V1, V2, V3);
                     }
-                    if(Sides.Bottom == 1)
+
+                    if (y == 0 || (Chunk->Blocks[x][z][y - 1].Id == BLOCK_ID_AIR))
                     {
                         V0.Position = Corners[4];
                         V1.Position = Corners[5];
@@ -255,7 +174,8 @@ void Draw_EntireChunk(const camera Camera, const bitmap Target,
                         V3.Position = Corners[0];
                         Draw_Quad(Target, Bottom, V0, V1, V2, V3);
                     }
-                    if(Sides.Top == 1)
+
+                    if((y == WORLD_CHUNK_HEIGHT - 1) || (Chunk->Blocks[x][z][y + 1].Id == BLOCK_ID_AIR))
                     {
                         V0.Position = Corners[2];
                         V1.Position = Corners[3];
@@ -263,9 +183,7 @@ void Draw_EntireChunk(const camera Camera, const bitmap Target,
                         V3.Position = Corners[6];
                         Draw_Quad(Target, Top, V0, V1, V2, V3);
                     }
-                    
                 }
-
             }
         }
     }

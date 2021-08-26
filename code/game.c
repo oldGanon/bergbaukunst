@@ -42,15 +42,15 @@ void Game_Init(game *Game)
         {
             for (i32 y = 0; y < 256; y++)
             {
+                world_block* Current_Block = &TestChunk->Blocks[x][z][y];
 
-                Block* Current_Block = &TestChunk->Blocks[x][z][y];
-                Current_Block->Position = (vec3){ (f32)x, (f32)y, (f32)z };
-
-                if (y == 0) {
-                    Current_Block->Translucent = (i8)0;
+                if (y == 0)
+                {
+                    Current_Block->Id = BLOCK_ID_GRAS;
                 }
-                else {
-                    Current_Block->Translucent = (i8)1;
+                else
+                {
+                    Current_Block->Id = BLOCK_ID_AIR;
                 }
             }
         }
