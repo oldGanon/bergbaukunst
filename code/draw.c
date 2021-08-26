@@ -1142,23 +1142,16 @@ void Draw_TriangleTexturedVerts(bitmap Target, const bitmap Texture, vertex A, v
 
 void Draw_QuadVerts(bitmap Target, color Color, vertex A, vertex B, vertex C, vertex D)
 {
-    vec3 ABC = Vec3_Cross(Vec3_Sub(A.Position, B.Position), Vec3_Sub(C.Position, B.Position));
-    vec3 CDA = Vec3_Cross(Vec3_Sub(C.Position, D.Position), Vec3_Sub(A.Position, D.Position));
-    
-    if (Vec3_Dot(ABC, CDA) < 0.0f) return;
-
+    // TODO: check convex
+    // TODO: check coplanar
     Draw_TriangleVerts(Target, Color, A, B, C);
     Draw_TriangleVerts(Target, Color, C, D, A);
-
 }
 
 void Draw_QuadTexturedVerts(bitmap Target, bitmap Texture, vertex A, vertex B, vertex C, vertex D)
 {
-    vec3 ABC = Vec3_Cross(Vec3_Sub(A.Position, B.Position), Vec3_Sub(C.Position, B.Position));
-    vec3 CDA = Vec3_Cross(Vec3_Sub(C.Position, D.Position), Vec3_Sub(A.Position, D.Position));
-    
-    if (Vec3_Dot(ABC, CDA) < 0.0f) return;
-
+    // TODO: check convex
+    // TODO: check coplanar
     Draw_TriangleTexturedVerts(Target, Texture, A, B, C);
     Draw_TriangleTexturedVerts(Target, Texture, C, D, A);
 }

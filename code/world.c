@@ -22,7 +22,7 @@ typedef struct world_chunk
 {
     world_block Blocks[WORLD_CHUNK_WIDTH][WORLD_CHUNK_WIDTH][WORLD_CHUNK_HEIGHT];
     world_quad* ChunkQuads;
-    i32 QuadNumber;
+    i32 QuadCount;
 
 } world_chunk;
 
@@ -36,22 +36,21 @@ typedef struct entity
     f32 x, y, z;
 } entity;
 
-
-
 typedef struct world
 {
     entity Entities[256];
     world_region Region;
 } world;
 
-void Distance_Squared_Quad(const camera Camera, world_quad* Quads, const i32 Quad_Count, f32* Distance);
+void DistanceSquaredQuad(const camera Camera, world_quad *Quads, const i32 QuadCount, f32 *Distance);
 
-Set_Quads_Chunk(world_chunk* Chunk)
+
+
+void Chunk_GatherQuads(world_chunk *Chunk)
 {
     i32 i = 0;
-    world_quad* chunk_quads = malloc(sizeof(world_quad)*WORLD_CHUNK_WIDTH* WORLD_CHUNK_WIDTH* WORLD_CHUNK_HEIGHT*3);
+    world_quad* ChunkQuads = malloc(sizeof(world_quad) * WORLD_CHUNK_WIDTH * WORLD_CHUNK_WIDTH * WORLD_CHUNK_HEIGHT * 3);
     
-
     for (i32 x = 0; x < WORLD_CHUNK_WIDTH; x++)
     {
         for (i32 z = 0; z < WORLD_CHUNK_WIDTH; z++)
@@ -86,7 +85,7 @@ Set_Quads_Chunk(world_chunk* Chunk)
                         V1.Position = Corners[0];
                         V2.Position = Corners[2];
                         V3.Position = Corners[6];
-                        chunk_quads[i] = (world_quad){V0,V1,V2,V3};
+                        ChunkQuads[i] = (world_quad){V0,V1,V2,V3};
                         i++;
                     }
 
@@ -100,7 +99,7 @@ Set_Quads_Chunk(world_chunk* Chunk)
                         V1.Position = Corners[5];
                         V2.Position = Corners[7];
                         V3.Position = Corners[3];
-                        chunk_quads[i] = (world_quad){ V0,V1,V2,V3 };
+                        ChunkQuads[i] = (world_quad){ V0,V1,V2,V3 };
                         i++;
                     }
 
@@ -114,7 +113,7 @@ Set_Quads_Chunk(world_chunk* Chunk)
                         V1.Position = Corners[1];
                         V2.Position = Corners[3];
                         V3.Position = Corners[2];
-                        chunk_quads[i] = (world_quad){ V0,V1,V2,V3 };
+                        ChunkQuads[i] = (world_quad){ V0,V1,V2,V3 };
                         i++;
                     }
 
@@ -128,7 +127,7 @@ Set_Quads_Chunk(world_chunk* Chunk)
                         V1.Position = Corners[4];
                         V2.Position = Corners[6];
                         V3.Position = Corners[7];
-                        chunk_quads[i] = (world_quad){ V0,V1,V2,V3 };                  
+                        ChunkQuads[i] = (world_quad){ V0,V1,V2,V3 };                  
                         i++;
                     }
 
@@ -142,7 +141,7 @@ Set_Quads_Chunk(world_chunk* Chunk)
                         V1.Position = Corners[5];
                         V2.Position = Corners[1];
                         V3.Position = Corners[0];
-                        chunk_quads[i] = (world_quad){ V0,V1,V2,V3 };
+                        ChunkQuads[i] = (world_quad){ V0,V1,V2,V3 };
                         i++;
                     }
 
@@ -156,22 +155,25 @@ Set_Quads_Chunk(world_chunk* Chunk)
                         V1.Position = Corners[3];
                         V2.Position = Corners[7];
                         V3.Position = Corners[6];
-                        chunk_quads[i] = (world_quad){ V0,V1,V2,V3 };
+                        ChunkQuads[i] = (world_quad){ V0,V1,V2,V3 };
                         i++;
                     }
                 }
             }
         }
     }
-    chunk_quads = realloc(chunk_quads, sizeof(world_quad) * i);
-    Chunk->QuadNumber = i;
-    Chunk->ChunkQuads = chunk_quads;
+    if (Chunk->ChunkQuads)
+        free(Chunk->ChunkQuads);
+
+    ChunkQuads = realloc(ChunkQuads, sizeof(world_quad) * i);
+    Chunk->QuadCount = i;
+    Chunk->ChunkQuads = ChunkQuads;
 }
 
 
-Draw_Quads_Chunk(const camera Camera,const bitmap Target, bitmap TextureImage, const world_chunk* Chunk)
+void Draw_QuadsChunk(const camera Camera,const bitmap Target, bitmap TerrainTexture, const world_chunk *Chunk)
 {
-    for (i32 i = 0; i < Chunk->QuadNumber; i++) 
+    for (i32 i = 0; i < Chunk->QuadCount; i++) 
     {
         vertex V0 = Chunk->ChunkQuads[i].Vertices[0];
         vertex V1 = Chunk->ChunkQuads[i].Vertices[1];
@@ -183,12 +185,7 @@ Draw_Quads_Chunk(const camera Camera,const bitmap Target, bitmap TextureImage, c
         V2.Position = CameraToScreen(Target, WorldToCamera(Camera, V2.Position));
         V3.Position = CameraToScreen(Target, WorldToCamera(Camera, V3.Position));
 
-
-        bitmap QuadTexture = Bitmap_Section(TextureImage, (i32)V0.TexCoord.u, 
-                                                          (i32)V0.TexCoord.v, 
-                                                          (i32)V2.TexCoord.u-(i32)V0.TexCoord.u, 
-                                                          (i32)V2.TexCoord.v-(i32)V0.TexCoord.v);
-        Draw_Quad(Target, QuadTexture, V0, V1, V2, V3);
+        Draw_Quad(Target, TerrainTexture, V0, V1, V2, V3);
     }
 }
 
@@ -254,17 +251,17 @@ void Draw_GrasBlock(const camera Camera, const bitmap Target,
 }
 
 
-void Sort_Initial(const camera Camera, world_quad* Quads, const i32 Quad_Count)
+void Chunk_SortQuadsBubble(const camera Camera, world_quad *Quads, const i32 QuadCount)
 {
-    if (Quad_Count == 0) return;
+    if (QuadCount == 0) return;
 
-    f32 *DistancesSquared = malloc(sizeof(f32) * Quad_Count);
+    f32 *DistancesSquared = malloc(sizeof(f32) * QuadCount);
 
-    Distance_Squared_Quad(Camera, Quads, Quad_Count, DistancesSquared);
+    DistanceSquaredQuad(Camera, Quads, QuadCount, DistancesSquared);
 
-    for (i32 j = 0; j < Quad_Count - 1; j++)
+    for (i32 j = 0; j < QuadCount - 1; j++)
     {
-        for (i32 i = 0; i < Quad_Count - 1; i++)
+        for (i32 i = 0; i < QuadCount - 1; i++)
         {
             f32 Distance = DistancesSquared[i];
             if (DistancesSquared[i] < DistancesSquared[i+1])
@@ -282,19 +279,19 @@ void Sort_Initial(const camera Camera, world_quad* Quads, const i32 Quad_Count)
     free(DistancesSquared);
 }
 
-void Sort_Almost_Sorted(const camera Camera, world_quad* Quads,const i32 Quad_Count)
+void Chunk_SortQuadsInsertion(const camera Camera, world_quad *Quads,const i32 QuadCount)
 {
-    if (Quad_Count == 0) return;
-    f32* DistancesSquared = malloc(sizeof(f32) * Quad_Count);
+    if (QuadCount == 0) return;
+    f32* DistancesSquared = malloc(sizeof(f32) * QuadCount);
 
-    Distance_Squared_Quad(Camera, Quads, Quad_Count, DistancesSquared);
+    DistanceSquaredQuad(Camera, Quads, QuadCount, DistancesSquared);
 
-    for (i32 i = Quad_Count-1; i >= 0; i--)
+    for (i32 i = QuadCount-1; i >= 0; i--)
     {
         f32 Value = DistancesSquared[i];
         world_quad QuadValue = Quads[i];
         i32 j = i;
-        while ((j < Quad_Count) && (DistancesSquared[j + 1] > Value))
+        while ((j < QuadCount) && (DistancesSquared[j + 1] > Value))
         {
             DistancesSquared[j] = DistancesSquared[j + 1];
             Quads[j] = Quads[j + 1];
@@ -307,21 +304,21 @@ void Sort_Almost_Sorted(const camera Camera, world_quad* Quads,const i32 Quad_Co
     free(DistancesSquared);
 }
 
-void Distance_Squared_Quad(const camera Camera, world_quad* Quads, const i32 Quad_Count, f32* Distance)
+void DistanceSquaredQuad(const camera Camera, world_quad* Quads, const i32 QuadCount, f32 *Distance)
 {
-    for (i32 i = 0; i < Quad_Count; i++)
+    for (i32 i = 0; i < QuadCount; i++)
     {
         vec3 QuadMiddlePoint = { (Quads[i].Vertices[2].Position.x - Quads[i].Vertices[0].Position.x) / 2 + Quads[i].Vertices[0].Position.x,
-                                (Quads[i].Vertices[2].Position.y - Quads[i].Vertices[0].Position.y) / 2 + Quads[i].Vertices[0].Position.y,
-                                (Quads[i].Vertices[2].Position.z - Quads[i].Vertices[0].Position.z) / 2 + Quads[i].Vertices[0].Position.z };
+                                 (Quads[i].Vertices[2].Position.y - Quads[i].Vertices[0].Position.y) / 2 + Quads[i].Vertices[0].Position.y,
+                                 (Quads[i].Vertices[2].Position.z - Quads[i].Vertices[0].Position.z) / 2 + Quads[i].Vertices[0].Position.z };
 
         vec3 PlayerToQuad = { QuadMiddlePoint.x - Camera.Position.x,
-                             QuadMiddlePoint.y - Camera.Position.y,
-                             QuadMiddlePoint.z - Camera.Position.z };
+                              QuadMiddlePoint.y - Camera.Position.y,
+                              QuadMiddlePoint.z - Camera.Position.z };
 
         Distance[i] = (f32)(PlayerToQuad.x * PlayerToQuad.x +
-                                    PlayerToQuad.y * PlayerToQuad.y +
-                                    PlayerToQuad.z * PlayerToQuad.z);
+                            PlayerToQuad.y * PlayerToQuad.y +
+                            PlayerToQuad.z * PlayerToQuad.z);
     }
 }
 

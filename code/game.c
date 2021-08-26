@@ -55,8 +55,8 @@ void Game_Init(game *Game)
             }
         }
     }
-    Set_Quads_Chunk(TestChunk);
-    Sort_Initial(Game->Camera,&TestChunk->ChunkQuads[0], TestChunk->QuadNumber);
+    Chunk_GatherQuads(TestChunk);
+    Chunk_SortQuadsBubble(Game->Camera, &TestChunk->ChunkQuads[0], TestChunk->QuadCount);
 }
 
 void Game_Update(game *Game, const input Input)
@@ -110,9 +110,9 @@ void Game_Draw(const game *Game, bitmap Buffer)
 {
     Bitmap_Clear(Buffer, COLOR_SKYBLUE);
 
-    Sort_Almost_Sorted(Game->Camera,&Game->World.Region.Chunks[0][0].ChunkQuads[0], Game->World.Region.Chunks[0][0].QuadNumber);
+    Chunk_SortQuadsInsertion(Game->Camera, &Game->World.Region.Chunks[0][0].ChunkQuads[0], Game->World.Region.Chunks[0][0].QuadCount);
 
-    Draw_Quads_Chunk(Game->Camera, Buffer, Game->Image, &Game->World.Region.Chunks[0][0]);
+    Draw_QuadsChunk(Game->Camera, Buffer, Game->Image, &Game->World.Region.Chunks[0][0]);
 
     Draw_String(Buffer, Game->Font, COLOR_WHITE, 32, 32, "ASFIDJH\nasdasd");
 
