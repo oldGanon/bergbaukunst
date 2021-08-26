@@ -205,9 +205,9 @@ void SortBlockDistances(camera Cammera, vec3 *Offsets, i32 Length)
                               PlayerToBlock.z * PlayerToBlock.z;
     }
 
-    for (i32 j = 0; j <= Length - 1; j++)
+    for (i32 j = 0; j < Length - 1; j++)
     {
-        for (i32 i = 0; i <= Length - 1; i++)
+        for (i32 i = 0; i < Length - 1; i++)
         {
             f32 Distance = DistancesSquared[i];
             if (DistancesSquared[i] < DistancesSquared[i+1])
