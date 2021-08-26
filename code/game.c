@@ -31,7 +31,7 @@ void Game_Init(game *Game)
     Game->Image = Win32_LoadBitmap("IMAGE");
     Game->Font = Win32_LoadBitmap("FONT");
 
-    Camera_SetPosition(&Game->Camera, (vec3) { 5.0f, -3.0f, -5.0f });
+    Camera_SetPosition(&Game->Camera, (vec3) { 0.0f, 0.0f, -5.0f });
     Camera_SetRotation(&Game->Camera, 0.0f, -0.78539816339f * 0.75f);
 
     world_chunk* TestChunk = &Game->World.Region.Chunks[0][0];
@@ -44,7 +44,7 @@ void Game_Init(game *Game)
             {
                 world_block* Current_Block = &TestChunk->Blocks[x][z][y];
 
-                if (y == 0)
+                if (y == 0 || y == 5 || (z ==5 && x == 5))
                 {
                     Current_Block->Id = BLOCK_ID_GRAS;
                 }
@@ -56,6 +56,7 @@ void Game_Init(game *Game)
         }
     }
     Set_Quads_Chunk(TestChunk);
+    Sort_Initial(Game->Camera,&TestChunk->ChunkQuads[0], TestChunk->QuadNumber);
 }
 
 void Game_Update(game *Game, const input Input)
@@ -104,13 +105,21 @@ void Game_Update(game *Game, const input Input)
     }
     Camera_SetPosition(Camera, NewCameraPosition);
 }
+
 void Game_Draw(const game *Game, bitmap Buffer)
 {
     Bitmap_Clear(Buffer, COLOR_SKYBLUE);
 
+    Sort_Almost_Sorted(Game->Camera,&Game->World.Region.Chunks[0][0].ChunkQuads[0], Game->World.Region.Chunks[0][0].QuadNumber);
+
     Draw_Quads_Chunk(Game->Camera, Buffer, Game->Image, &Game->World.Region.Chunks[0][0]);
 
     Draw_String(Buffer, Game->Font, COLOR_WHITE, 32, 32, "ASFIDJH\nasdasd");
+
+
+
+
+
 
     /*
     //bitmap GrasTop = Bitmap_Section(Game->Image, 0, 0, 16, 16);

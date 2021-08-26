@@ -44,11 +44,11 @@ typedef struct world
     world_region Region;
 } world;
 
+void Distance_Squared_Quad(const camera Camera, world_quad* Quads, const i32 Quad_Count, f32* Distance);
 
 Set_Quads_Chunk(world_chunk* Chunk)
 {
-    i32 i = Chunk->QuadNumber;
-    i = 0;
+    i32 i = 0;
     world_quad* chunk_quads = malloc(sizeof(world_quad)*WORLD_CHUNK_WIDTH* WORLD_CHUNK_WIDTH* WORLD_CHUNK_HEIGHT*3);
     
 
@@ -253,119 +253,18 @@ void Draw_GrasBlock(const camera Camera, const bitmap Target,
     Draw_Quad(Target, Bottom, V0, V1, V2, V3);
 }
 
-void Draw_EntireChunk(const camera Camera, const bitmap Target,
-                      const bitmap Top, const bitmap Side, const bitmap Bottom, const world_chunk* Chunk) 
+
+void Sort_Initial(const camera Camera, world_quad* Quads, const i32 Quad_Count)
 {
-    for (i32 x = 0; x < WORLD_CHUNK_WIDTH; x++)
+    if (Quad_Count == 0) return;
+
+    f32 *DistancesSquared = malloc(sizeof(f32) * Quad_Count);
+
+    Distance_Squared_Quad(Camera, Quads, Quad_Count, DistancesSquared);
+
+    for (i32 j = 0; j < Quad_Count - 1; j++)
     {
-        for (i32 z = 0; z < WORLD_CHUNK_WIDTH; z++)
-        {
-            for (i32 y = 0; y < WORLD_CHUNK_HEIGHT; y++)
-            {
-                world_block CurrentBlock = Chunk->Blocks[x][z][y];
-                
-                if (CurrentBlock.Id != BLOCK_ID_AIR)
-                {
-                    vec3 BlockCenter = (vec3){ (f32)x, (f32)y, (f32)z };
-
-                    vec3 Corners[8] = {
-                        { .x = -0.5f + BlockCenter.x, .y = -0.5f + BlockCenter.y, .z = -0.5f + BlockCenter.z },
-                        { .x = +0.5f + BlockCenter.x, .y = -0.5f + BlockCenter.y, .z = -0.5f + BlockCenter.z },
-                        { .x = -0.5f + BlockCenter.x, .y = +0.5f + BlockCenter.y, .z = -0.5f + BlockCenter.z },
-                        { .x = +0.5f + BlockCenter.x, .y = +0.5f + BlockCenter.y, .z = -0.5f + BlockCenter.z },
-                        { .x = -0.5f + BlockCenter.x, .y = -0.5f + BlockCenter.y, .z = +0.5f + BlockCenter.z },
-                        { .x = +0.5f + BlockCenter.x, .y = -0.5f + BlockCenter.y, .z = +0.5f + BlockCenter.z },
-                        { .x = -0.5f + BlockCenter.x, .y = +0.5f + BlockCenter.y, .z = +0.5f + BlockCenter.z },
-                        { .x = +0.5f + BlockCenter.x, .y = +0.5f + BlockCenter.y, .z = +0.5f + BlockCenter.z },
-                    };
-
-                    for (u32 i = 0; i < 8; ++i)
-                        Corners[i] = CameraToScreen(Target, WorldToCamera(Camera, Corners[i]));
-
-                    vertex V0 = { .TexCoord.u =  0.0f, .TexCoord.v =  0.0f };
-                    vertex V1 = { .TexCoord.u = 16.0f, .TexCoord.v =  0.0f };
-                    vertex V2 = { .TexCoord.u = 16.0f, .TexCoord.v = 16.0f };
-                    vertex V3 = { .TexCoord.u =  0.0f, .TexCoord.v = 16.0f };
-
-                    if (x == 0 || (Chunk->Blocks[x - 1][z][y].Id == BLOCK_ID_AIR))
-                    {
-                        V0.Position = Corners[4];
-                        V1.Position = Corners[0];
-                        V2.Position = Corners[2];
-                        V3.Position = Corners[6];
-                        Draw_Quad(Target, Side, V0, V1, V2, V3);
-                    }
-
-                    if ((x == WORLD_CHUNK_WIDTH - 1) || (Chunk->Blocks[x + 1][z][y].Id == BLOCK_ID_AIR))
-                    {
-                        V0.Position = Corners[1];
-                        V1.Position = Corners[5];
-                        V2.Position = Corners[7];
-                        V3.Position = Corners[3];
-                        Draw_Quad(Target, Side, V0, V1, V2, V3);
-                    }
-
-                    if (z == 0 || (Chunk->Blocks[x][z - 1][y].Id == BLOCK_ID_AIR))
-                    {
-                        V0.Position = Corners[0];
-                        V1.Position = Corners[1];
-                        V2.Position = Corners[3];
-                        V3.Position = Corners[2];
-                        Draw_Quad(Target, Side, V0, V1, V2, V3);
-                    }
-
-                    if((z == WORLD_CHUNK_WIDTH - 1) || (Chunk->Blocks[x][z + 1][y].Id == BLOCK_ID_AIR))
-                    {
-                        V0.Position = Corners[5];
-                        V1.Position = Corners[4];
-                        V2.Position = Corners[6];
-                        V3.Position = Corners[7];
-                        Draw_Quad(Target, Side, V0, V1, V2, V3);
-                    }
-
-                    if (y == 0 || (Chunk->Blocks[x][z][y - 1].Id == BLOCK_ID_AIR))
-                    {
-                        V0.Position = Corners[4];
-                        V1.Position = Corners[5];
-                        V2.Position = Corners[1];
-                        V3.Position = Corners[0];
-                        Draw_Quad(Target, Bottom, V0, V1, V2, V3);
-                    }
-
-                    if((y == WORLD_CHUNK_HEIGHT - 1) || (Chunk->Blocks[x][z][y + 1].Id == BLOCK_ID_AIR))
-                    {
-                        V0.Position = Corners[2];
-                        V1.Position = Corners[3];
-                        V2.Position = Corners[7];
-                        V3.Position = Corners[6];
-                        Draw_Quad(Target, Top, V0, V1, V2, V3);
-                    }
-                }
-            }
-        }
-    }
-}
-
-void SortBlockDistances(camera Cammera, vec3 *Offsets, i32 Length) 
-{
-    if (Length == 0) return;
-    f32 *DistancesSquared = malloc(sizeof(f32) * Length);
-
-    for (i32 i = 0; i < Length; i++)
-    {
-        vec3 PlayerToBlock = {
-            Offsets[i].x - Cammera.Position.x,
-            Offsets[i].y - Cammera.Position.y,
-            Offsets[i].z - Cammera.Position.z
-        };
-        DistancesSquared[i] = PlayerToBlock.x * PlayerToBlock.x + 
-                              PlayerToBlock.y * PlayerToBlock.y +
-                              PlayerToBlock.z * PlayerToBlock.z;
-    }
-
-    for (i32 j = 0; j < Length - 1; j++)
-    {
-        for (i32 i = 0; i < Length - 1; i++)
+        for (i32 i = 0; i < Quad_Count - 1; i++)
         {
             f32 Distance = DistancesSquared[i];
             if (DistancesSquared[i] < DistancesSquared[i+1])
@@ -374,12 +273,55 @@ void SortBlockDistances(camera Cammera, vec3 *Offsets, i32 Length)
                 DistancesSquared[i] = DistancesSquared[i+1];
                 DistancesSquared[i+1] = TempDistance;
 
-                vec3 TempOffset = Offsets[i];
-                Offsets[i] = Offsets[i+1];
-                Offsets[i+1] = TempOffset;
+                world_quad TempQuad = Quads[i];
+                Quads[i] = Quads[i+1];
+                Quads[i+1] = TempQuad;
             }
         }
     }
-
     free(DistancesSquared);
 }
+
+void Sort_Almost_Sorted(const camera Camera, world_quad* Quads,const i32 Quad_Count)
+{
+    if (Quad_Count == 0) return;
+    f32* DistancesSquared = malloc(sizeof(f32) * Quad_Count);
+
+    Distance_Squared_Quad(Camera, Quads, Quad_Count, DistancesSquared);
+
+    for (i32 i = Quad_Count-1; i >= 0; i--)
+    {
+        f32 Value = DistancesSquared[i];
+        world_quad QuadValue = Quads[i];
+        i32 j = i;
+        while ((j < Quad_Count) && (DistancesSquared[j + 1] > Value))
+        {
+            DistancesSquared[j] = DistancesSquared[j + 1];
+            Quads[j] = Quads[j + 1];
+            j = j + 1;
+        }
+        DistancesSquared[j] = Value;
+        Quads[j] = QuadValue;
+
+    }
+    free(DistancesSquared);
+}
+
+void Distance_Squared_Quad(const camera Camera, world_quad* Quads, const i32 Quad_Count, f32* Distance)
+{
+    for (i32 i = 0; i < Quad_Count; i++)
+    {
+        vec3 QuadMiddlePoint = { (Quads[i].Vertices[2].Position.x - Quads[i].Vertices[0].Position.x) / 2 + Quads[i].Vertices[0].Position.x,
+                                (Quads[i].Vertices[2].Position.y - Quads[i].Vertices[0].Position.y) / 2 + Quads[i].Vertices[0].Position.y,
+                                (Quads[i].Vertices[2].Position.z - Quads[i].Vertices[0].Position.z) / 2 + Quads[i].Vertices[0].Position.z };
+
+        vec3 PlayerToQuad = { QuadMiddlePoint.x - Camera.Position.x,
+                             QuadMiddlePoint.y - Camera.Position.y,
+                             QuadMiddlePoint.z - Camera.Position.z };
+
+        Distance[i] = (f32)(PlayerToQuad.x * PlayerToQuad.x +
+                                    PlayerToQuad.y * PlayerToQuad.y +
+                                    PlayerToQuad.z * PlayerToQuad.z);
+    }
+}
+
