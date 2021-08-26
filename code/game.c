@@ -55,6 +55,7 @@ void Game_Init(game *Game)
             }
         }
     }
+    Set_Quads_Chunk(TestChunk);
 }
 
 void Game_Update(game *Game, const input Input)
@@ -107,11 +108,16 @@ void Game_Draw(const game *Game, bitmap Buffer)
 {
     Bitmap_Clear(Buffer, COLOR_SKYBLUE);
 
-    bitmap GrasTop = Bitmap_Section(Game->Image, 0, 0, 16, 16);
-    bitmap GrasSide = Bitmap_Section(Game->Image, 16, 0, 16, 16);
-    bitmap GrasBottom = Bitmap_Section(Game->Image, 32, 0, 16, 16);
+    Draw_Quads_Chunk(Game->Camera, Buffer, Game->Image, &Game->World.Region.Chunks[0][0]);
+
+    Draw_String(Buffer, Game->Font, COLOR_WHITE, 32, 32, "ASFIDJH\nasdasd");
 
     /*
+    //bitmap GrasTop = Bitmap_Section(Game->Image, 0, 0, 16, 16);
+    //bitmap GrasSide = Bitmap_Section(Game->Image, 16, 0, 16, 16);
+    //bitmap GrasBottom = Bitmap_Section(Game->Image, 32, 0, 16, 16);
+
+    
     vec3 Offsets[256] = { 0 };
     for (i32 x = 0; x < 16; x++)
     {
@@ -126,15 +132,13 @@ void Game_Draw(const game *Game, bitmap Buffer)
     for (i32 i = 0; i < 256; i++)
     {
         Draw_GrasBlock(Game->Camera, Buffer, GrasTop, GrasSide, GrasBottom, Offsets[i]);
-    }*/
+    }
 
     //Draw_GrasBlock(Game->Camera, Buffer, GrasTop, GrasSide, GrasBottom, (vec3) { 1, 1, 1 });
 
-    Draw_EntireChunk(Game->Camera, Buffer, GrasTop, GrasSide, GrasBottom, &Game->World.Region.Chunks[0][0]);
-
-    Draw_String(Buffer, Game->Font, COLOR_WHITE, 32, 32, "ASFIDJH\nasdasd");
+    //Draw_EntireChunk(Game->Camera, Buffer, GrasTop, GrasSide, GrasBottom, &Game->World.Region.Chunks[0][0]);
     
-
+    */
 /*
     Bitmap_Clear(Buffer, COLOR_HEX(0xC0FFEE));
     Bitmap_SetPixel(Buffer, COLOR_HEX(0xDEAD), 10, 10);
