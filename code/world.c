@@ -163,7 +163,9 @@ void Chunk_GatherQuads(world_chunk *Chunk)
     if (Chunk->ChunkQuads)
         free(Chunk->ChunkQuads);
 
+    
     ChunkQuads = realloc(ChunkQuads, sizeof(world_quad) * i);
+
     Chunk->QuadCount = i;
     Chunk->ChunkQuads = ChunkQuads;
 }
@@ -301,12 +303,12 @@ void Chunk_SortQuadsInsertion(const camera Camera, world_quad *Quads, const i32 
 
     DistanceSquaredQuad(Camera, Quads, QuadCount, DistancesSquared);
 
-    for (i32 i = QuadCount-1; i >= 0; i--)
+    for (i32 i = QuadCount-2; i >= 0; i--)
     {
         f32 Value = DistancesSquared[i];
         world_quad QuadValue = Quads[i];
         i32 j = i;
-        while ((j < QuadCount) && (DistancesSquared[j + 1] > Value))
+        while ((j < QuadCount-1) && (DistancesSquared[j + 1] > Value))
         {
             DistancesSquared[j] = DistancesSquared[j + 1];
             Quads[j] = Quads[j + 1];
