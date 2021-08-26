@@ -31,15 +31,28 @@ void Game_Init(game *Game)
     Game->Image = Win32_LoadBitmap("IMAGE");
     Game->Font = Win32_LoadBitmap("FONT");
 
-    Camera_SetPosition(&Game->Camera, (vec3) { 0,1.0f,-1.0f });
+    Camera_SetPosition(&Game->Camera, (vec3) { 5.0f, -3.0f, -5.0f });
     Camera_SetRotation(&Game->Camera, 0.0f, -0.78539816339f * 0.75f);
 
     world_chunk* TestChunk = &Game->World.Region.Chunks[0][0];
+
     for (i32 x = 0; x < 16; x++)
     {
         for (i32 z = 0; z < 16; z++)
         {
-            TestChunk->Blocks[x][z]->Position = (vec3){ (f32)x, 0, (f32)z };
+            for (i32 y = 0; y < 256; y++)
+            {
+
+                Block* Current_Block = &TestChunk->Blocks[x][z][y];
+                Current_Block->Position = (vec3){ (f32)x, (f32)y, (f32)z };
+
+                if (y == 0) {
+                    Current_Block->Translucent = (i8)0;
+                }
+                else {
+                    Current_Block->Translucent = (i8)1;
+                }
+            }
         }
     }
 }
@@ -50,7 +63,8 @@ void Game_Update(game *Game, const input Input)
 
     Camera_SetRotation(Camera, Camera->Yaw , Camera->Pitch);
 
-    vec3 Forward = Camera_Forward(*Camera);
+    vec3 Forward = Camera_Direction(*Camera);
+     
     vec3 Right = Camera_Right(*Camera);
     vec3 NewCameraPosition = Camera->Position;
 
@@ -87,8 +101,6 @@ void Game_Update(game *Game, const input Input)
     if (Input.LookLeft) {
         Camera->Yaw -= TurnSpeed;
     }
-
-
     Camera_SetPosition(Camera, NewCameraPosition);
 }
 void Game_Draw(const game *Game, bitmap Buffer)
@@ -99,6 +111,7 @@ void Game_Draw(const game *Game, bitmap Buffer)
     bitmap GrasSide = Bitmap_Section(Game->Image, 16, 0, 16, 16);
     bitmap GrasBottom = Bitmap_Section(Game->Image, 32, 0, 16, 16);
 
+    /*
     vec3 Offsets[256] = { 0 };
     for (i32 x = 0; x < 16; x++)
     {
@@ -113,7 +126,11 @@ void Game_Draw(const game *Game, bitmap Buffer)
     for (i32 i = 0; i < 256; i++)
     {
         Draw_GrasBlock(Game->Camera, Buffer, GrasTop, GrasSide, GrasBottom, Offsets[i]);
-    }
+    }*/
+
+    //Draw_GrasBlock(Game->Camera, Buffer, GrasTop, GrasSide, GrasBottom, (vec3) { 1, 1, 1 });
+
+    Draw_EntireChunk(Game->Camera, Buffer, GrasTop, GrasSide, GrasBottom, &Game->World.Region.Chunks[0][0]);
 
     Draw_String(Buffer, Game->Font, COLOR_WHITE, 32, 32, "ASFIDJH\nasdasd");
     
