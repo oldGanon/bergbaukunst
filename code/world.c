@@ -42,8 +42,6 @@ typedef struct world
     world_region Region;
 } world;
 
-void DistanceSquaredQuad(const camera Camera, world_quad *Quads, const i32 QuadCount, f32 *Distance);
-
 
 
 void Chunk_GatherQuads(world_chunk *Chunk)
@@ -250,6 +248,23 @@ void Draw_GrasBlock(const camera Camera, const bitmap Target,
     Draw_Quad(Target, Bottom, V0, V1, V2, V3);
 }
 
+void DistanceSquaredQuad(const camera Camera, world_quad *Quads, const i32 QuadCount, f32 *Distance)
+{
+    for (i32 i = 0; i < QuadCount; i++)
+    {
+        vec3 QuadMiddlePoint = { (Quads[i].Vertices[2].Position.x - Quads[i].Vertices[0].Position.x) / 2 + Quads[i].Vertices[0].Position.x,
+                                 (Quads[i].Vertices[2].Position.y - Quads[i].Vertices[0].Position.y) / 2 + Quads[i].Vertices[0].Position.y,
+                                 (Quads[i].Vertices[2].Position.z - Quads[i].Vertices[0].Position.z) / 2 + Quads[i].Vertices[0].Position.z };
+
+        vec3 PlayerToQuad = { QuadMiddlePoint.x - Camera.Position.x,
+                              QuadMiddlePoint.y - Camera.Position.y,
+                              QuadMiddlePoint.z - Camera.Position.z };
+
+        Distance[i] = (f32)(PlayerToQuad.x * PlayerToQuad.x +
+                            PlayerToQuad.y * PlayerToQuad.y +
+                            PlayerToQuad.z * PlayerToQuad.z);
+    }
+}
 
 void Chunk_SortQuadsBubble(const camera Camera, world_quad *Quads, const i32 QuadCount)
 {
@@ -303,22 +318,3 @@ void Chunk_SortQuadsInsertion(const camera Camera, world_quad *Quads, const i32 
     }
     free(DistancesSquared);
 }
-
-void DistanceSquaredQuad(const camera Camera, world_quad *Quads, const i32 QuadCount, f32 *Distance)
-{
-    for (i32 i = 0; i < QuadCount; i++)
-    {
-        vec3 QuadMiddlePoint = { (Quads[i].Vertices[2].Position.x - Quads[i].Vertices[0].Position.x) / 2 + Quads[i].Vertices[0].Position.x,
-                                 (Quads[i].Vertices[2].Position.y - Quads[i].Vertices[0].Position.y) / 2 + Quads[i].Vertices[0].Position.y,
-                                 (Quads[i].Vertices[2].Position.z - Quads[i].Vertices[0].Position.z) / 2 + Quads[i].Vertices[0].Position.z };
-
-        vec3 PlayerToQuad = { QuadMiddlePoint.x - Camera.Position.x,
-                              QuadMiddlePoint.y - Camera.Position.y,
-                              QuadMiddlePoint.z - Camera.Position.z };
-
-        Distance[i] = (f32)(PlayerToQuad.x * PlayerToQuad.x +
-                            PlayerToQuad.y * PlayerToQuad.y +
-                            PlayerToQuad.z * PlayerToQuad.z);
-    }
-}
-
