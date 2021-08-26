@@ -5,13 +5,14 @@ typedef union
 {
     struct { f32 x, y; };
     struct { f32 u, v; };
+    f32 E[2];
 } vec2;
 
 typedef union
 {
-    alignas(16) f32 E[4];
     struct { f32 x, y, z; };
     struct { f32 r, g, b; };
+    f32 E[4];
 } vec3;
 
 #define MATH_PI 3.14159265358979323846f
@@ -77,9 +78,38 @@ f32 Cos(f32 x)
     return (x - 1.0f) * (x + 1.0f) * x3 * x;
 }
 
+#define LOAD_VEC2(V) _mm_castpd_ps(_mm_load_sd((f64*)&V.E[0]))
+#define STORE_VEC2(V,M) _mm_store_sd((f64*)V.E,_mm_castps_pd(M))
+inline vec2 Vec2_Add(vec2 A, vec2 B) { STORE_VEC2(A, _mm_add_ps(LOAD_VEC2(A), LOAD_VEC2(B))); return A; }
+inline vec2 Vec2_Sub(vec2 A, vec2 B) { STORE_VEC2(A, _mm_sub_ps(LOAD_VEC2(A), LOAD_VEC2(B))); return A; }
+inline vec2 Vec2_Mul(vec2 A, vec2 B) { STORE_VEC2(A, _mm_mul_ps(LOAD_VEC2(A), LOAD_VEC2(B))); return A; }
+inline vec2 Vec2_Div(vec2 A, vec2 B) { STORE_VEC2(A, _mm_div_ps(LOAD_VEC2(A), LOAD_VEC2(B))); return A; }
 
+#define LOAD_VEC3(V) _mm_loadu_ps(V.E)
+#define STORE_VEC3(V,M) _mm_storeu_ps(V.E,M)
+inline vec3 Vec3_Add(vec3 A, vec3 B) { STORE_VEC3(A, _mm_add_ps(LOAD_VEC3(A), LOAD_VEC3(B))); return A; }
+inline vec3 Vec3_Sub(vec3 A, vec3 B) { STORE_VEC3(A, _mm_sub_ps(LOAD_VEC3(A), LOAD_VEC3(B))); return A; }
+inline vec3 Vec3_Mul(vec3 A, vec3 B) { STORE_VEC3(A, _mm_mul_ps(LOAD_VEC3(A), LOAD_VEC3(B))); return A; }
+inline vec3 Vec3_Div(vec3 A, vec3 B) { STORE_VEC3(A, _mm_div_ps(LOAD_VEC3(A), LOAD_VEC3(B))); return A; }
 
-inline vec3 Vec3_Add(vec3 A, vec3 B) { _mm_store_ps(A.E, _mm_add_ps(_mm_load_ps(A.E), _mm_load_ps(B.E))); return A; }
-inline vec3 Vec3_Sub(vec3 A, vec3 B) { _mm_store_ps(A.E, _mm_sub_ps(_mm_load_ps(A.E), _mm_load_ps(B.E))); return A; }
-inline vec3 Vec3_Mul(vec3 A, vec3 B) { _mm_store_ps(A.E, _mm_mul_ps(_mm_load_ps(A.E), _mm_load_ps(B.E))); return A; }
-inline vec3 Vec3_Div(vec3 A, vec3 B) { _mm_store_ps(A.E, _mm_div_ps(_mm_load_ps(A.E), _mm_load_ps(B.E))); return A; }
+inline f32 Vec3_Dot(vec3 A, vec3 B)
+{
+    __m128 mA = LOAD_VEC3(A);
+    __m128 mB = LOAD_VEC3(B);
+    __m128 V = _mm_mul_ps(mA, mB);
+    V = _mm_add_ps(V, _mm_shuffle_ps(V, V, _MM_SHUFFLE(1,0,3,2)));
+    V = _mm_add_ss(V, _mm_shuffle_ps(V, V, _MM_SHUFFLE(2,3,0,1)));
+    return _mm_cvtss_f32(V);
+}
+
+inline vec3 Vec3_Cross(vec3 A, vec3 B)
+{
+    __m128 mA = LOAD_VEC3(A);
+    __m128 mB = LOAD_VEC3(B);
+    __m128 V = _mm_sub_ps(
+        _mm_mul_ps(mA, _mm_shuffle_ps(mB, mB, _MM_SHUFFLE(3,0,2,1))),
+        _mm_mul_ps(mB, _mm_shuffle_ps(mA, mA, _MM_SHUFFLE(3,0,2,1))));
+    V = _mm_shuffle_ps(V, V, _MM_SHUFFLE(3,0,2,1));
+    STORE_VEC3(A, V);
+    return A;
+}
