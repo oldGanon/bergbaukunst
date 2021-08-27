@@ -7,11 +7,12 @@ enum
 
 #define WORLD_CHUNK_WIDTH 16
 #define WORLD_CHUNK_HEIGHT 256
-#define REGION_SIZE 8
+#define REGION_SIZE 1
 
 typedef struct world_quad
 {
     vertex Vertices[4];
+    f32 Distance;
 }world_quad;
 
 typedef struct world_block
@@ -259,13 +260,13 @@ void Draw_GrasBlock(const camera Camera, const bitmap Target,
     Draw_Quad(Target, Bottom, V0, V1, V2, V3);
 }
 
-void DistanceSquaredQuad(const camera Camera, world_quad *Quads, const i32 QuadCount, f32 *Distance)
+/*void DistanceSquaredQuad(const camera Camera, world_quad* Quads, const i32 QuadCount, f32* Distance)
 {
     for (i32 i = 0; i < QuadCount; i++)
     {
-        vec3 QuadMiddlePoint = { (Quads[i].Vertices[2].Position.x - Quads[i].Vertices[0].Position.x) / 2 + Quads[i].Vertices[0].Position.x,
-                                 (Quads[i].Vertices[2].Position.y - Quads[i].Vertices[0].Position.y) / 2 + Quads[i].Vertices[0].Position.y,
-                                 (Quads[i].Vertices[2].Position.z - Quads[i].Vertices[0].Position.z) / 2 + Quads[i].Vertices[0].Position.z };
+        vec3 QuadMiddlePoint = { (Quads[i].Vertices[2].Position.x - 0.5f),
+                                 (Quads[i].Vertices[2].Position.y - 0.5f),
+                                 (Quads[i].Vertices[2].Position.z - 0.5f)};
 
         vec3 PlayerToQuad = { QuadMiddlePoint.x - Camera.Position.x,
                               QuadMiddlePoint.y - Camera.Position.y,
@@ -275,64 +276,60 @@ void DistanceSquaredQuad(const camera Camera, world_quad *Quads, const i32 QuadC
                             PlayerToQuad.y * PlayerToQuad.y +
                             PlayerToQuad.z * PlayerToQuad.z);
     }
-}
+}*/
 
 void Chunk_SortQuadsBubble(const camera Camera, world_quad *Quads, const i32 QuadCount)
 {
     if (QuadCount == 0) return;
 
-    f32 *DistancesSquared = malloc(sizeof(f32) * QuadCount);
-
-    DistanceSquaredQuad(Camera, Quads, QuadCount, DistancesSquared);
+    for (i32 i = 0; i < QuadCount - 1; i++)
+    {
+        Quads[i].Distance = Camera_CalcZ(Camera, (vec3) {(Quads[i].Vertices[2].Position.x - 0.5f),
+                                                         (Quads[i].Vertices[2].Position.y - 0.5f),
+                                                         (Quads[i].Vertices[2].Position.z - 0.5f)});
+    }
 
     for (i32 j = 0; j < QuadCount - 1; j++)
     {
         for (i32 i = 0; i < QuadCount - 1; i++)
         {
-            f32 Distance = DistancesSquared[i];
-            if (DistancesSquared[i] < DistancesSquared[i+1])
+            if (Quads[i].Distance < Quads[i+1].Distance)
             {
-                f32 TempDistance = DistancesSquared[i];
-                DistancesSquared[i] = DistancesSquared[i+1];
-                DistancesSquared[i+1] = TempDistance;
-
                 world_quad TempQuad = Quads[i];
                 Quads[i] = Quads[i+1];
                 Quads[i+1] = TempQuad;
             }
         }
     }
-    free(DistancesSquared);
 }
 
 void Chunk_SortQuadsInsertion(const camera Camera, world_quad *Quads, const i32 QuadCount)
 {
     if (QuadCount == 0) return;
-    f32* DistancesSquared = malloc(sizeof(f32) * QuadCount);
 
-    DistanceSquaredQuad(Camera, Quads, QuadCount, DistancesSquared);
+    for (i32 i = 0; i < QuadCount-1; i++)
+    {
+        Quads[i].Distance = Camera_CalcZ(Camera, (vec3) {(Quads[i].Vertices[2].Position.x - 0.5f),
+                                                         (Quads[i].Vertices[2].Position.y - 0.5f),
+                                                         (Quads[i].Vertices[2].Position.z - 0.5f)});
+    }
 
     for (i32 i = QuadCount-2; i >= 0; i--)
     {
-        f32 Value = DistancesSquared[i];
-        world_quad QuadValue = Quads[i];
+        world_quad Value = Quads[i];
         i32 j = i;
-        while ((j < QuadCount-1) && (DistancesSquared[j + 1] > Value))
+        while ((j < QuadCount-1) && (Quads[j + 1].Distance > Value.Distance))
         {
-            DistancesSquared[j] = DistancesSquared[j + 1];
             Quads[j] = Quads[j + 1];
             j = j + 1;
         }
-        DistancesSquared[j] = Value;
-        Quads[j] = QuadValue;
+        Quads[j] = Value;
 
     }
-    free(DistancesSquared);
 }
 
 void Chunk_Initionalize(world_chunk *Chunk,camera Camera, i32 ChunkOffsetX, i32 ChunkOffsetZ)
 {
-
     for (i32 x = 0; x < WORLD_CHUNK_WIDTH; x++)
     {
         for (i32 z = 0; z < WORLD_CHUNK_WIDTH; z++)
@@ -341,7 +338,7 @@ void Chunk_Initionalize(world_chunk *Chunk,camera Camera, i32 ChunkOffsetX, i32 
             {
                 world_block* Current_Block = &Chunk->Blocks[x][z][y];
 
-                if (y == 0 || (y == 1 && x==2 && z==1))
+                if (y == 0 || (y == 1 && x==2 && z==1) || (z == 5 && x == 5&& y<20) )
                 {
                     Current_Block->Id = BLOCK_ID_GRAS;
                 }
