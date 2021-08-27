@@ -31,32 +31,21 @@ void Game_Init(game *Game)
     Game->Image = Win32_LoadBitmap("IMAGE");
     Game->Font = Win32_LoadBitmap("FONT");
 
-    Camera_SetPosition(&Game->Camera, (vec3) { 0.0f, 0.0f, -5.0f });
+    Camera_SetPosition(&Game->Camera, (vec3) { 0.0f, 2.0f, -5.0f });
     Camera_SetRotation(&Game->Camera, 0.0f, -0.78539816339f * 0.75f);
 
-    world_chunk* TestChunk = &Game->World.Region.Chunks[0][0];
+    i32 RegionOffsetX = Game->World.Region.RegionOffsetX;
+    i32 RegionOffsetZ = Game->World.Region.RegionOffsetZ;
 
-    for (i32 x = 0; x < 16; x++)
+
+    for (i32 x = 0; x < REGION_SIZE ; x++)
     {
-        for (i32 z = 0; z < 16; z++)
+        for (i32 z = 0; z < REGION_SIZE; z++)
         {
-            for (i32 y = 0; y < 256; y++)
-            {
-                world_block* Current_Block = &TestChunk->Blocks[x][z][y];
-
-                if (y == 0 || y == 5 || (z ==5 && x == 5))
-                {
-                    Current_Block->Id = BLOCK_ID_GRAS;
-                }
-                else
-                {
-                    Current_Block->Id = BLOCK_ID_AIR;
-                }
-            }
+            world_chunk* Chunk = &Game->World.Region.Chunks[x][z];
+            Chunk_Initionalize(Chunk,Game->Camera,(x - (REGION_SIZE /2))*16+ RegionOffsetX,(z - (REGION_SIZE / 2)) * 16+ RegionOffsetZ);
         }
     }
-    Chunk_GatherQuads(TestChunk);
-    Chunk_SortQuadsBubble(Game->Camera, &TestChunk->ChunkQuads[0], TestChunk->QuadCount);
 }
 
 void Game_Update(game *Game, const input Input)
@@ -70,8 +59,8 @@ void Game_Update(game *Game, const input Input)
     vec3 Right = Camera_Right(*Camera);
     vec3 NewCameraPosition = Camera->Position;
 
-    f32 Speed = 0.1f;
-    f32 TurnSpeed = 0.02f;
+    f32 Speed = 0.5f;
+    f32 TurnSpeed = 0.05f;
 
     if (Input.MoveUp) {
         NewCameraPosition.x += Forward.x * Speed;
@@ -110,15 +99,17 @@ void Game_Draw(const game *Game, bitmap Buffer)
 {
     Bitmap_Clear(Buffer, COLOR_SKYBLUE);
 
-    const world_chunk *Chunk = &Game->World.Region.Chunks[0][0];
-    Chunk_SortQuadsInsertion(Game->Camera, &Chunk->ChunkQuads[0], Chunk->QuadCount);
-    Draw_QuadsChunk(Game->Camera, Buffer, Game->Image, Chunk);
+    for (i32 x = 0; x < REGION_SIZE; x++)
+    {
+        for (i32 z = 0; z < REGION_SIZE; z++)
+        {
+            const world_chunk* Chunk = &Game->World.Region.Chunks[x][z];
+            Chunk_SortQuadsInsertion(Game->Camera, &Chunk->ChunkQuads[0], Chunk->QuadCount);
+            Draw_QuadsChunk(Game->Camera, Buffer, Game->Image, Chunk);
+        }
+    }
 
     Draw_String(Buffer, Game->Font, COLOR_WHITE, 32, 32, "ASFIDJH\nasdasd");
-
-
-
-
 
 
     /*

@@ -7,6 +7,7 @@ enum
 
 #define WORLD_CHUNK_WIDTH 16
 #define WORLD_CHUNK_HEIGHT 256
+#define REGION_SIZE 8
 
 typedef struct world_quad
 {
@@ -28,7 +29,9 @@ typedef struct world_chunk
 
 typedef struct world_region
 {
-    struct world_chunk Chunks[16][16];
+    struct world_chunk Chunks[REGION_SIZE][REGION_SIZE];
+    i32 RegionOffsetX;
+    i32 RegionOffsetZ;
 } world_region;
 
 typedef struct entity
@@ -44,7 +47,7 @@ typedef struct world
 
 
 
-void Chunk_GatherQuads(world_chunk *Chunk)
+void Chunk_GatherQuads(world_chunk *Chunk, i32 ChunkOffsetX, i32 ChunkOffsetZ)
 {
     i32 i = 0;
     world_quad* ChunkQuads = malloc(sizeof(world_quad) * WORLD_CHUNK_WIDTH * WORLD_CHUNK_WIDTH * WORLD_CHUNK_HEIGHT * 3);
@@ -62,14 +65,14 @@ void Chunk_GatherQuads(world_chunk *Chunk)
                     vec3 BlockCenter = (vec3){ (f32)x, (f32)y, (f32)z };
 
                     vec3 Corners[8] = {
-                        {.x = -0.5f + BlockCenter.x, .y = -0.5f + BlockCenter.y, .z = -0.5f + BlockCenter.z },
-                        {.x = +0.5f + BlockCenter.x, .y = -0.5f + BlockCenter.y, .z = -0.5f + BlockCenter.z },
-                        {.x = -0.5f + BlockCenter.x, .y = +0.5f + BlockCenter.y, .z = -0.5f + BlockCenter.z },
-                        {.x = +0.5f + BlockCenter.x, .y = +0.5f + BlockCenter.y, .z = -0.5f + BlockCenter.z },
-                        {.x = -0.5f + BlockCenter.x, .y = -0.5f + BlockCenter.y, .z = +0.5f + BlockCenter.z },
-                        {.x = +0.5f + BlockCenter.x, .y = -0.5f + BlockCenter.y, .z = +0.5f + BlockCenter.z },
-                        {.x = -0.5f + BlockCenter.x, .y = +0.5f + BlockCenter.y, .z = +0.5f + BlockCenter.z },
-                        {.x = +0.5f + BlockCenter.x, .y = +0.5f + BlockCenter.y, .z = +0.5f + BlockCenter.z },
+                        {.x = -0.5f + BlockCenter.x+ChunkOffsetX, .y = -0.5f + BlockCenter.y, .z = -0.5f + BlockCenter.z+ChunkOffsetZ },
+                        {.x = +0.5f + BlockCenter.x+ChunkOffsetX, .y = -0.5f + BlockCenter.y, .z = -0.5f + BlockCenter.z+ChunkOffsetZ },
+                        {.x = -0.5f + BlockCenter.x+ChunkOffsetX, .y = +0.5f + BlockCenter.y, .z = -0.5f + BlockCenter.z+ChunkOffsetZ },
+                        {.x = +0.5f + BlockCenter.x+ChunkOffsetX, .y = +0.5f + BlockCenter.y, .z = -0.5f + BlockCenter.z+ChunkOffsetZ },
+                        {.x = -0.5f + BlockCenter.x+ChunkOffsetX, .y = -0.5f + BlockCenter.y, .z = +0.5f + BlockCenter.z+ChunkOffsetZ },
+                        {.x = +0.5f + BlockCenter.x+ChunkOffsetX, .y = -0.5f + BlockCenter.y, .z = +0.5f + BlockCenter.z+ChunkOffsetZ },
+                        {.x = -0.5f + BlockCenter.x+ChunkOffsetX, .y = +0.5f + BlockCenter.y, .z = +0.5f + BlockCenter.z+ChunkOffsetZ },
+                        {.x = +0.5f + BlockCenter.x+ChunkOffsetX, .y = +0.5f + BlockCenter.y, .z = +0.5f + BlockCenter.z+ChunkOffsetZ },
                     };
                     //Left, Right, Front, Back, Bottom, Top
 
@@ -325,4 +328,30 @@ void Chunk_SortQuadsInsertion(const camera Camera, world_quad *Quads, const i32 
 
     }
     free(DistancesSquared);
+}
+
+void Chunk_Initionalize(world_chunk *Chunk,camera Camera, i32 ChunkOffsetX, i32 ChunkOffsetZ)
+{
+
+    for (i32 x = 0; x < WORLD_CHUNK_WIDTH; x++)
+    {
+        for (i32 z = 0; z < WORLD_CHUNK_WIDTH; z++)
+        {
+            for (i32 y = 0; y < WORLD_CHUNK_HEIGHT; y++)
+            {
+                world_block* Current_Block = &Chunk->Blocks[x][z][y];
+
+                if (y == 0 || (y == 1 && x==2 && z==1))
+                {
+                    Current_Block->Id = BLOCK_ID_GRAS;
+                }
+                else
+                {
+                    Current_Block->Id = BLOCK_ID_AIR;
+                }
+            }
+        }
+    }
+    Chunk_GatherQuads(Chunk,ChunkOffsetX,ChunkOffsetZ);
+    Chunk_SortQuadsBubble(Camera, &Chunk->ChunkQuads[0], Chunk->QuadCount);
 }
