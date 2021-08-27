@@ -73,12 +73,13 @@ void Chunk_GatherQuads(world_chunk *Chunk)
                     };
                     //Left, Right, Front, Back, Bottom, Top
 
+                    // Left
                     if (x == 0 || (Chunk->Blocks[x - 1][z][y].Id == BLOCK_ID_AIR))
                     {
-                        vertex V0 = (vertex){ .TexCoord.u = 0.0f + 16.0f,.TexCoord.v = 0.0f };
-                        vertex V1 = (vertex){ .TexCoord.u = 16.0f + 16.0f,.TexCoord.v = 0.0f };
-                        vertex V2 = (vertex){ .TexCoord.u = 16.0f + 16.0f,.TexCoord.v = 16.0f };
-                        vertex V3 = (vertex){ .TexCoord.u = 0.0f + 16.0f,.TexCoord.v = 16.0f};
+                        vertex V0 = (vertex){ .TexCoord.u =  0 + 16, .TexCoord.v =  0, .Shadow = 0.5f };
+                        vertex V1 = (vertex){ .TexCoord.u = 16 + 16, .TexCoord.v =  0, .Shadow = 0.5f };
+                        vertex V2 = (vertex){ .TexCoord.u = 16 + 16, .TexCoord.v = 16, .Shadow = 0.0f };
+                        vertex V3 = (vertex){ .TexCoord.u =  0 + 16, .TexCoord.v = 16, .Shadow = 0.0f };
                         V0.Position = Corners[4];
                         V1.Position = Corners[0];
                         V2.Position = Corners[2];
@@ -87,12 +88,13 @@ void Chunk_GatherQuads(world_chunk *Chunk)
                         i++;
                     }
 
+                    // Right
                     if ((x == WORLD_CHUNK_WIDTH - 1) || (Chunk->Blocks[x + 1][z][y].Id == BLOCK_ID_AIR))
                     {
-                        vertex V0 = (vertex){ .TexCoord.u = 0.0f+16.0f,.TexCoord.v = 0.0f };
-                        vertex V1 = (vertex){ .TexCoord.u = 16.0f+ 16.0f,.TexCoord.v = 0.0f };
-                        vertex V2 = (vertex){ .TexCoord.u = 16.0f+ 16.0f,.TexCoord.v = 16.0f };
-                        vertex V3 = (vertex){ .TexCoord.u = 0.0f+ 16.0f,.TexCoord.v = 16.0f };
+                        vertex V0 = (vertex){ .TexCoord.u =  0 + 16, .TexCoord.v =  0, .Shadow = 0.5f };
+                        vertex V1 = (vertex){ .TexCoord.u = 16 + 16, .TexCoord.v =  0, .Shadow = 0.5f };
+                        vertex V2 = (vertex){ .TexCoord.u = 16 + 16, .TexCoord.v = 16, .Shadow = 0.0f };
+                        vertex V3 = (vertex){ .TexCoord.u =  0 + 16, .TexCoord.v = 16, .Shadow = 0.0f };
                         V0.Position = Corners[1];
                         V1.Position = Corners[5];
                         V2.Position = Corners[7];
@@ -101,12 +103,13 @@ void Chunk_GatherQuads(world_chunk *Chunk)
                         i++;
                     }
 
+                    // Front
                     if (z == 0 || (Chunk->Blocks[x][z - 1][y].Id == BLOCK_ID_AIR))
                     {
-                        vertex V0 = (vertex){ .TexCoord.u = 0.0f + 16.0f,.TexCoord.v = 0.0f };
-                        vertex V1 = (vertex){ .TexCoord.u = 16.0f + 16.0f,.TexCoord.v = 0.0f };
-                        vertex V2 = (vertex){ .TexCoord.u = 16.0f + 16.0f,.TexCoord.v = 16.0f };
-                        vertex V3 = (vertex){ .TexCoord.u = 0.0f + 16.0f,.TexCoord.v = 16.0f };
+                        vertex V0 = (vertex){ .TexCoord.u =  0 + 16, .TexCoord.v =  0, .Shadow = 0.5f };
+                        vertex V1 = (vertex){ .TexCoord.u = 16 + 16, .TexCoord.v =  0, .Shadow = 0.5f };
+                        vertex V2 = (vertex){ .TexCoord.u = 16 + 16, .TexCoord.v = 16, .Shadow = 0.0f };
+                        vertex V3 = (vertex){ .TexCoord.u =  0 + 16, .TexCoord.v = 16, .Shadow = 0.0f };
                         V0.Position = Corners[0];
                         V1.Position = Corners[1];
                         V2.Position = Corners[3];
@@ -115,12 +118,13 @@ void Chunk_GatherQuads(world_chunk *Chunk)
                         i++;
                     }
 
+                    // Back
                     if ((z == WORLD_CHUNK_WIDTH - 1) || (Chunk->Blocks[x][z + 1][y].Id == BLOCK_ID_AIR))
                     {
-                        vertex V0 = (vertex){ .TexCoord.u = 0.0f + 16.0f,.TexCoord.v = 0.0f };
-                        vertex V1 = (vertex){ .TexCoord.u = 16.0f + 16.0f,.TexCoord.v = 0.0f };
-                        vertex V2 = (vertex){ .TexCoord.u = 16.0f + 16.0f,.TexCoord.v = 16.0f };
-                        vertex V3 = (vertex){ .TexCoord.u = 0.0f + 16.0f,.TexCoord.v = 16.0f };
+                        vertex V0 = (vertex){ .TexCoord.u =  0 + 16, .TexCoord.v =  0, .Shadow = 0.5f };
+                        vertex V1 = (vertex){ .TexCoord.u = 16 + 16, .TexCoord.v =  0, .Shadow = 0.5f };
+                        vertex V2 = (vertex){ .TexCoord.u = 16 + 16, .TexCoord.v = 16, .Shadow = 0.0f };
+                        vertex V3 = (vertex){ .TexCoord.u =  0 + 16, .TexCoord.v = 16, .Shadow = 0.0f };
                         V0.Position = Corners[5];
                         V1.Position = Corners[4];
                         V2.Position = Corners[6];
@@ -129,12 +133,13 @@ void Chunk_GatherQuads(world_chunk *Chunk)
                         i++;
                     }
 
+                    // Bottom
                     if (y == 0 || (Chunk->Blocks[x][z][y - 1].Id == BLOCK_ID_AIR))
                     {
-                        vertex V0 = (vertex){ .TexCoord.u = 0.0f+32.0f,.TexCoord.v = 0.0f };
-                        vertex V1 = (vertex){ .TexCoord.u = 16.0f + 32.0f,.TexCoord.v = 0.0f };
-                        vertex V2 = (vertex){ .TexCoord.u = 16.0f + 32.0f,.TexCoord.v = 16.0f };
-                        vertex V3 = (vertex){ .TexCoord.u = 0.0f + 32.0f,.TexCoord.v = 16.0f };
+                        vertex V0 = (vertex){ .TexCoord.u =  0 + 32, .TexCoord.v =  0, .Shadow = 0.5f };
+                        vertex V1 = (vertex){ .TexCoord.u = 16 + 32, .TexCoord.v =  0, .Shadow = 0.5f };
+                        vertex V2 = (vertex){ .TexCoord.u = 16 + 32, .TexCoord.v = 16, .Shadow = 0.5f };
+                        vertex V3 = (vertex){ .TexCoord.u =  0 + 32, .TexCoord.v = 16, .Shadow = 0.5f };
                         V0.Position = Corners[4];
                         V1.Position = Corners[5];
                         V2.Position = Corners[1];
@@ -143,12 +148,13 @@ void Chunk_GatherQuads(world_chunk *Chunk)
                         i++;
                     }
 
+                    // Top
                     if ((y == WORLD_CHUNK_HEIGHT - 1) || (Chunk->Blocks[x][z][y + 1].Id == BLOCK_ID_AIR))
                     {
-                        vertex V0 = (vertex){ .TexCoord.u = 0.0f,.TexCoord.v = 0.0f };
-                        vertex V1 = (vertex){ .TexCoord.u = 16.0f,.TexCoord.v = 0.0f };
-                        vertex V2 = (vertex){ .TexCoord.u = 16.0f,.TexCoord.v = 16.0f };
-                        vertex V3 = (vertex){ .TexCoord.u = 0.0f,.TexCoord.v = 16.0f };
+                        vertex V0 = (vertex){ .TexCoord.u =  0, .TexCoord.v =  0 };
+                        vertex V1 = (vertex){ .TexCoord.u = 16, .TexCoord.v =  0 };
+                        vertex V2 = (vertex){ .TexCoord.u = 16, .TexCoord.v = 16 };
+                        vertex V3 = (vertex){ .TexCoord.u =  0, .TexCoord.v = 16 };
                         V0.Position = Corners[2];
                         V1.Position = Corners[3];
                         V2.Position = Corners[7];

@@ -48,7 +48,8 @@ inline f32 Lerp(f32 A, f32 B, f32 t) { return (1.0f-t)*A + t*B; }
 inline f32 Fract(f32 n) { return n - Floor(n); }
 inline f32 Modulo(f32 n, f32 d) { return n - d * Floor(n / d); }
 
-
+inline i32 Int_Max(i32 A, i32 B) { return _mm_cvtsi128_si32(_mm_max_epi32(_mm_cvtsi32_si128(A),_mm_cvtsi32_si128(B))); }
+inline i32 Int_Min(i32 A, i32 B) { return _mm_cvtsi128_si32(_mm_min_epi32(_mm_cvtsi32_si128(A),_mm_cvtsi32_si128(B))); }
 
 f32 Sin(f32 x)
 {
