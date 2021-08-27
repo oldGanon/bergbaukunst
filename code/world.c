@@ -186,10 +186,10 @@ void Draw_QuadsChunk(const camera Camera,const bitmap Target, bitmap TerrainText
         vertex V2 = Chunk->ChunkQuads[i].Vertices[2];
         vertex V3 = Chunk->ChunkQuads[i].Vertices[3];
 
-        V0.Position = CameraToScreen(Target, WorldToCamera(Camera, V0.Position));
-        V1.Position = CameraToScreen(Target, WorldToCamera(Camera, V1.Position));
-        V2.Position = CameraToScreen(Target, WorldToCamera(Camera, V2.Position));
-        V3.Position = CameraToScreen(Target, WorldToCamera(Camera, V3.Position));
+        V0.Position = Camera_WorldToScreen(Camera, Target, V0.Position);
+        V1.Position = Camera_WorldToScreen(Camera, Target, V1.Position);
+        V2.Position = Camera_WorldToScreen(Camera, Target, V2.Position);
+        V3.Position = Camera_WorldToScreen(Camera, Target, V3.Position);
 
         Draw_Quad(Target, TerrainTexture, V0, V1, V2, V3);
     }
@@ -211,7 +211,7 @@ void Draw_GrasBlock(const camera Camera, const bitmap Target,
     };
 
     for (u32 i = 0; i < 8; ++i)
-        Corners[i] = CameraToScreen(Target, WorldToCamera(Camera, Corners[i]));
+        Corners[i] = Camera_WorldToScreen(Camera, Target, Corners[i]);
 
 
     vertex V0 = { .TexCoord.u =  0.0f, .TexCoord.v =  0.0f };

@@ -47,7 +47,7 @@ vec3 Camera_Right(const camera Camera)
     };
 }
 
-vec3 CameraToScreen(const bitmap Screen, vec3 Position)
+vec3 Camera_ToScreen(const bitmap Screen, vec3 Position)
 {
     f32 HalfWidth = Screen.Width * 0.5f;
     f32 HalfHeight = Screen.Height * 0.5f;
@@ -58,7 +58,7 @@ vec3 CameraToScreen(const bitmap Screen, vec3 Position)
     return Position;
 }
 
-vec3 WorldToCamera(const camera Camera, vec3 Position)
+vec3 Camera_FromWorld(const camera Camera, vec3 Position)
 {
     Position.x -= Camera.Position.x;
     Position.y -= Camera.Position.y;
@@ -78,4 +78,19 @@ vec3 WorldToCamera(const camera Camera, vec3 Position)
     }
 
     return Position;
+}
+
+f32 Camera_CalcZ(const camera Camera, vec3 Position)
+{
+    Position.x -= Camera.Position.x;
+    Position.y -= Camera.Position.y;
+    Position.z -= Camera.Position.z;
+    Position.z = Camera.CosYaw * Position.z + Camera.SinYaw * Position.x;
+    Position.z = Camera.CosPitch * Position.z + Camera.SinPitch * Position.y;
+    return Position.z;
+}
+
+vec3 Camera_WorldToScreen(const camera Camera, const bitmap Screen, vec3 Position)
+{
+    return Camera_ToScreen(Screen, Camera_FromWorld(Camera, Position));
 }
