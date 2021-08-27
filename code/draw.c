@@ -832,7 +832,7 @@ inline void Draw__TriangleTexturedShadedVerts3DInternal(bitmap Target, const bit
             f32 z = 1.0f / invz;
             const i32 iu = Floor_toInt(u_z * z) & umask;
             const i32 iv = Floor_toInt(v_z * z) & vmask;
-            const u8 is = Floor_toInt(s_z * z * 15) & 15;
+            const u8 is = Floor_toInt(s_z * z * 15.999f) & 15;
             color Color = *(Texture.Pixels + Texture.Pitch * iv + iu);
             if (Color.Value) Dst->Value = Color.Value | is;
             ++Dst;
