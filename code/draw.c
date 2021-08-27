@@ -655,60 +655,6 @@ inline vertex Vertex_Lerp(vertex A, vertex B, f32 t)
     return A;
 }
 
-inline bool Draw__TriangleVisible(const bitmap Target, vertex A, vertex B, vertex C)
-{
-    // triangle winding order
-    f32 Cross = (B.Position.x - A.Position.x) * (C.Position.y - A.Position.y) - 
-                (B.Position.y - A.Position.y) * (C.Position.x - A.Position.x);
-    if (Cross < 0.0f) return false;
-
-    // triangle offscreen left
-    if (Max(Max(A.Position.x, B.Position.x), C.Position.x) < 0)
-        return false;
-    
-    // triangle offscreen right
-    if (Min(Min(A.Position.x, B.Position.x), C.Position.x) > (f32)Target.Width)
-        return false;
-
-     // triangle offscreen bottom
-    if (Max(Max(A.Position.y, B.Position.y), C.Position.y) < 0)
-        return false;
-
-    // triangle offscreen top
-    if (Min(Min(A.Position.y, B.Position.y), C.Position.y) > (f32)Target.Height)
-        return false;
-
-    return true;
-}
-
-inline void Draw__PrepareTriangleVerts(vertex *A, vertex *B, vertex *C)
-{
-    // sort vertices vertically
-    if (A->Position.y > B->Position.y)
-    {
-        if (B->Position.y > C->Position.y) { vertex T = *A; *A = *C; *C = T; }
-        else
-        {
-            if (A->Position.y > C->Position.y) { vertex T = *A; *A = *B; *B = *C; *C = T; }
-            else                               { vertex T = *A; *A = *B; *B = T; }
-        }
-    }
-    else
-    {
-        if (B->Position.y > C->Position.y)
-        {
-            if (A->Position.y > C->Position.y) { vertex T = *C; *C = *B; *B = *A; *A = T; }
-            else                               { vertex T = *B; *B = *C; *C = T; }
-        }
-    }
-
-    // move pixel center
-    vec3 PixelCenter = (vec3){ 0.5f, 0.5f, 0.0f };
-    A->Position = Vec3_Sub(A->Position, PixelCenter);
-    B->Position = Vec3_Sub(B->Position, PixelCenter);
-    C->Position = Vec3_Sub(C->Position, PixelCenter);
-}
-
 inline u32 Draw__TriangleClipZ(vertex *V)
 {
 #define CAMERA_NEAR 0.1f
@@ -748,6 +694,61 @@ inline u32 Draw__TriangleClipZ(vertex *V)
     return 0;
 }
 
+inline bool Draw__PrepareTriangleVerts(const bitmap Target, vertex *A, vertex *B, vertex *C)
+{
+    // move pixel center
+    vec3 PixelCenter = (vec3){ 0.5f, 0.5f, 0.0f };
+    A->Position = Vec3_Sub(A->Position, PixelCenter);
+    B->Position = Vec3_Sub(B->Position, PixelCenter);
+    C->Position = Vec3_Sub(C->Position, PixelCenter);
+
+    // triangle winding order
+    f32 Cross = (B->Position.x - A->Position.x) * (C->Position.y - A->Position.y) - 
+                (B->Position.y - A->Position.y) * (C->Position.x - A->Position.x);
+    if (Cross < 0.0f) return false;
+
+    // triangle offscreen left
+    f32 MaxX = Max(Max(A->Position.x, B->Position.x), C->Position.x);
+    if (MaxX < 0) return false;
+    
+    // triangle offscreen right
+    f32 MinX = Min(Min(A->Position.x, B->Position.x), C->Position.x);
+    if (MinX > (f32)Target.Width) return false;
+
+     // triangle offscreen bottom
+    f32 MaxY = Max(Max(A->Position.y, B->Position.y), C->Position.y);
+    if (MaxY < 0) return false;
+
+    // triangle offscreen top
+    f32 MinY = Min(Min(A->Position.y, B->Position.y), C->Position.y);
+    if (MinY > (f32)Target.Height) return false;
+
+    // triangle too small
+    if (Abs(Floor(MaxX) - Floor(MinX)) < 1.0f) return false;
+    if (Abs(Floor(MaxY) - Floor(MinY)) < 1.0f) return false;
+
+    // sort vertices vertically
+    if (A->Position.y > B->Position.y)
+    {
+        if (B->Position.y > C->Position.y) { vertex T = *A; *A = *C; *C = T; }
+        else
+        {
+            if (A->Position.y > C->Position.y) { vertex T = *A; *A = *B; *B = *C; *C = T; }
+            else                               { vertex T = *A; *A = *B; *B = T; }
+        }
+    }
+    else
+    {
+        if (B->Position.y > C->Position.y)
+        {
+            if (A->Position.y > C->Position.y) { vertex T = *C; *C = *B; *B = *A; *A = T; }
+            else                               { vertex T = *B; *B = *C; *C = T; }
+        }
+    }
+
+    return true;
+}
+
 inline vec3 Draw__PerspectiveDivide(bitmap Target, vec3 Position)
 {
     f32 HalfWidth = Target.Width * 0.5f;
@@ -759,36 +760,18 @@ inline vec3 Draw__PerspectiveDivide(bitmap Target, vec3 Position)
 
 void Draw_TriangleTexturedVerts(bitmap Target, const bitmap Texture, vertex A, vertex B, vertex C)
 {
-    // if ((A.Position.z == B.Position.z) && (B.Position.z == C.Position.z))
-    // {
-    //     if (A.Position.z < 0.0f) return;
-    //     if (A.Position.z > 0.0f)
-    //     {
-    //         A.Position = Draw__PerspectiveDivide(Target, A.Position);
-    //         B.Position = Draw__PerspectiveDivide(Target, B.Position);
-    //         C.Position = Draw__PerspectiveDivide(Target, C.Position);
-    //     }
+    vertex Vertices[6] = { A, B, C };
+    u32 TriangleCount = Draw__TriangleClipZ(Vertices);
+    for (u32 i = 0; i < TriangleCount; ++i)
+    {
+        vertex *V = Vertices + (i * 3);
+        V[0].Position = Draw__PerspectiveDivide(Target, V[0].Position);
+        V[1].Position = Draw__PerspectiveDivide(Target, V[1].Position);
+        V[2].Position = Draw__PerspectiveDivide(Target, V[2].Position);
 
-    //     if (!Draw__TriangleVisible(A, B, C, Clip)) return;
-    //     Draw__PrepareTriangleVerts(&A, &B, &C);
-    //     Draw__TriangleTexturedVerts2D(Target, Texture, A, B, C, Clip);
-    // }
-    // else
-    // {
-        vertex Vertices[6] = { A, B, C };
-        u32 TriangleCount = Draw__TriangleClipZ(Vertices);
-        for (u32 i = 0; i < TriangleCount; ++i)
-        {
-            vertex *V = Vertices + (i * 3);
-            V[0].Position = Draw__PerspectiveDivide(Target, V[0].Position);
-            V[1].Position = Draw__PerspectiveDivide(Target, V[1].Position);
-            V[2].Position = Draw__PerspectiveDivide(Target, V[2].Position);
-
-            if (!Draw__TriangleVisible(Target, V[0], V[1], V[2])) return;
-            Draw__PrepareTriangleVerts(&V[0], &V[1], &V[2]);
-            Draw__TriangleTexturedShadedVerts3D(Target, Texture, V[0], V[1], V[2]);
-        }
-    // }
+        if (!Draw__PrepareTriangleVerts(Target, &V[0], &V[1], &V[2])) return;
+        Draw__TriangleTexturedShadedVerts3D(Target, Texture, V[0], V[1], V[2]);
+    }
 }
 
 void Draw_TriangleVerts(bitmap Target, color Color, vertex A, vertex B, vertex C)
