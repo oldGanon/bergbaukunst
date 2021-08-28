@@ -7,7 +7,7 @@ enum
 
 #define WORLD_CHUNK_WIDTH 16
 #define WORLD_CHUNK_HEIGHT 256
-#define REGION_SIZE 1
+#define REGION_SIZE 16
 
 typedef struct world_quad
 {

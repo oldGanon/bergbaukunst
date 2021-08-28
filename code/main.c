@@ -35,9 +35,9 @@ typedef size_t index;
 #endif
 
 #define GAME_NAME "LD44"
-#define SCREEN_WIDTH 300 // 1920
-#define SCREEN_HEIGHT 200 // 1080
-#define SCREEN_SCALE 4 // 1
+#define SCREEN_WIDTH 640 // 1920
+#define SCREEN_HEIGHT 360 // 1080
+#define SCREEN_SCALE 2
 #define BYTES_PER_PIXEL 1
 
 int _fltused = 0;
@@ -531,6 +531,8 @@ int WINAPI CALLBACK WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR 
 
 int WinStartUp(void)
 {
+    _mm_setcsr( _mm_getcsr() | 0x8040 );
+    
     LPWSTR CmdLine = GetCommandLineW();
     int Result = WinMain(GetModuleHandle(0), 0, 0, 0);
     return Result;

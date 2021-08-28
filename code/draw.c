@@ -655,10 +655,6 @@ void Draw__TriangleTexturedShadedVerts3D(bitmap Target, const bitmap Texture, ve
 #define PACK_WIDTH (1 << PACK_WIDTH_SHIFT)
 #define PACK_HEIGHT (1 << PACK_HEIGHT_SHIFT)
 
-#define SUB_SHIFT 4
-#define SUB_STEP (1 << SUB_SHIFT)
-#define SUB_MASK (SUB_STEP - 1)
-
     __m128 ColOffset = _mm_setr_ps(0, 1, 2, 3);
     __m128 RowOffset = _mm_setr_ps(0, 0, 0, 0);
     __m128 One = _mm_set1_ps(1);
@@ -669,7 +665,6 @@ void Draw__TriangleTexturedShadedVerts3D(bitmap Target, const bitmap Texture, ve
     f32 MaxY = (f32)Target.Height;
 
     {
-        // use fixed-point only for X and Y. Avoid work for Z and W.
         f32 X[3] = { A.Position.x, B.Position.x, C.Position.x };
         f32 Y[3] = { A.Position.y, B.Position.y, C.Position.y };
         
@@ -679,28 +674,25 @@ void Draw__TriangleTexturedShadedVerts3D(bitmap Target, const bitmap Texture, ve
         f32 s[3] = { A.Shadow, B.Shadow, C.Shadow };
         f32 u[3] = { A.TexCoord.u, B.TexCoord.u, C.TexCoord.u };
         f32 v[3] = { A.TexCoord.v, B.TexCoord.v, C.TexCoord.v };
+        
+        // barycentric edge functions
+        // FAB(x, y) = (A.y - B.y)x + (B.x - A.x)y + (A.x * B.yy - B.x * A.y) = 0
+        // FBC(x, y) = (B.y - C.y)x + (C.x - B.x)y + (B.x * C.yy - C.x * B.y) = 0
+        // FCA(x, y) = (C.y - A.y)x + (A.x - C.x)y + (C.x * A.yy - A.x * C.y) = 0
 
-        // Fab(x, y) =     Ax       +       By     +      C              = 0
-        // Fab(x, y) = (ya - yb)x   +   (xb - xa)y + (xa * yb - xb * ya) = 0
-
-        // Compute A = (ya - yb) for the 3 line segments that make up each triangle
         f32 F12_dx = Y[1] - Y[2];
         f32 F20_dx = Y[2] - Y[0];
         f32 F01_dx = Y[0] - Y[1];
 
-        // Compute B = (xb - xa) for the 3 line segments that make up each triangle
         f32 F12_dy = X[2] - X[1];
         f32 F20_dy = X[0] - X[2];
         f32 F01_dy = X[1] - X[0];
 
-        // Compute C = (xa * yb - xb * ya) for the 3 line segments that make up each triangle
-        f32 C0 = X[1] * Y[2] - X[2] * Y[1];
-        f32 C1 = X[2] * Y[0] - X[0] * Y[2];
-        f32 C2 = X[0] * Y[1] - X[1] * Y[0];
+        f32 F12_0 = X[1] * Y[2] - X[2] * Y[1];
+        f32 F20_0 = X[2] * Y[0] - X[0] * Y[2];
+        f32 F01_0 = X[0] * Y[1] - X[1] * Y[0];
 
-        // Compute triangle area
         f32 invTriArea = 1.0f / (F01_dy * F20_dx - F20_dy * F01_dx);
-
         z[1] = (z[1] - z[0]) * invTriArea;
         z[2] = (z[2] - z[0]) * invTriArea;
         a[1] = (a[1] - a[0]) * invTriArea;
@@ -708,13 +700,11 @@ void Draw__TriangleTexturedShadedVerts3D(bitmap Target, const bitmap Texture, ve
         b[1] = (b[1] - b[0]) * invTriArea;
         b[2] = (b[2] - b[0]) * invTriArea;
 
-        // Use bounding box traversal strategy to determine which pixels to rasterize
         MinX = Max(Floor(Min(Min(X[0], X[1]), X[2]) / PACK_WIDTH) * PACK_WIDTH, MinX);
         MinY = Max(Floor(Min(Min(Y[0], Y[1]), Y[2]) / PACK_HEIGHT) * PACK_HEIGHT, MinY);
         MaxX = Min(Ceil(Max(Max(X[0], X[1]), X[2])), MaxX);
         MaxY = Min(Ceil(Max(Max(Y[0], Y[1]), Y[2])), MaxY);
 
-        // Specific to single triangle code follows
         {
             __m128 z4[3] = { _mm_set1_ps(z[0]), _mm_set1_ps(z[1]), _mm_set1_ps(z[2]) };
             __m128 a4[3] = { _mm_set1_ps(a[0]), _mm_set1_ps(a[1]), _mm_set1_ps(a[2]) };
@@ -723,7 +713,6 @@ void Draw__TriangleTexturedShadedVerts3D(bitmap Target, const bitmap Texture, ve
             __m128 u4[3] = { _mm_set1_ps(u[0]), _mm_set1_ps(u[1]), _mm_set1_ps(u[2]) };
             __m128 v4[3] = { _mm_set1_ps(v[0]), _mm_set1_ps(v[1]), _mm_set1_ps(v[2]) };
         
-            // Incrementally compute Fab(x, y) for all the pixels inside the bounding box formed by (startX, endX) and (startY, endY) 
             __m128 F12_dx4 = _mm_set1_ps(F12_dx);
             __m128 F20_dx4 = _mm_set1_ps(F20_dx);
             __m128 F01_dx4 = _mm_set1_ps(F01_dx);
@@ -742,9 +731,9 @@ void Draw__TriangleTexturedShadedVerts3D(bitmap Target, const bitmap Texture, ve
             __m128 B20_0 = _mm_mul_ps(F20_dy4, Row);
             __m128 B01_0 = _mm_mul_ps(F01_dy4, Row);
 
-            __m128 F12_Row = _mm_add_ps(_mm_add_ps(A12_0, B12_0), _mm_set1_ps(C0));
-            __m128 F20_Row = _mm_add_ps(_mm_add_ps(A20_0, B20_0), _mm_set1_ps(C1));
-            __m128 F01_Row = _mm_add_ps(_mm_add_ps(A01_0, B01_0), _mm_set1_ps(C2));
+            __m128 F12_Row = _mm_add_ps(_mm_add_ps(A12_0, B12_0), _mm_set1_ps(F12_0));
+            __m128 F20_Row = _mm_add_ps(_mm_add_ps(A20_0, B20_0), _mm_set1_ps(F20_0));
+            __m128 F01_Row = _mm_add_ps(_mm_add_ps(A01_0, B01_0), _mm_set1_ps(F01_0));
 
             F12_dx4 = _mm_mul_ps(F12_dx4, _mm_set1_ps(PACK_WIDTH));
             F20_dx4 = _mm_mul_ps(F20_dx4, _mm_set1_ps(PACK_WIDTH));
@@ -767,20 +756,17 @@ void Draw__TriangleTexturedShadedVerts3D(bitmap Target, const bitmap Texture, ve
 
             for(i32 y = iMinY; y < iMaxY; y += PACK_HEIGHT)
             {
-                // Compute barycentric coordinates 
                 i32 Index = RowIndex;
                 __m128 Alpha = F12_Row;
                 __m128 Beta  = F20_Row;
                 __m128 Gamma = F01_Row;
 
-                // Compute barycentric-interpolated attributes
                 __m128 zz = _mm_add_ps(_mm_add_ps(z4[0], _mm_mul_ps(Beta, z4[1])), _mm_mul_ps(Gamma, z4[2]));
                 __m128 aa = _mm_add_ps(_mm_add_ps(a4[0], _mm_mul_ps(Beta, a4[1])), _mm_mul_ps(Gamma, a4[2]));
                 __m128 bb = _mm_add_ps(_mm_add_ps(b4[0], _mm_mul_ps(Beta, b4[1])), _mm_mul_ps(Gamma, b4[2]));
 
                 for(i32 x = iMinX; x < iMaxX; x += PACK_WIDTH)
                 {
-                    // Test Pixel inside triangle
                     __m128i Mask = _mm_srai_epi32(_mm_castps_si128(_mm_or_ps(_mm_or_ps(Alpha, Beta), Gamma)), 32);
                     if (!_mm_test_all_ones(Mask))
                     {
