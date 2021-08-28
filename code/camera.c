@@ -94,3 +94,22 @@ vec3 Camera_WorldToScreen(const camera Camera, const bitmap Screen, vec3 Positio
 {
     return Camera_ToScreen(Screen, Camera_FromWorld(Camera, Position));
 }
+
+bool Camera_PositionVisible(const camera Camera, const bitmap Screen, vec3 Position)
+{
+    Position = Camera_FromWorld(Camera, Position);
+    f32 MinDim = 1.f / Min(Screen.Width, Screen.Height);
+    f32 X = Screen.Width * MinDim;
+    f32 Y = Screen.Height * MinDim;
+
+    vec3 A = {-X,-Y, 1 };
+    vec3 B = { X,-Y, 1 };
+    vec3 C = { X, Y, 1 };
+    vec3 D = {-X, Y, 1 };
+
+    if (Vec3_Dot(Position, Vec3_Cross(A, B)) < 0) return false;
+    if (Vec3_Dot(Position, Vec3_Cross(B, C)) < 0) return false;
+    if (Vec3_Dot(Position, Vec3_Cross(C, D)) < 0) return false;
+    if (Vec3_Dot(Position, Vec3_Cross(D, A)) < 0) return false;
+    return true;
+}
