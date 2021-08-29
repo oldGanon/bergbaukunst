@@ -31,19 +31,19 @@ void Game_Init(game *Game)
     Game->Terrain = Win32_LoadBitmap("TERRAIN");
     Game->Font = Win32_LoadBitmap("FONT");
 
-    Camera_SetPosition(&Game->Camera, (vec3) { 0.0f, 2.0f, -5.0f });
+    Camera_SetPosition(&Game->Camera, (vec3) { 0.0f, 2.0f, 0.0f });
     Camera_SetRotation(&Game->Camera, 0.0f, -0.78539816339f * 0.75f);
 
-    i32 RegionOffsetX = Game->World.Region.RegionOffsetX;
-    i32 RegionOffsetZ = Game->World.Region.RegionOffsetZ;
+    i32 RegionOffsetX = Game->World.Region.OffsetX;
+    i32 RegionOffsetZ = Game->World.Region.OffsetZ;
 
 
     for (i32 x = 0; x < REGION_SIZE ; x++)
     {
         for (i32 z = 0; z < REGION_SIZE; z++)
         {
-            world_chunk* Chunk = &Game->World.Region.Chunks[x][z];
-            Chunk_Initionalize(Chunk,Game->Camera,(x - (REGION_SIZE /2))*16+ RegionOffsetX,(z - (REGION_SIZE / 2)) * 16+ RegionOffsetZ);
+            world_chunk *Chunk = Region_ChunkGetAtXZ(&Game->World.Region, x, z);
+            Chunk_Initionalize(Chunk,&Game->World.Region,Game->Camera,x,z);
         }
     }
 }
@@ -93,17 +93,21 @@ void Game_Update(game *Game, const input Input)
         Camera->Yaw -= TurnSpeed;
     }
     Camera_SetPosition(Camera, NewCameraPosition);
+    World_Update_Region_Offset(&Game->World.Region,*Camera);
+    i32 daw = 0;
 }
 
 void Game_Draw(const game *Game, bitmap Buffer)
 {
     Bitmap_Clear(Buffer, COLOR_SKYBLUE);
 
+
+
     for (i32 x = 0; x < REGION_SIZE; x++)
     {
         for (i32 z = 0; z < REGION_SIZE; z++)
         {
-            const world_chunk* Chunk = &Game->World.Region.Chunks[x][z];
+            world_chunk* Chunk = Region_ChunkGetAtXZ(&Game->World.Region,x, z);
             Chunk_SortQuadsInsertion(Game->Camera, &Chunk->ChunkQuads[0], Chunk->QuadCount);
             Draw_QuadsChunk(Game->Camera, Buffer, Game->Terrain, Chunk);
         }

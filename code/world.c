@@ -7,7 +7,8 @@ enum
 
 #define WORLD_CHUNK_WIDTH 16
 #define WORLD_CHUNK_HEIGHT 256
-#define REGION_SIZE 16
+#define CHUNKS_AROUND_PLAYER 2
+#define REGION_SIZE ((CHUNKS_AROUND_PLAYER*2)+1)
 
 typedef struct world_quad
 {
@@ -23,6 +24,7 @@ typedef struct world_block
 typedef struct world_chunk
 {
     world_block Blocks[WORLD_CHUNK_WIDTH][WORLD_CHUNK_WIDTH][WORLD_CHUNK_HEIGHT];
+    f32 Distance;
     world_quad* ChunkQuads;
     i32 QuadCount;
 
@@ -30,9 +32,9 @@ typedef struct world_chunk
 
 typedef struct world_region
 {
-    struct world_chunk Chunks[REGION_SIZE][REGION_SIZE];
-    i32 RegionOffsetX;
-    i32 RegionOffsetZ;
+    struct world_chunk *Chunks[REGION_SIZE][REGION_SIZE];
+    i32 OffsetX;
+    i32 OffsetZ;
 } world_region;
 
 typedef struct entity
@@ -47,6 +49,31 @@ typedef struct world
 } world;
 
 
+world_chunk* Region_ChunkGetAtXZ(world_region* Region, i32 x, i32 z)
+{
+    i32 OffsetX = (((Region->OffsetX / WORLD_CHUNK_WIDTH) + x) % REGION_SIZE + REGION_SIZE) % REGION_SIZE;
+    i32 OffsetZ = (((Region->OffsetZ / WORLD_CHUNK_WIDTH) + z) % REGION_SIZE + REGION_SIZE) % REGION_SIZE;
+    return Region->Chunks[OffsetX][OffsetZ];
+}
+
+void Region_ChunkSetAtXZ(world_region* Region, i32 x, i32 z, world_chunk* Chunk)
+{
+    i32 OffsetX = (((Region->OffsetX / WORLD_CHUNK_WIDTH) + x) % REGION_SIZE + REGION_SIZE) % REGION_SIZE;
+    i32 OffsetZ = (((Region->OffsetZ / WORLD_CHUNK_WIDTH) + z) % REGION_SIZE + REGION_SIZE) % REGION_SIZE;
+    Region->Chunks[OffsetX][OffsetZ] = Chunk;
+}
+
+i32 Region_ChunkGetXOffset(world_region* Region, i32 x, i32 z)
+{
+    i32 OffsetX = x * 16 - ((REGION_SIZE / 2) * 16) + Region->OffsetX-8;
+    return OffsetX;
+}
+
+i32 Region_ChunkGetZOffset(world_region* Region, i32 x, i32 z)
+{
+    i32 OffsetZ = z * 16 - ((REGION_SIZE / 2) * 16) + Region->OffsetZ-8;
+    return OffsetZ;
+}
 
 void Chunk_GatherQuads(world_chunk *Chunk, i32 ChunkOffsetX, i32 ChunkOffsetZ)
 {
@@ -328,8 +355,11 @@ void Chunk_SortQuadsInsertion(const camera Camera, world_quad *Quads, const i32 
     }
 }
 
-void Chunk_Initionalize(world_chunk *Chunk,camera Camera, i32 ChunkOffsetX, i32 ChunkOffsetZ)
+void Chunk_Initionalize(world_chunk *Chunk,world_region *Region,camera Camera, i32 ChunkOffsetX, i32 ChunkOffsetZ)
 {
+    Chunk = malloc(sizeof(world_chunk));
+    Region_ChunkSetAtXZ(Region, ChunkOffsetX, ChunkOffsetZ, Chunk);
+
     for (i32 x = 0; x < WORLD_CHUNK_WIDTH; x++)
     {
         for (i32 z = 0; z < WORLD_CHUNK_WIDTH; z++)
@@ -349,6 +379,58 @@ void Chunk_Initionalize(world_chunk *Chunk,camera Camera, i32 ChunkOffsetX, i32 
             }
         }
     }
-    Chunk_GatherQuads(Chunk,ChunkOffsetX,ChunkOffsetZ);
+    Chunk_GatherQuads(Chunk,Region_ChunkGetXOffset(Region, ChunkOffsetX, ChunkOffsetZ), Region_ChunkGetZOffset(Region, ChunkOffsetX, ChunkOffsetZ));
     Chunk_SortQuadsBubble(Camera, &Chunk->ChunkQuads[0], Chunk->QuadCount);
+}
+
+void World_Update_Region_Offset(world_region *Region,const camera Camera) 
+{
+    if(Camera.Position.x - Region->OffsetX < -8)
+    {
+        Region->OffsetX -= WORLD_CHUNK_WIDTH;
+        for(i32 z = 0; z < REGION_SIZE; z++)
+        {
+            world_chunk *OldChunk = Region_ChunkGetAtXZ(Region, 0 , z);
+            free(OldChunk->ChunkQuads);
+            free(OldChunk);
+            world_chunk* NewChunk = { 0 };
+            Chunk_Initionalize(NewChunk, Region, Camera, 0, z);
+        }
+    }
+    else if (Camera.Position.x - Region->OffsetX > 8)
+    {
+        Region->OffsetX += WORLD_CHUNK_WIDTH;
+        for (i32 z = 0; z < REGION_SIZE; z++)
+        {
+            world_chunk* OldChunk = Region_ChunkGetAtXZ(Region, REGION_SIZE-1, z);
+            free(OldChunk->ChunkQuads);
+            free(OldChunk);
+            world_chunk* NewChunk = { 0 };
+            Chunk_Initionalize(NewChunk, Region, Camera, REGION_SIZE - 1, z);
+        }
+    }
+    else if (Camera.Position.z - Region->OffsetZ < -8)
+    {
+        Region->OffsetZ -= WORLD_CHUNK_WIDTH;
+        for (i32 x = 0; x < REGION_SIZE; x++)
+        {
+            world_chunk* OldChunk = Region_ChunkGetAtXZ(Region, x, 0);
+            free(OldChunk->ChunkQuads);
+            free(OldChunk);
+            world_chunk* NewChunk = { 0 };
+            Chunk_Initionalize(NewChunk, Region, Camera, x, 0);
+        }
+    }
+    else if (Camera.Position.z - Region->OffsetZ > 8)
+    {
+        Region->OffsetZ += WORLD_CHUNK_WIDTH;
+        for (i32 x = 0; x < REGION_SIZE; x++)
+        {
+            world_chunk* OldChunk = Region_ChunkGetAtXZ(Region, x, REGION_SIZE - 1);
+            free(OldChunk->ChunkQuads);
+            free(OldChunk);
+            world_chunk* NewChunk = { 0 };
+            Chunk_Initionalize(NewChunk, Region, Camera, x, REGION_SIZE - 1);
+        }
+    }
 }
