@@ -806,6 +806,7 @@ void Draw__TriangleTexturedShadedVerts3D(bitmap Target, const bitmap Texture, ve
                         {
                             color *Dst = (Target.Pixels + Index);
                             color Texel = *(Texture.Pixels + Texture.Pitch * iv[p] + iu[p]);
+                            Texel.Value &= 0xF8;
                             Texel.Value |= (is[p] & 0xFF);
                             Texel.Value &= M[p];
                             if (Texel.Value) Dst[p].Value = Texel.Value;
@@ -834,18 +835,15 @@ void Draw__TriangleTexturedShadedVerts3D(bitmap Target, const bitmap Texture, ve
 
 inline vertex Vertex_Lerp(vertex A, vertex B, f32 t)
 {
-    A.Position.x = Lerp(A.Position.x, B.Position.x, t);
-    A.Position.y = Lerp(A.Position.y, B.Position.y, t);
-    A.Position.z = Lerp(A.Position.z, B.Position.z, t);
-    A.TexCoord.x = Lerp(A.TexCoord.x, B.TexCoord.x, t);
-    A.TexCoord.y = Lerp(A.TexCoord.y, B.TexCoord.y, t);
+    A.Position = Lerp(A.Position, B.Position, t);
+    A.TexCoord = Lerp(A.TexCoord, B.TexCoord, t);
     A.Shadow = Lerp(A.Shadow, B.Shadow, t);
     return A;
 }
 
 inline u32 Draw__TriangleClipZ(vertex *V)
 {
-#define CAMERA_FAR 128.0f
+#define CAMERA_FAR 256.0f
     if (Max(Max(V[0].Position.z, V[1].Position.z), V[2].Position.z) > CAMERA_FAR)
         return 0;
 
@@ -888,16 +886,16 @@ inline u32 Draw__TriangleClipZ(vertex *V)
 
 inline bool Draw__PrepareTriangleVerts(const bitmap Target, vertex *A, vertex *B, vertex *C)
 {
+    // triangle winding order
+    f32 Cross = (B->Position.x - A->Position.x) * (C->Position.y - A->Position.y) - 
+                (B->Position.y - A->Position.y) * (C->Position.x - A->Position.x);
+    if (Cross < 0.0f) return false;
+
     // move pixel center
     vec3 PixelCenter = (vec3){ 0.5f, 0.5f, 0.0f };
     A->Position = Vec3_Sub(A->Position, PixelCenter);
     B->Position = Vec3_Sub(B->Position, PixelCenter);
     C->Position = Vec3_Sub(C->Position, PixelCenter);
-
-    // triangle winding order
-    f32 Cross = (B->Position.x - A->Position.x) * (C->Position.y - A->Position.y) - 
-                (B->Position.y - A->Position.y) * (C->Position.x - A->Position.x);
-    if (Cross < 0.0f) return false;
 
     // triangle offscreen left
     f32 MaxX = Max(Max(A->Position.x, B->Position.x), C->Position.x);
