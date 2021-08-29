@@ -6,7 +6,7 @@ typedef struct game
     u64 Frame;
 
     /* RESOURCES */
-    bitmap Image;
+    bitmap Terrain;
     bitmap Font;
 
     camera Camera;
@@ -28,7 +28,7 @@ typedef struct input
 
 void Game_Init(game *Game)
 {
-    Game->Image = Win32_LoadBitmap("IMAGE");
+    Game->Terrain = Win32_LoadBitmap("TERRAIN");
     Game->Font = Win32_LoadBitmap("FONT");
 
     Camera_SetPosition(&Game->Camera, (vec3) { 0.0f, 2.0f, -5.0f });
@@ -105,7 +105,7 @@ void Game_Draw(const game *Game, bitmap Buffer)
         {
             const world_chunk* Chunk = &Game->World.Region.Chunks[x][z];
             Chunk_SortQuadsInsertion(Game->Camera, &Chunk->ChunkQuads[0], Chunk->QuadCount);
-            Draw_QuadsChunk(Game->Camera, Buffer, Game->Image, Chunk);
+            Draw_QuadsChunk(Game->Camera, Buffer, Game->Terrain, Chunk);
         }
     }
 
