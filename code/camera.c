@@ -137,6 +137,11 @@ f32 Camera_CalcZ(const camera Camera, vec3 Position)
     return Position.z;
 }
 
+f32 Camera_CalcDist(const camera Camera, vec3 Position)
+{
+    return Vec3_LengthSq(Vec3_Sub(Position, Camera.Position));
+}
+
 bool Camera_PositionVisible(const camera Camera, const bitmap Screen, vec3 Position)
 {
     Position = Camera_FromWorld(Camera, Position);

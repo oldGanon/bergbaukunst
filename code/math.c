@@ -10,8 +10,26 @@ typedef union
 
 typedef union
 {
-    struct { f32 x, y, z; };
-    struct { f32 r, g, b; };
+    struct
+    {
+        f32 x;
+        union
+        {
+            struct { f32 y, z; };
+            vec2 yz;
+        };
+    };
+    struct { vec2 xy; };
+    struct
+    {
+        f32 r;
+        union
+        {
+            struct { f32 g, b; };
+            vec2 gb;
+        };
+    };
+    struct { vec2 rg; };
     f32 E[4];
 } vec3;
 
@@ -152,6 +170,25 @@ inline vec3 Vec3_Min(vec3 A, vec3 B) { STORE_VEC3(A, _mm_min_ps(LOAD_VEC3(A), LO
 inline vec3 Vec3_Max(vec3 A, vec3 B) { STORE_VEC3(A, _mm_max_ps(LOAD_VEC3(A), LOAD_VEC3(B))); return A; }
 inline vec3 Vec3_Clamp(vec3 A, vec3 min, vec3 max) { return Vec3_Min(Vec3_Max(A, min), max); }
 inline vec3 Vec3_Modulo(vec3 N, vec3 D) { return Vec3_Sub(N, Vec3_Mul(D, Vec3_Floor(Vec3_Div(N, D)))); }
+
+inline f32 Vec3_Sum(vec3 A)
+{
+    __m128 mA = LOAD_VEC3(A);
+    mA = _mm_add_ps(mA, _mm_shuffle_ps(mA, mA, _MM_SHUFFLE(1,0,3,2)));
+    mA = _mm_add_ss(mA, _mm_shuffle_ps(mA, mA, _MM_SHUFFLE(2,3,0,1)));
+    return _mm_cvtss_f32(mA);
+}
+
+inline f32 Vec3_LengthSq(vec3 A)
+{
+    __m128 mA = LOAD_VEC3(A);
+    mA = _mm_mul_ps(mA, mA);
+    mA = _mm_add_ps(mA, _mm_shuffle_ps(mA, mA, _MM_SHUFFLE(1,0,3,2)));
+    mA = _mm_add_ss(mA, _mm_shuffle_ps(mA, mA, _MM_SHUFFLE(2,3,0,1)));
+    return _mm_cvtss_f32(mA);
+}
+
+inline f32 Vec3_Length(vec3 A)   { return F32_Sqrt(Vec3_LengthSq(A)); }
 
 inline f32 Vec3_Dot(vec3 A, vec3 B)
 {
