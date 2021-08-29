@@ -5,3 +5,4 @@ APP_ICON ICON icon.ico
 IMAGE BITMAP image.bmp
 FONT BITMAP font.bmp
 PALETTE BITMAP palette.bmp
+TERRAIN BITMAP terrain.bmp

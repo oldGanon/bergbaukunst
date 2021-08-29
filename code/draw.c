@@ -659,6 +659,18 @@ void Draw__TriangleTexturedShadedVerts3D(bitmap Target, const bitmap Texture, ve
     __m128 RowOffset = _mm_setr_ps(0, 0, 0, 0);
     __m128 One = _mm_set1_ps(1);
 
+    __m128i umask = _mm_set1_epi32(Texture.Width - 1);
+    __m128i vmask = _mm_set1_epi32(Texture.Height - 1);
+    __m128i smask = _mm_set1_epi32(7);
+    __m128 ssize  = _mm_set1_ps(7);
+
+    __m128 Bayer[4] = {
+        _mm_set_ps( 0.0f/16.0f, 8.0f/16.0f, 2.0f/16.0f,10.0f/16.0f),
+        _mm_set_ps(12.0f/16.0f, 4.0f/16.0f,14.0f/16.0f, 6.0f/16.0f),
+        _mm_set_ps( 3.0f/16.0f,11.0f/16.0f, 1.0f/16.0f, 9.0f/16.0f),
+        _mm_set_ps(15.0f/16.0f, 7.0f/16.0f,13.0f/16.0f, 5.0f/16.0f),
+    };
+
     f32 MinX = 0;
     f32 MinY = 0;
     f32 MaxX = (f32)Target.Width;
@@ -780,10 +792,12 @@ void Draw__TriangleTexturedShadedVerts3D(bitmap Target, const bitmap Texture, ve
                         __m128 vvv = _mm_add_ps(_mm_add_ps(_mm_mul_ps(v4[0], aaa), _mm_mul_ps(v4[1], bbb)), _mm_mul_ps(v4[2], ccc));
                         __m128 sss = _mm_add_ps(_mm_add_ps(_mm_mul_ps(s4[0], aaa), _mm_mul_ps(s4[1], bbb)), _mm_mul_ps(s4[2], ccc));
 
+                        sss = _mm_add_ps(_mm_mul_ps(sss, ssize), Bayer[y&3]);
+
                         i32 iu[4], iv[4], is[4];
-                        _mm_storeu_epi32(iu, _mm_and_si128(_mm_cvtps_epi32(_mm_floor_ps(uuu)), _mm_set1_epi32(255)));
-                        _mm_storeu_epi32(iv, _mm_and_si128(_mm_cvtps_epi32(_mm_floor_ps(vvv)), _mm_set1_epi32(255)));
-                        _mm_storeu_epi32(is, _mm_and_si128(_mm_cvtps_epi32(_mm_floor_ps(_mm_mul_ps(sss, _mm_set1_ps(16)))), _mm_set1_epi32(15)));
+                        _mm_storeu_epi32(iu, _mm_and_si128(_mm_cvttps_epi32(uuu), umask));
+                        _mm_storeu_epi32(iv, _mm_and_si128(_mm_cvttps_epi32(vvv), vmask));
+                        _mm_storeu_epi32(is, _mm_and_si128(_mm_cvttps_epi32(sss), smask));
 
                         u32 M[4];
                         _mm_storeu_epi32(M, Mask4);
