@@ -224,7 +224,7 @@ void Bitmap_Clear(bitmap Buffer, color Color)
 
 void Draw_PointStruct(bitmap Target, color Color, point Point)
 {
-    Bitmap_SetPixel(Target, Color, Floor_toI32(Point.x), Floor_toI32(Point.y));
+    Bitmap_SetPixel(Target, Color, F32_FloorToI32(Point.x), F32_FloorToI32(Point.y));
 }
 
 inline void Draw__VerticalLine(bitmap Target, color Color, i32 X, i32 Y0, i32 Y1)
@@ -261,10 +261,10 @@ void Draw_LineStruct(bitmap Target, color Color, line Line)
     Line.b.y -= 0.5f;
 
     {   // check if vertical or horizontal line
-        const i32 ix0 = Ceil_toI32(Min(Line.a.x, Line.b.x));
-        const i32 ix1 = Ceil_toI32(Max(Line.a.x, Line.b.x));
-        const i32 iy0 = Ceil_toI32(Min(Line.a.y, Line.b.y));
-        const i32 iy1 = Ceil_toI32(Max(Line.a.y, Line.b.y));
+        const i32 ix0 = F32_CeilToI32(Min(Line.a.x, Line.b.x));
+        const i32 ix1 = F32_CeilToI32(Max(Line.a.x, Line.b.x));
+        const i32 iy0 = F32_CeilToI32(Min(Line.a.y, Line.b.y));
+        const i32 iy1 = F32_CeilToI32(Max(Line.a.y, Line.b.y));
         if (ix0 == ix1) Draw__VerticalLine(Target, Color, ix0, iy0, iy1);
         if (iy0 == iy1) Draw__HorizontalLine(Target, Color, ix0, ix1, iy0);
     }
@@ -289,11 +289,11 @@ void Draw_LineStruct(bitmap Target, color Color, line Line)
             f32 d = dy * (x0 - Line.a.x);
             y = Line.a.y + d + 0.5f;
         }
-        const i32 ix0 = Float_toI32(x0);
-        const i32 ix1 = Float_toI32(x1);
+        const i32 ix0 = F32_FloatToI32(x0);
+        const i32 ix1 = F32_FloatToI32(x1);
         for (i32 x = ix0; x < ix1; ++x)
         {
-            Bitmap__SetPixelFast(Target, Color, x, Floor_toI32(y));
+            Bitmap__SetPixelFast(Target, Color, x, F32_FloorToI32(y));
             y += dy;
         }
     }
@@ -315,11 +315,11 @@ void Draw_LineStruct(bitmap Target, color Color, line Line)
             f32 d = dx * (y0 - Line.a.y);
             x = Line.a.x + d + 0.5f;
         }
-        const i32 iy0 = Float_toI32(y0);
-        const i32 iy1 = Float_toI32(y1);
+        const i32 iy0 = F32_FloatToI32(y0);
+        const i32 iy1 = F32_FloatToI32(y1);
         for (i32 y = iy0; y < iy1; ++y)
         {
-            Bitmap__SetPixelFast(Target, Color, Floor_toI32(x), y);
+            Bitmap__SetPixelFast(Target, Color, F32_FloorToI32(x), y);
             x += dx;
         }
     }
@@ -343,9 +343,9 @@ void Draw_TriangleStruct(bitmap Target, color Color, triangle Triangle)
 
     const triangle Tri = Triangle_SortY(Triangle);
     
-    const i32 iy0 = Ceil_toI32(Max(Tri.a.y, miny));
-    const i32 iy1 = Ceil_toI32(Clamp(Tri.b.y, miny, maxy));
-    const i32 iy2 = Ceil_toI32(Min(Tri.c.y, maxy));
+    const i32 iy0 = F32_CeilToI32(Max(Tri.a.y, miny));
+    const i32 iy1 = F32_CeilToI32(Clamp(Tri.b.y, miny, maxy));
+    const i32 iy2 = F32_CeilToI32(Min(Tri.c.y, maxy));
 
     const f32 dx01 = (Tri.b.x - Tri.a.x) / (Tri.b.y - Tri.a.y);
     const f32 dx02 = (Tri.c.x - Tri.a.x) / (Tri.c.y - Tri.a.y);
@@ -360,8 +360,8 @@ void Draw_TriangleStruct(bitmap Target, color Color, triangle Triangle)
     f32 x1 = Tri.a.x + (dx1 * da);
     for (i32 y = iy0; y < iy1; ++y)
     {
-        const i32 ix0 = Ceil_toI32(Max(x0, minx));
-        const i32 ix1 = Ceil_toI32(Min(x1, maxx));
+        const i32 ix0 = F32_CeilToI32(Max(x0, minx));
+        const i32 ix1 = F32_CeilToI32(Min(x1, maxx));
         for (i32 x = ix0; x < ix1; ++x)
             Bitmap__SetPixelFast(Target, Color, x, y);
         x0 += dx0;
@@ -374,8 +374,8 @@ void Draw_TriangleStruct(bitmap Target, color Color, triangle Triangle)
     else             x1 = Tri.b.x + (dx1 * db);
     for (i32 y = iy1; y < iy2; ++y)
     {
-        const i32 ix0 = Ceil_toI32(Max(x0, minx));
-        const i32 ix1 = Ceil_toI32(Min(x1, maxx));
+        const i32 ix0 = F32_CeilToI32(Max(x0, minx));
+        const i32 ix1 = F32_CeilToI32(Min(x1, maxx));
         for (i32 x = ix0; x < ix1; ++x)
             Bitmap__SetPixelFast(Target, Color, x, y);
         x0 += dx0;
@@ -385,10 +385,10 @@ void Draw_TriangleStruct(bitmap Target, color Color, triangle Triangle)
 
 void Draw_RectStruct(bitmap Target, color Color, rect Rect)
 {
-    bitmap ClearRect = Bitmap_Section(Target, Floor_toI32(Rect.x), 
-                                              Floor_toI32(Rect.y),
-                                              Floor_toI32(Rect.w),
-                                              Floor_toI32(Rect.h));
+    bitmap ClearRect = Bitmap_Section(Target, F32_FloorToI32(Rect.x), 
+                                              F32_FloorToI32(Rect.y),
+                                              F32_FloorToI32(Rect.w),
+                                              F32_FloorToI32(Rect.h));
     Bitmap_Clear(ClearRect, Color);
 }
 
@@ -759,10 +759,10 @@ void Draw__TriangleTexturedShadedVerts3D(bitmap Target, const bitmap Texture, ve
             __m128 aa_dx = _mm_add_ps(_mm_mul_ps(F20_dx4, a4[1]), _mm_mul_ps(F01_dx4, a4[2]));
             __m128 bb_dx = _mm_add_ps(_mm_mul_ps(F20_dx4, b4[1]), _mm_mul_ps(F01_dx4, b4[2]));
 
-            i32 iMinX = Float_toI32(MinX);
-            i32 iMinY = Float_toI32(MinY);
-            i32 iMaxX = Float_toI32(MaxX);
-            i32 iMaxY = Float_toI32(MaxY);
+            i32 iMinX = F32_FloatToI32(MinX);
+            i32 iMinY = F32_FloatToI32(MinY);
+            i32 iMaxX = F32_FloatToI32(MaxX);
+            i32 iMaxY = F32_FloatToI32(MaxY);
 
             i32 RowIndex = iMinY * Target.Pitch + iMinX;
 
