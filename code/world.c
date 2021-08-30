@@ -73,8 +73,8 @@ void World_Draw(world *World, const bitmap Target, bitmap TerrainTexture, const 
     i32 zMid = F32_FloorToI32(Camera.Position.z / CHUNK_WIDTH);
     i32 xMin = xMid - LOADED_CHUNKS / 2;
     i32 zMin = zMid - LOADED_CHUNKS / 2;
-    i32 xMax = xMin + LOADED_CHUNKS;
-    i32 zMax = zMin + LOADED_CHUNKS;
+    i32 xMax = xMin + LOADED_CHUNKS - 1;
+    i32 zMax = zMin + LOADED_CHUNKS - 1;
 
     vec3 Forward = Camera_Forward(Camera);
 
