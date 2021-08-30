@@ -28,36 +28,51 @@ typedef struct input
 
 void Game_Init(game *Game)
 {
+/*
+    chunk_map ChunkMap = ChunkMap_Create();
+
+    for (i32 x = -16; x < 16; ++x)
+    for (i32 z = -16; z < 16; ++z)
+    {
+        ChunkMap_AllocateChunk(&ChunkMap, x, z);
+    }
+
+    for (i32 x = -16; x < 16; ++x)
+    for (i32 z = -16; z < 16; ++z)
+    {
+        chunk *Chunk = ChunkMap_GetChunk(&ChunkMap, x, z);
+        assert(Chunk->x == x);
+        assert(Chunk->z == z);
+    }
+
+    for (i32 x = -16; x < 16; ++x)
+    for (i32 z = -16; z < 16; ++z)
+    {
+        ChunkMap_DeleteChunk(&ChunkMap, x, z);
+    }
+
+    ChunkMap_Delete(&ChunkMap);
+*/
+
     Game->Terrain = Win32_LoadBitmap("TERRAIN");
     Game->Font = Win32_LoadBitmap("FONT");
 
     Camera_SetPosition(&Game->Camera, (vec3) { 0.0f, 2.0f, 0.0f });
     Camera_SetRotation(&Game->Camera, 0.0f, -0.78539816339f * 0.75f);
 
-    i32 RegionOffsetX = Game->World.Region.OffsetX;
-    i32 RegionOffsetZ = Game->World.Region.OffsetZ;
-
-
-    for (i32 x = 0; x < REGION_SIZE ; x++)
-    {
-        for (i32 z = 0; z < REGION_SIZE; z++)
-        {
-            world_chunk *Chunk = Region_ChunkGetAtXZ(&Game->World.Region, x, z);
-            Chunk_Initionalize(Chunk,&Game->World.Region,Game->Camera,x,z);
-        }
-    }
+    World_Create(&Game->World);
 }
 
 void Game_Update(game *Game, const input Input)
 {
     camera* Camera = &Game->Camera;
 
-    Camera_SetRotation(Camera, Camera->Yaw , Camera->Pitch);
-
     vec3 Forward = Camera_Direction(*Camera);
      
     vec3 Right = Camera_Right(*Camera);
     vec3 NewCameraPosition = Camera->Position;
+    f32 NewYaw = Camera->Yaw;
+    f32 NewPitch = Camera->Pitch;
 
     f32 Speed = 0.5f;
     f32 TurnSpeed = 0.05f;
@@ -81,40 +96,31 @@ void Game_Update(game *Game, const input Input)
         NewCameraPosition.z -= Right.z * Speed;
     }
     if (Input.LookUp) {
-        Camera->Pitch += TurnSpeed;
+        NewPitch += TurnSpeed;
     }
     if (Input.LookDown) {
-        Camera->Pitch -= TurnSpeed;
+        NewPitch -= TurnSpeed;
     }
     if (Input.LookRight) {
-        Camera->Yaw += TurnSpeed;
+        NewYaw += TurnSpeed;
     }
     if (Input.LookLeft) {
-        Camera->Yaw -= TurnSpeed;
+        NewYaw -= TurnSpeed;
     }
+    
     Camera_SetPosition(Camera, NewCameraPosition);
-    World_Update_Region_Offset(&Game->World.Region,*Camera);
-    i32 daw = 0;
+    Camera_SetRotation(Camera, NewYaw, NewPitch);
+
+    World_Update(&Game->World, Game->Camera);
 }
 
-void Game_Draw(const game *Game, bitmap Buffer)
+void Game_Draw(game *Game, bitmap Buffer)
 {
     Bitmap_Clear(Buffer, COLOR_SKYBLUE);
 
-
-
-    for (i32 x = 0; x < REGION_SIZE; x++)
-    {
-        for (i32 z = 0; z < REGION_SIZE; z++)
-        {
-            world_chunk* Chunk = Region_ChunkGetAtXZ(&Game->World.Region,x, z);
-            Chunk_SortQuadsInsertion(Game->Camera, &Chunk->ChunkQuads[0], Chunk->QuadCount);
-            Draw_QuadsChunk(Game->Camera, Buffer, Game->Terrain, Chunk);
-        }
-    }
+    World_Draw(&Game->World, Buffer, Game->Terrain, Game->Camera);
 
     Draw_String(Buffer, Game->Font, COLOR_WHITE, 32, 32, "ASFIDJH\nasdasd");
-
 
     /*
     //bitmap GrasTop = Bitmap_Section(Game->Image, 0, 0, 16, 16);
