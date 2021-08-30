@@ -33,6 +33,38 @@ typedef union
     f32 E[4];
 } vec3;
 
+typedef union
+{
+    struct { i32 x, y; };
+    struct { i32 u, v; };
+    i32 E[2];
+} ivec2;
+
+typedef union
+{
+    struct
+    {
+        i32 x;
+        union
+        {
+            struct { i32 y, z; };
+            ivec2 yz;
+        };
+    };
+    struct { ivec2 xy; };
+    struct
+    {
+        i32 r;
+        union
+        {
+            struct { i32 g, b; };
+            ivec2 gb;
+        };
+    };
+    struct { ivec2 rg; };
+    i32 E[4];
+} ivec3;
+
 #define MATH_PI 3.14159265358979323846f
 
 #define ABS(A) (((A)<(0))?(-A):(A))
@@ -211,6 +243,28 @@ inline vec3 Vec3_Cross(vec3 A, vec3 B)
     STORE_VEC3(A, V);
     return A;
 }
+
+/*************/
+/*   iVec3   */
+/*************/
+#define LOAD_IVEC3(V) _mm_loadu_si128((__m128i *)V.E)
+#define STORE_IVEC3(V,M) _mm_storeu_si128((__m128i *)V.E,M)
+inline ivec3 iVec3_Add(ivec3 A, ivec3 B) { STORE_IVEC3(A, _mm_add_epi32(LOAD_IVEC3(A), LOAD_IVEC3(B))); return A; }
+inline ivec3 iVec3_Sub(ivec3 A, ivec3 B) { STORE_IVEC3(A, _mm_sub_epi32(LOAD_IVEC3(A), LOAD_IVEC3(B))); return A; }
+inline ivec3 iVec3_Mul(ivec3 A, ivec3 B) { STORE_IVEC3(A, _mm_mul_epi32(LOAD_IVEC3(A), LOAD_IVEC3(B))); return A; }
+inline ivec3 iVec3_Div(ivec3 A, ivec3 B) { STORE_IVEC3(A, _mm_div_epi32(LOAD_IVEC3(A), LOAD_IVEC3(B))); return A; }
+
+inline ivec3 iVec3_Min(ivec3 A, ivec3 B) { STORE_IVEC3(A, _mm_min_epi32(LOAD_IVEC3(A), LOAD_IVEC3(B))); return A; }
+inline ivec3 iVec3_Max(ivec3 A, ivec3 B) { STORE_IVEC3(A, _mm_max_epi32(LOAD_IVEC3(A), LOAD_IVEC3(B))); return A; }
+
+/*****************/
+/* Vec3 -> iVec3 */
+/*****************/
+inline ivec3 Vec3_RoundToIVec3(vec3 A) { ivec3 B; STORE_IVEC3(B, _mm_cvtps_epi32(_mm_round_ps(LOAD_VEC3(A), _MM_FROUND_TO_NEAREST_INT|_MM_FROUND_NO_EXC))); return B; }
+inline ivec3 Vec3_TruncToIVec3(vec3 A) { ivec3 B; STORE_IVEC3(B, _mm_cvtps_epi32(_mm_round_ps(LOAD_VEC3(A), _MM_FROUND_TO_ZERO|_MM_FROUND_NO_EXC))); return B; }
+inline ivec3 Vec3_CeilToIVec3(vec3 A)  { ivec3 B; STORE_IVEC3(B, _mm_cvtps_epi32(_mm_ceil_ps(LOAD_VEC3(A)))); return B; }
+inline ivec3 Vec3_FloorToIVec3(vec3 A) { ivec3 B; STORE_IVEC3(B, _mm_cvtps_epi32(_mm_floor_ps(LOAD_VEC3(A)))); return B; }
+inline ivec3 Vec3_FloatToIVec3(vec3 A) { ivec3 B; STORE_IVEC3(B, _mm_cvtps_epi32(LOAD_VEC3(A))); return B; }
 
 /************/
 /* Generics */
