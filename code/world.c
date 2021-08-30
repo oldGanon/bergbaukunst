@@ -7,7 +7,8 @@ enum
 
 #define WORLD_CHUNK_WIDTH 16
 #define WORLD_CHUNK_HEIGHT 256
-#define LOADED_CHUNKS 8
+#define LOADED_CHUNKS 16
+#define VIEW_DISTANCE 4
 
 // #define CHUNKS_AROUND_PLAYER 2
 // #define REGION_SIZE ((CHUNKS_AROUND_PLAYER*2)+1)
@@ -71,10 +72,10 @@ void World_Draw(world *World, const bitmap Target, bitmap TerrainTexture, const 
 {
     i32 xMid = F32_FloorToI32(Camera.Position.x / CHUNK_WIDTH);
     i32 zMid = F32_FloorToI32(Camera.Position.z / CHUNK_WIDTH);
-    i32 xMin = xMid - LOADED_CHUNKS / 2;
-    i32 zMin = zMid - LOADED_CHUNKS / 2;
-    i32 xMax = xMin + LOADED_CHUNKS - 1;
-    i32 zMax = zMin + LOADED_CHUNKS - 1;
+    i32 xMin = xMid - VIEW_DISTANCE;
+    i32 zMin = zMid - VIEW_DISTANCE;
+    i32 xMax = xMid + VIEW_DISTANCE;
+    i32 zMax = zMid + VIEW_DISTANCE;
 
     vec3 Forward = Camera_Forward(Camera);
 
