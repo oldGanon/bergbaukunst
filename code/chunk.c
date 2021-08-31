@@ -255,13 +255,14 @@ u32 Chunk_BlockMask(chunk *Chunk, vec3 Position)
     ivec3 One = (ivec3) { 1, 1, 1 };
     ivec3 iPos = Vec3_FloorToIVec3(Position);
     ivec3 iMin = iVec3_Max(iVec3_Sub(iPos, One), (ivec3) {  0,  0,  0 });
-    ivec3 iMax = iVec3_Min(iVec3_Add(iPos, One), (ivec3) { 16, 16, 16 });
-    for (i32 x = iMin.x; x <= iMax.x; ++x)
-    for (i32 z = iMin.z; z <= iMax.z; ++z)
+    ivec3 iMax = iVec3_Min(iVec3_Add(iPos, One), (ivec3) { 15, 15, 15 });
     for (i32 y = iMin.y; y <= iMax.y; ++y)
+    for (i32 z = iMin.z; z <= iMax.z; ++z)
+    for (i32 x = iMin.x; x <= iMax.x; ++x)
     {
-        if ((Chunk->Blocks[x][z][y].Id != BLOCK_ID_AIR) &&
-            (Chunk->Blocks[x][z][y].Id != BLOCK_ID_LEAVES))
+        u8 BlockId = Chunk->Blocks[x][z][y].Id;
+        if ((BlockId != BLOCK_ID_AIR) &&
+            (BlockId != BLOCK_ID_LEAVES))
         {
             Mask |= 1 << ((x+1-iPos.x) + (z+1-iPos.z)*3 + (y+1-iPos.y)*9);
         }

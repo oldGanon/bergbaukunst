@@ -142,7 +142,7 @@ f32 Camera_CalcDist(const camera Camera, vec3 Position)
     return Vec3_LengthSq(Vec3_Sub(Position, Camera.Position));
 }
 
-bool Camera_PositionVisible(const camera Camera, const bitmap Screen, vec3 Position)
+bool Camera_PointVisible(const camera Camera, const bitmap Screen, vec3 Position)
 {
     Position = Camera_FromWorld(Camera, Position);
     f32 MinDim = 1.0f / Min(Screen.Width, Screen.Height);
@@ -164,12 +164,11 @@ bool Camera_PositionVisible(const camera Camera, const bitmap Screen, vec3 Posit
 bool Camera_BoxVisible(const camera Camera, const bitmap Screen, vec3 P0, vec3 P1)
 {
     vec3 Min = Vec3_Min(P0, P1);
-    vec3 Max = Vec3_Min(P0, P1);
+    vec3 Max = Vec3_Max(P0, P1);
 
     vec3 Half = (vec3){ 0.5f, 0.5f, 0.5f };
     vec3 HalfDim = Vec3_Mul(Vec3_Sub(Max, Min), Half);
-    vec3 Center = Vec3_Mul(Vec3_Add(Max, Min), Half);
-    Center = Vec3_Sub(Center, Camera.Position);
+    vec3 Center = Vec3_Sub(Vec3_Add(Min, HalfDim), Camera.Position);
 
     f32 MinDim = 1.0f / Min(Screen.Width, Screen.Height);
     f32 X = Screen.Width * MinDim;
@@ -185,9 +184,9 @@ bool Camera_BoxVisible(const camera Camera, const bitmap Screen, vec3 P0, vec3 P
     vec3 CD = Camera_ToWorldDir(Camera, Vec3_Cross(C, D));
     vec3 DA = Camera_ToWorldDir(Camera, Vec3_Cross(D, A));
 
-    if (Vec3_Dot(AB, Vec3_Sub(Vec3_Add(Vec3_Mul(Vec3_Sign(AB), HalfDim), Center), Camera.Position)) < 0) return false;
-    if (Vec3_Dot(BC, Vec3_Sub(Vec3_Add(Vec3_Mul(Vec3_Sign(BC), HalfDim), Center), Camera.Position)) < 0) return false;
-    if (Vec3_Dot(CD, Vec3_Sub(Vec3_Add(Vec3_Mul(Vec3_Sign(CD), HalfDim), Center), Camera.Position)) < 0) return false;
-    if (Vec3_Dot(DA, Vec3_Sub(Vec3_Add(Vec3_Mul(Vec3_Sign(DA), HalfDim), Center), Camera.Position)) < 0) return false;
+    if (Vec3_Dot(AB, Vec3_Add(Vec3_Mul(Vec3_Sign(AB), HalfDim), Center)) < 0) return false;
+    if (Vec3_Dot(BC, Vec3_Add(Vec3_Mul(Vec3_Sign(BC), HalfDim), Center)) < 0) return false;
+    if (Vec3_Dot(CD, Vec3_Add(Vec3_Mul(Vec3_Sign(CD), HalfDim), Center)) < 0) return false;
+    if (Vec3_Dot(DA, Vec3_Add(Vec3_Mul(Vec3_Sign(DA), HalfDim), Center)) < 0) return false;
     return true;
 }
