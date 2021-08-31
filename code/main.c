@@ -81,6 +81,7 @@ void free(void *);
 
 struct bitmap Win32_LoadBitmap(const char*);
 void Win32_DeleteBitmap(struct bitmap);
+void Win32_LockMouse(bool Lock);
 
 #include "math.c"
 #include "geom.c"
@@ -125,6 +126,7 @@ void *realloc(void *ptr, size_t size)
 
 void free(void *ptr)
 {
+    if (!ptr) return;
     HeapFree(GetProcessHeap(), 0, ptr);
 }
 
@@ -248,20 +250,18 @@ void Win32_GatherSamples(DWORD AudioCursor)
     }
 }
 
-void Win32_GetWindowDimension(i32 *Width, i32 *Height)
+ivec2 Win32_GetWindowDimension(void)
 {
     RECT ClientRect;
     GetClientRect(GlobalWindow, &ClientRect);
-    *Width = ClientRect.right - ClientRect.left;
-    *Height = ClientRect.bottom - ClientRect.top;
+    return (ivec2) { ClientRect.right - ClientRect.left, ClientRect.bottom - ClientRect.top };
 }
 
 void Win32_DisplayBitmap(HDC DeviceContext)
 {
-    i32 Width, Height;
-    Win32_GetWindowDimension(&Width, &Height);
+    ivec2 Dim = Win32_GetWindowDimension();
     StretchDIBits(DeviceContext,
-                  0, 0, Width, Height,
+                  0, 0, Dim.x, Dim.y,
                   0, 0, GlobalBackbuffer.Width, GlobalBackbuffer.Height,
                   GlobalBackbuffer.Pixels,
                   (BITMAPINFO *)&GlobalBackbufferInfo,
@@ -340,6 +340,23 @@ u64 Win32_TimeSince(u64 Counter)
     return Result;
 }
 
+void Win32_LockMouse(bool Lock)
+{
+    if (Lock)
+    {
+        RECT ClientRect;
+        GetClientRect(GlobalWindow, &ClientRect);
+        MapWindowPoints(GlobalWindow, HWND_DESKTOP, (POINT *)&ClientRect, 2);
+        ClipCursor(&ClientRect);
+        ShowCursor(false);
+    }
+    else
+    {
+        ClipCursor(0);
+        ShowCursor(true);
+    }
+}
+
 LRESULT CALLBACK Win32_WindowCallback(HWND Window, UINT Message, WPARAM WParam, LPARAM LParam)
 {
     LRESULT Result = 0;
@@ -377,6 +394,7 @@ LRESULT CALLBACK Win32_WindowCallback(HWND Window, UINT Message, WPARAM WParam, 
         case WM_ENTERSIZEMOVE:
         case WM_KILLFOCUS:
         {
+            Win32_LockMouse(false);
             GlobalFocus = false;
             if (GlobalAudioBuffer) 
                 IDirectSoundBuffer_Stop(GlobalAudioBuffer);
@@ -385,6 +403,7 @@ LRESULT CALLBACK Win32_WindowCallback(HWND Window, UINT Message, WPARAM WParam, 
         case WM_EXITSIZEMOVE:
         case WM_SETFOCUS:
         {
+            Win32_LockMouse(true);
             GlobalFocus = true;
             if(GlobalAudioBuffer) 
                 IDirectSoundBuffer_Play(GlobalAudioBuffer, 0, 0, DSBPLAY_LOOPING);
@@ -409,8 +428,9 @@ int WINAPI CALLBACK WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR 
             .hCursor       = LoadCursor(0, IDC_ARROW),
             .hIcon         = LoadIcon(hInstance, "APP_ICON"),
             .lpszClassName = ClassName }))
-        return 0;
+        return 1;
 
+    // WINDOW
     RECT WindowDim = { .right = SCREEN_WIDTH * SCREEN_SCALE,
                        .bottom = SCREEN_HEIGHT * SCREEN_SCALE };
     AdjustWindowRect(&WindowDim, WS_OVERLAPPEDWINDOW, 0);
@@ -421,8 +441,10 @@ int WINAPI CALLBACK WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR 
                                    WindowDim.right - WindowDim.left,
                                    WindowDim.bottom - WindowDim.top,
                                    0, 0, hInstance, 0);
-    if(!GlobalWindow) return 0;
+    if(!GlobalWindow) return 1;
 
+
+    // BACKBUFFER
     GlobalBackbuffer = Bitmap_Create(SCREEN_WIDTH, SCREEN_HEIGHT);
     GlobalBackbufferInfo = (BITMAPINFO_AND_PALETTE){
         .bmiHeader = {
@@ -436,23 +458,38 @@ int WINAPI CALLBACK WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR 
     };
     Win32_LoadPalette("PALETTE");
 
+    // AUDIO
     DWORD AudioCursor = 0;
     Win32_InitDSound();
     
+    // TIMING
     LARGE_INTEGER PerfCountFrequency;
     QueryPerformanceFrequency(&PerfCountFrequency);
     u64 TargetTimePerFrame = PerfCountFrequency.QuadPart / 60;
     u64 TargetTimePerFrameCarry = TargetTimePerFrame + PerfCountFrequency.QuadPart % 60;
     u64 LastTime = Win32_GetTime();
 
+    // GAME STATE
     input Input = { 0 };
     game *Game = malloc(sizeof(game));
     memset(Game, 0, sizeof(game));
     Game_Init(Game);
 
+    // RAW INPUT
+    Win32_LockMouse(true);
+    RAWINPUTDEVICE Rid[1];
+    Rid[0].usUsagePage = 1;
+    Rid[0].usUsage = 2; 
+    Rid[0].dwFlags = 0;//RIDEV_INPUTSINK;
+    Rid[0].hwndTarget = GlobalWindow;
+    RegisterRawInputDevices(Rid, 1, sizeof(Rid[0]));
+
+    // GAME LOOP
     GlobalRunning = true;
     while (GlobalRunning)
     {
+        Input.Look = (vec2){ 0 };
+
         MSG Message;
         while (PeekMessage(&Message, 0, 0, 0, PM_REMOVE))
         {
@@ -463,14 +500,25 @@ int WINAPI CALLBACK WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR 
                     GlobalRunning = false;
                 } break;
 
+                case WM_MBUTTONDOWN:
+                case WM_MBUTTONUP:
                 case WM_SYSKEYDOWN:
                 case WM_SYSKEYUP:
                 case WM_KEYDOWN:
                 case WM_KEYUP:
                 {
                     WPARAM Code = Message.wParam;    
-                    u8 WasDown = (((Message.lParam >> 30) & 1) != 0);
-                    u8 IsDown = (((Message.lParam >> 31) & 1) == 0);
+                    bool WasDown = (((Message.lParam >> 30) & 1) != 0);
+                    bool IsDown = (((Message.lParam >> 31) & 1) == 0);
+                    bool AltDown = (Message.lParam & (1 << 29)) != 0;
+                    
+                    if (IsDown && AltDown)
+                    {
+                        if (Code == VK_F4)
+                            GlobalRunning = false;
+                        // if (Code == VK_RETURN) FULLSCREEN
+                    }
+
                     if (WasDown != IsDown)
                     {
                         switch (Code)
@@ -480,16 +528,43 @@ int WINAPI CALLBACK WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR 
                             case 'S': Input.MoveBack = IsDown; break;
                             case 'D': Input.MoveRight = IsDown; break;
 
-                            case VK_UP: Input.LookUp = IsDown; break;
-                            case VK_LEFT: Input.LookLeft = IsDown; break;
-                            case VK_DOWN: Input.LookDown = IsDown; break;
+                            case VK_UP:    Input.LookUp = IsDown; break;
+                            case VK_LEFT:  Input.LookLeft = IsDown; break;
+                            case VK_DOWN:  Input.LookDown = IsDown; break;
                             case VK_RIGHT: Input.LookRight = IsDown; break;
 
                             case 'E': Input.Interact = IsDown; break;
-                            case VK_SPACE: Input.Jump; break;
-                            case VK_LBUTTON: Input.Punch; break;
-                            case VK_RBUTTON: Input.Place; break;
+                            case VK_SPACE: Input.Jump = IsDown; break;
+                            case VK_SHIFT: Input.Crouch = IsDown; break;
+                            case VK_LBUTTON: Input.Punch = IsDown; break;
+                            case VK_RBUTTON: Input.Place = IsDown; break;
                         }
+                    }
+                } break;
+
+                case WM_MOUSEMOVE:
+                {
+                    ivec2 Dim = Win32_GetWindowDimension();
+                    i16 xx = Message.lParam & 0xFFFF;
+                    i16 yy = (Message.lParam >> 16) & 0xFFFF;
+                    i32 x = (xx * GlobalBackbuffer.Width / Dim.x);
+                    i32 y = (yy * GlobalBackbuffer.Height / Dim.y);
+                    y = GlobalBackbuffer.Height - y - 1;
+                    Input.Mouse = (ivec2){ x, y };
+                } break;
+
+                case WM_INPUT:
+                {
+                    UINT dwSize = 48;
+                    u8 lpb[48];
+
+                    GetRawInputData((HRAWINPUT)Message.lParam, RID_INPUT, 
+                                    lpb, &dwSize, sizeof(RAWINPUTHEADER));
+                    RAWINPUT* raw = (RAWINPUT*)lpb;
+                    if (raw->header.dwType == RIM_TYPEMOUSE) 
+                    {
+                        Input.Look.x += raw->data.mouse.lLastX;
+                        Input.Look.y -= raw->data.mouse.lLastY;
                     }
                 } break;
 
@@ -536,9 +611,7 @@ int WINAPI CALLBACK WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR 
 }
 
 int WinStartUp(void)
-{
-    _mm_setcsr( _mm_getcsr() | 0x8040 );
-    
+{    
     LPWSTR CmdLine = GetCommandLineW();
     int Result = WinMain(GetModuleHandle(0), 0, 0, 0);
     return Result;

@@ -650,6 +650,7 @@ inline void Draw__TriangleTexturedShadedVerts3D(bitmap Target, const bitmap Text
 
 void Draw__TriangleTexturedShadedVerts3D(bitmap Target, const bitmap Texture, vertex A, vertex B, vertex C)
 {
+    _mm_setcsr(_mm_getcsr() | 0x8040);
 #define PACK_WIDTH_SHIFT 2
 #define PACK_HEIGHT_SHIFT 0
 #define PACK_WIDTH (1 << PACK_WIDTH_SHIFT)

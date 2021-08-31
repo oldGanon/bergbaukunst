@@ -272,6 +272,8 @@ u32 Chunk_BlockMask(chunk *Chunk, vec3 Position)
 
 void Chunk_GenerateMesh(chunk *Chunk)
 {
+    Mesh_Clear(&Chunk->Mesh);
+
     for (i32 x = 0; x < CHUNK_WIDTH; ++x)
     for (i32 z = 0; z < CHUNK_WIDTH; ++z)
     for (i32 y = 0; y < CHUNK_HEIGHT; ++y)

@@ -15,6 +15,9 @@ typedef struct game
 
 typedef struct input
 {
+    vec2 Look;
+    ivec2 Mouse;
+
     bool MoveForward;
     bool MoveBack;
     bool MoveLeft;
@@ -27,6 +30,7 @@ typedef struct input
 
     bool Interact;
     bool Jump;
+    bool Crouch;
     bool Punch;
     bool Place;
 } input;
@@ -81,6 +85,7 @@ void Game_Update(game *Game, const input Input)
 
     f32 Speed = 0.5f;
     f32 TurnSpeed = 0.05f;
+    f32 Sensitivity = 0.01f;
 
     if (Input.MoveForward) {
         NewCameraPosition.x += Forward.x * Speed;
@@ -112,6 +117,9 @@ void Game_Update(game *Game, const input Input)
     if (Input.LookLeft) {
         NewYaw -= TurnSpeed;
     }
+
+    NewYaw += Input.Look.x * Sensitivity;
+    NewPitch += Input.Look.y * Sensitivity;
     
     Camera_SetPosition(Camera, NewCameraPosition);
     Camera_SetRotation(Camera, NewYaw, NewPitch);
@@ -127,7 +135,7 @@ void Game_Draw(game *Game, bitmap Buffer)
 
     Draw_String(Buffer, Game->Font, COLOR_WHITE, 32, 32, "ASFIDJH\nasdasd");
 
-    /*
+/*
     //bitmap GrasTop = Bitmap_Section(Game->Image, 0, 0, 16, 16);
     //bitmap GrasSide = Bitmap_Section(Game->Image, 16, 0, 16, 16);
     //bitmap GrasBottom = Bitmap_Section(Game->Image, 32, 0, 16, 16);
