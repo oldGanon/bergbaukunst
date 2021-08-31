@@ -66,8 +66,10 @@ void Game_Init(game *Game)
     Game->Terrain = Win32_LoadBitmap("TERRAIN");
     Game->Font = Win32_LoadBitmap("FONT");
 
-    Camera_SetPosition(&Game->Camera, (vec3) { 0.0f, 2.0f, 0.0f });
-    Camera_SetRotation(&Game->Camera, 0.0f, -0.78539816339f * 0.75f);
+    Camera_SetPosition(&Game->Camera, (vec3) { 3.0f, 2.0f, 2.0f });
+    //Camera_SetRotation(&Game->Camera, 0.0f, -0.78539816339f * 0.75f);
+    Camera_SetRotation(&Game->Camera, 0.0f, 0.0f);
+
 
     World_Create(&Game->World);
 }
@@ -114,6 +116,7 @@ void Game_Update(game *Game, const input Input)
     if (Input.LookRight) {
         NewYaw += TurnSpeed;
     }
+    
     if (Input.LookLeft) {
         NewYaw -= TurnSpeed;
     }
@@ -121,10 +124,16 @@ void Game_Update(game *Game, const input Input)
     NewYaw += Input.Look.x * Sensitivity;
     NewPitch += Input.Look.y * Sensitivity;
     
+    if (Input.Interact)
+    {
+        Block_PlayerLookingAt(&Game->World, Game->Camera);
+    }
+    
     Camera_SetPosition(Camera, NewCameraPosition);
     Camera_SetRotation(Camera, NewYaw, NewPitch);
 
     World_Update(&Game->World, Game->Camera);
+
 }
 
 void Game_Draw(game *Game, bitmap Buffer)
@@ -144,7 +153,10 @@ void Game_Draw(game *Game, bitmap Buffer)
     Draw_Line(Buffer, COLOR_WHITE, C, D);
     Draw_Line(Buffer, COLOR_WHITE, D, A);
 
-/*
+    Draw_RectIVec2(Buffer, COLOR_BLACK, (ivec2) { Buffer.Width / 2 - 3, Buffer.Height / 2 - 3}, (ivec2) {5, 5});
+    //Draw_RectInt(Buffer, COLOR_BLACK, Buffer.Width/2 - 3, Buffer.Height / 2 - 3, 5, 5 );
+
+    /*
     //bitmap GrasTop = Bitmap_Section(Game->Image, 0, 0, 16, 16);
     //bitmap GrasSide = Bitmap_Section(Game->Image, 16, 0, 16, 16);
     //bitmap GrasBottom = Bitmap_Section(Game->Image, 32, 0, 16, 16);

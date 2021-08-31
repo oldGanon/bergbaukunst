@@ -325,7 +325,7 @@ void Chunk_Create(chunk *Chunk, i32 x, i32 z)
         world_block* Current_Block = &Chunk->Blocks[xx][zz][yy];
 
         if ((yy == 0) || 
-            (zz == 1 && xx == 2 && yy == 1) ||
+            (zz == 1 && xx == 2 && yy == 1) ||  
             (zz == 2 && xx == 3 && yy == 1) ||
             (zz == 9 && xx == 1 && yy == 1) ||
             (zz == 8 && xx == 2 && yy == 1) ||
