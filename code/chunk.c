@@ -303,8 +303,11 @@ void Chunk_GenerateMesh(chunk *Chunk)
 
 void Chunk_Draw(const camera Camera, const bitmap Target, bitmap TerrainTexture, chunk *Chunk)
 {
-    vec3 ChunkOffset = { (f32)Chunk->x * CHUNK_WIDTH, 0, (f32)Chunk->z * CHUNK_WIDTH };
-    Mesh_Draw(Target, Camera, TerrainTexture, ChunkOffset, &Chunk->Mesh);
+    vec3 ChunkDim = (vec3) { CHUNK_WIDTH, CHUNK_HEIGHT, CHUNK_WIDTH };
+    vec3 ChunkMin = Vec3_Mul(ChunkDim, (vec3) { (f32)Chunk->x, 0, (f32)Chunk->z});
+    vec3 ChunkMax = Vec3_Add(ChunkDim, ChunkMin);
+    if (!Camera_BoxVisible(Camera, Target, ChunkMin, ChunkMax)) return;
+    Mesh_Draw(Target, Camera, TerrainTexture, ChunkMin, &Chunk->Mesh);
 }
 
 void Chunk_Create(chunk *Chunk, i32 x, i32 z)

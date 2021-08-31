@@ -34,7 +34,7 @@ typedef size_t index;
   #define assert(x) do{(void)sizeof(x);}while(0)
 #endif
 
-#define GAME_NAME "LD44"
+#define GAME_NAME "Bergbaukunst"
 #define SCREEN_WIDTH 640 // 1920
 #define SCREEN_HEIGHT 360 // 1080
 #define SCREEN_SCALE 2

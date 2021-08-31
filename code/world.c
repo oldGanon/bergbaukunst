@@ -67,11 +67,7 @@ void World_Update(world *World, const camera Camera)
 void World_DrawChunk(chunk *Chunk, const bitmap Target, bitmap TerrainTexture, const camera Camera)
 {
     if (!Chunk) return;
-    vec3 ChunkDim = (vec3) { CHUNK_WIDTH, CHUNK_HEIGHT, CHUNK_WIDTH };
-    vec3 ChunkMin = Vec3_Mul(ChunkDim, (vec3) { (f32)Chunk->x, 0, (f32)Chunk->z});
-    vec3 ChunkMax = Vec3_Add(ChunkDim, ChunkMin);
-    if (Camera_BoxVisible(Camera, Target, ChunkMin, ChunkMax))
-        Chunk_Draw(Camera, Target, TerrainTexture, Chunk);
+    Chunk_Draw(Camera, Target, TerrainTexture, Chunk);
 }
 
 void World_Draw(world *World, const bitmap Target, bitmap TerrainTexture, const camera Camera)
