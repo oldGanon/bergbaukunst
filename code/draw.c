@@ -53,9 +53,9 @@ typedef struct vertex
 
 bitmap Bitmap_Create(u32 Width, u32 Height);
 bitmap Bitmap_Section(bitmap Bitmap, i32 X, i32 Y, u32 W, u32 H);
-color Bitmap_GetPixel(bitmap Buffer, i32 X, i32 Y);
-void Bitmap_SetPixel(bitmap Buffer, color Color, i32 X, i32 Y);
-void Bitmap_Clear(bitmap Buffer, color Color);
+color Bitmap_GetPixel(bitmap Bitmap, i32 X, i32 Y);
+void Bitmap_SetPixel(bitmap Bitmap, color Color, i32 X, i32 Y);
+void Bitmap_Clear(bitmap Bitmap, color Color);
 
 void Draw_PointStruct(bitmap Target, color Color, point Point);
 void Draw_LineStruct(bitmap Target, color Color, line Line);
@@ -189,35 +189,35 @@ void Bitmap_Blit(bitmap Dst, bitmap Src)
             Dst.Pixels[x + y * Dst.Pitch] = Src.Pixels[x + y * Src.Pitch];
 }
 
-inline color Bitmap__GetPixelFast(bitmap Buffer, i32 X, i32 Y)
+inline color Bitmap__GetPixelFast(bitmap Bitmap, i32 X, i32 Y)
 {
-    return *(Buffer.Pixels + X + Y * Buffer.Pitch);
+    return *(Bitmap.Pixels + X + Y * Bitmap.Pitch);
 }
 
-color Bitmap_GetPixel(bitmap Buffer, i32 X, i32 Y)
+color Bitmap_GetPixel(bitmap Bitmap, i32 X, i32 Y)
 {
-    if ((u32)X >= Buffer.Width)  return (color){ 0 };
-    if ((u32)Y >= Buffer.Height) return (color){ 0 };
-    return Bitmap__GetPixelFast(Buffer, X, Y);
+    if ((u32)X >= Bitmap.Width)  return (color){ 0 };
+    if ((u32)Y >= Bitmap.Height) return (color){ 0 };
+    return Bitmap__GetPixelFast(Bitmap, X, Y);
 }
 
-inline void Bitmap__SetPixelFast(bitmap Buffer, color Color, i32 X, i32 Y)
+inline void Bitmap__SetPixelFast(bitmap Bitmap, color Color, i32 X, i32 Y)
 {
-    *(Buffer.Pixels + X + Y * Buffer.Pitch) = Color;
+    *(Bitmap.Pixels + X + Y * Bitmap.Pitch) = Color;
 }
 
-void Bitmap_SetPixel(bitmap Buffer, color Color, i32 X, i32 Y)
+void Bitmap_SetPixel(bitmap Bitmap, color Color, i32 X, i32 Y)
 {
-    if ((u32)X >= Buffer.Width)  return;
-    if ((u32)Y >= Buffer.Height) return;
-    Bitmap__SetPixelFast(Buffer, Color, X, Y);
+    if ((u32)X >= Bitmap.Width)  return;
+    if ((u32)Y >= Bitmap.Height) return;
+    Bitmap__SetPixelFast(Bitmap, Color, X, Y);
 }
 
-void Bitmap_Clear(bitmap Buffer, color Color)
+void Bitmap_Clear(bitmap Bitmap, color Color)
 {
-    for (u32 y = 0; y < Buffer.Height; ++y)
-    for (u32 x = 0; x < Buffer.Width; ++x)
-        Bitmap__SetPixelFast(Buffer, Color, x, y);
+    for (u32 y = 0; y < Bitmap.Height; ++y)
+    for (u32 x = 0; x < Bitmap.Width; ++x)
+        Bitmap__SetPixelFast(Bitmap, Color, x, y);
 }
 
 
@@ -807,9 +807,8 @@ void Draw__TriangleTexturedShadedVerts3D(bitmap Target, const bitmap Texture, ve
                             color *Dst = (Target.Pixels + Index);
                             color Texel = *(Texture.Pixels + Texture.Pitch * iv[p] + iu[p]);
                             Texel.Value &= 0xF8;
-                            Texel.Value |= (is[p] & 0xFF);
                             Texel.Value &= M[p];
-                            if (Texel.Value) Dst[p].Value = Texel.Value;
+                            if (Texel.Value) Dst[p].Value = Texel.Value | (is[p] & 0xFF);
                         }
                     }
 
@@ -987,37 +986,3 @@ void Draw_QuadTexturedVerts(bitmap Target, bitmap Texture, vertex A, vertex B, v
     Draw_TriangleTexturedVerts(Target, Texture, A, B, C);
     Draw_TriangleTexturedVerts(Target, Texture, C, D, A);
 }
-
-
-
-
-
-/* SIMD RASTER LOOP
-    __m128 p = _mm_setr_ps(u0, v0, x0, x1);
-    __m128 dp = _mm_setr_ps(du0, dv0, dx0, dx1);
-    __m128 duvdx = _mm_setr_ps(dudx, dvdx, 0, 0);
-
-    __m128 minxx = _mm_set1_ps(minx);
-    __m128 maxxx = _mm_set1_ps(maxx);
-
-    for (i32 iy = iy1; iy < iy2; ++iy)
-    {
-        __m128 x = _mm_shuffle_ps(p, p, 0xFA);
-        __m128 xx = _mm_ceil_ps(_mm_min_ps(_mm_max_ps(x, minxx), maxxx));
-        __m128 dx = _mm_sub_ps(xx, x);
-        __m128 uv = _mm_add_ps(p, _mm_mul_ps(duvdx, dx));
-
-        i32 ixx[4];
-        _mm_store_si128((__m128i *)ixx, _mm_cvtps_epi32(_mm_shuffle_ps(xx, xx, 0x0C)));
-        for (i32 ix = ixx[0]; ix < ixx[1]; ++ix)
-        {
-            i32 iuv[4];
-            _mm_store_si128((__m128i *)iuv, _mm_cvtps_epi32(_mm_floor_ps(uv)));
-            color Color = Bitmap_GetPixelFast(Texture, iuv[0], iuv[1]);
-            if (Color.Value) Bitmap_SetPixelFast(Buffer, Color, ix, iy);
-            
-            uv = _mm_add_ps(uv, duvdx);
-        }
-        p = _mm_add_ps(p, dp);
-    }
-*/

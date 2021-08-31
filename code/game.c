@@ -15,15 +15,20 @@ typedef struct game
 
 typedef struct input
 {
-    u8 MoveUp;
-    u8 MoveDown;
-    u8 MoveLeft;
-    u8 MoveRight;
+    bool MoveForward;
+    bool MoveBack;
+    bool MoveLeft;
+    bool MoveRight;
 
-    u8 LookUp;
-    u8 LookDown;
-    u8 LookLeft;
-    u8 LookRight;
+    bool LookUp;
+    bool LookDown;
+    bool LookLeft;
+    bool LookRight;
+
+    bool Interact;
+    bool Jump;
+    bool Punch;
+    bool Place;
 } input;
 
 void Game_Init(game *Game)
@@ -77,12 +82,12 @@ void Game_Update(game *Game, const input Input)
     f32 Speed = 0.5f;
     f32 TurnSpeed = 0.05f;
 
-    if (Input.MoveUp) {
+    if (Input.MoveForward) {
         NewCameraPosition.x += Forward.x * Speed;
         NewCameraPosition.y += Forward.y * Speed;
         NewCameraPosition.z += Forward.z * Speed;
     }
-    if (Input.MoveDown) {
+    if (Input.MoveBack) {
         NewCameraPosition.x -= Forward.x * Speed;
         NewCameraPosition.y -= Forward.y * Speed;
         NewCameraPosition.z -= Forward.z * Speed;

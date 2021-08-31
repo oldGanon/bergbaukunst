@@ -475,15 +475,20 @@ int WINAPI CALLBACK WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR 
                     {
                         switch (Code)
                         {
-                            case 'W': Input.MoveUp = IsDown; break;
+                            case 'W': Input.MoveForward = IsDown; break;
                             case 'A': Input.MoveLeft = IsDown; break;
-                            case 'S': Input.MoveDown = IsDown; break;
+                            case 'S': Input.MoveBack = IsDown; break;
                             case 'D': Input.MoveRight = IsDown; break;
 
                             case VK_UP: Input.LookUp = IsDown; break;
                             case VK_LEFT: Input.LookLeft = IsDown; break;
                             case VK_DOWN: Input.LookDown = IsDown; break;
                             case VK_RIGHT: Input.LookRight = IsDown; break;
+
+                            case 'E': Input.Interact = IsDown; break;
+                            case VK_SPACE: Input.Jump; break;
+                            case VK_LBUTTON: Input.Punch; break;
+                            case VK_RBUTTON: Input.Place; break;
                         }
                     }
                 } break;

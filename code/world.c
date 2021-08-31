@@ -3,6 +3,8 @@ enum
 {
     BLOCK_ID_AIR = 0,
     BLOCK_ID_GRAS = 1,
+    BLOCK_ID_WOOD = 2,
+    BLOCK_ID_LEAVES = 3,
 } world_block_id;
 
 #define WORLD_CHUNK_WIDTH 16
