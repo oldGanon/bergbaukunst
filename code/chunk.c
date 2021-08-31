@@ -102,7 +102,6 @@ void Chunk_GenerateMesh(chunk *Chunk)
                 V1.Position = Corners[0];
                 V2.Position = Corners[2];
                 V3.Position = Corners[6];
-                // Chunk->Quads[Chunk->QuadCount++] = (world_quad){V0,V1,V2,V3};
                 Mesh_AddQuad(&Chunk->Mesh, (quad){ V0, V1, V2, V3 });
             }
 
@@ -117,7 +116,6 @@ void Chunk_GenerateMesh(chunk *Chunk)
                 V1.Position = Corners[5];
                 V2.Position = Corners[7];
                 V3.Position = Corners[3];
-                // Chunk->Quads[Chunk->QuadCount++] = (world_quad){ V0,V1,V2,V3 };
                 Mesh_AddQuad(&Chunk->Mesh, (quad){ V0, V1, V2, V3 });
             }
 
@@ -132,7 +130,6 @@ void Chunk_GenerateMesh(chunk *Chunk)
                 V1.Position = Corners[1];
                 V2.Position = Corners[3];
                 V3.Position = Corners[2];
-                // Chunk->Quads[Chunk->QuadCount++] = (world_quad){ V0,V1,V2,V3 };
                 Mesh_AddQuad(&Chunk->Mesh, (quad){ V0, V1, V2, V3 });
             }
 
@@ -147,7 +144,6 @@ void Chunk_GenerateMesh(chunk *Chunk)
                 V1.Position = Corners[4];
                 V2.Position = Corners[6];
                 V3.Position = Corners[7];
-                // Chunk->Quads[Chunk->QuadCount++] = (world_quad){ V0,V1,V2,V3 };
                 Mesh_AddQuad(&Chunk->Mesh, (quad){ V0, V1, V2, V3 });
             }
 
@@ -162,7 +158,6 @@ void Chunk_GenerateMesh(chunk *Chunk)
                 V1.Position = Corners[5];
                 V2.Position = Corners[1];
                 V3.Position = Corners[0];
-                // Chunk->Quads[Chunk->QuadCount++] = (world_quad){ V0,V1,V2,V3 };
                 Mesh_AddQuad(&Chunk->Mesh, (quad){ V0, V1, V2, V3 });
             }
 
@@ -170,7 +165,6 @@ void Chunk_GenerateMesh(chunk *Chunk)
             // if ((y == WORLD_CHUNK_HEIGHT - 1) || (Chunk->Blocks[x][z][y + 1].Id == BLOCK_ID_AIR))
             if (!(OpaqueMask & (1 << 22)))
             {
-                // Chunk->Quads[Chunk->QuadCount++] = Block_TopFace(0, BlockPosition, OpaqueMask);
                 Mesh_AddQuad(&Chunk->Mesh, Block_TopFace(0, BlockPosition, OpaqueMask));
             }
         }
