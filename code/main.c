@@ -119,6 +119,7 @@ void *malloc(size_t size)
 __declspec(restrict)
 void *realloc(void *ptr, size_t size)
 {
+    if (!ptr) return HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, size);
     return HeapReAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, ptr, size);
 }
 
