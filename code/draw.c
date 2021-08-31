@@ -22,10 +22,8 @@ typedef struct color
 #define COLOR_LIGHTBLUE   (color){ 224 }
 #define COLOR_SKYBLUE     (color){ 240 }
 
-typedef struct color_and_depth
-{
-    u32 Value;
-} color_and_depth;
+#define CAMERA_NEAR 0.1f
+#define CAMERA_FAR 256.0f
 
 enum bitmap_flags
 {
@@ -37,11 +35,7 @@ typedef struct bitmap
     u32 Width, Height;
     u32 Pitch;
     u32 Flags;
-    union
-    {
-        color *Pixels;
-        color_and_depth *DepthPixels;
-    };
+    color *Pixels;
 } bitmap;
 
 typedef struct vertex
@@ -51,74 +45,78 @@ typedef struct vertex
     f32 Shadow;
 } vertex;
 
+// Bitmap
 bitmap Bitmap_Create(u32 Width, u32 Height);
 bitmap Bitmap_Section(bitmap Bitmap, i32 X, i32 Y, u32 W, u32 H);
 color Bitmap_GetPixel(bitmap Bitmap, i32 X, i32 Y);
 void Bitmap_SetPixel(bitmap Bitmap, color Color, i32 X, i32 Y);
 void Bitmap_Clear(bitmap Bitmap, color Color);
-
-void Draw_PointStruct(bitmap Target, color Color, point Point);
-void Draw_LineStruct(bitmap Target, color Color, line Line);
-void Draw_TriangleStruct(bitmap Target, color Color, triangle Triangle);
-void Draw_RectStruct(bitmap Target, color Color, rect Rect);
-
-void Draw_PointInt(bitmap Target, color Color, i32 X, i32 Y);
-void Draw_LineInt(bitmap Target, color Color, i32 X0, i32 Y0, i32 X1, i32 Y1);
-void Draw_TriangleInt(bitmap Target, color Color, i32 X0, i32 Y0, i32 X1, i32 Y1, i32 X2, i32 Y2);
-void Draw_RectInt(bitmap Target, color Color, i32 X, i32 Y, i32 W, i32 H);
-
 void Draw_Bitmap(bitmap Target, const bitmap Bitmap, i32 X, i32 Y);
-void Draw_String(bitmap Target, const bitmap Font, color Color, i32 X, i32 Y, const char *String);
 
-void Draw_TriangleVerts(bitmap Target, color Color, vertex A, vertex B, vertex C);
-void Draw_TriangleTexturedVerts(bitmap Target, const bitmap Texture, vertex A, vertex B, vertex C);
+// Point
+void Draw_PointStruct(bitmap, color, point);
+void Draw_PointIVec2(bitmap, color, ivec2);
+void Draw_PointVec3(bitmap, color, vec3);
+void Draw_PointVec2(bitmap, color, vec2);
 
-void Draw_QuadVerts(bitmap Target, color Color, vertex A, vertex B, vertex C, vertex D);
-void Draw_QuadTexturedVerts(bitmap Target, const bitmap Texture, vertex A, vertex B, vertex C, vertex D);
+// Line
+void Draw_LineStruct(bitmap, color, line);
+void Draw_LineIVec2(bitmap, color, ivec2, ivec2);
+void Draw_LineVec3(bitmap, color, vec3, vec3);
+void Draw_LineVec2(bitmap, color, vec2, vec2);
 
+// Triangle
+void Draw_TriangleStruct(bitmap, color, triangle);
+void Draw_TriangleIVec2(bitmap, color, ivec2, ivec2, ivec2);
+void Draw_TriangleVec2(bitmap, color, vec2, vec2, vec2);
+void Draw_TriangleVec3(bitmap, color, vec3, vec3, vec3);
 
+// Rect
+void Draw_RectIVec2(bitmap, color, ivec2, ivec2);
+void Draw_RectVec2(bitmap, color, vec2, vec2);
+
+// String
+void Draw_String(bitmap, const bitmap, color, ivec2, const char *);
+
+// Vertex Triangle
+void Draw_TriangleVerts(bitmap, color, vertex, vertex, vertex);
+void Draw_TriangleTexturedVerts(bitmap, const bitmap, vertex, vertex, vertex);
+
+// Vertex Quad
+void Draw_QuadVerts(bitmap, color, vertex, vertex, vertex, vertex);
+void Draw_QuadTexturedVerts(bitmap, const bitmap, vertex, vertex, vertex, vertex);
+
+// Generics
 #define Draw_Point(BUFFER, COLOR, X, ...) _Generic((X), \
     point: Draw_PointStruct, \
-    i8: Draw_PointInt, i16: Draw_PointInt, i32: Draw_PointInt, i64: Draw_PointInt, \
-    u8: Draw_PointInt, u16: Draw_PointInt, u32: Draw_PointInt, u64: Draw_PointInt  \
+    ivec2: Draw_PointIVec2, \
+    vec3: Draw_PointVec3, \
+    vec2: Draw_PointVec2 \
 )(BUFFER, COLOR, X, __VA_ARGS__)
 
 #define Draw_Line(BUFFER, COLOR, X, ...) _Generic((X), \
     line: Draw_LineStruct, \
-    i8: Draw_LineInt, i16: Draw_LineInt, i32: Draw_LineInt, i64: Draw_LineInt, \
-    u8: Draw_LineInt, u16: Draw_LineInt, u32: Draw_LineInt, u64: Draw_LineInt \
+    ivec2: Draw_LineIVec2, \
+    vec3: Draw_LineVec3, \
+    vec2: Draw_LineVec2 \
 )(BUFFER, COLOR, X, __VA_ARGS__)
 
-
-#define Draw_TriangleColor(BUFFER, COLOR, X, ...) _Generic((X), \
-    vertex: Draw_TriangleVerts,\
-    triangle: Draw_TriangleStruct, \
-    i8: Draw_TriangleInt, i16: Draw_TriangleInt, i32: Draw_TriangleInt, i64: Draw_TriangleInt, \
-    u8: Draw_TriangleInt, u16: Draw_TriangleInt, u32: Draw_TriangleInt, u64: Draw_TriangleInt \
-)(BUFFER, COLOR, X, __VA_ARGS__)
-
-#define Draw_TriangleTextured(BUFFER, COLOR, X, ...) _Generic((X), \
-    vertex: Draw_TriangleTexturedVerts \
+#define Draw_Rect(BUFFER, COLOR, X, ...) _Generic((X), \
+    rect: Draw_RectStruct, \
+    ivec2: Draw_RectIVec2, \
+    vec2: Draw_RectVec2 \
 )(BUFFER, COLOR, X, __VA_ARGS__)
 
 #define Draw_Triangle(BUFFER, COLOR, X, ...) _Generic((COLOR), \
     color:  _Generic((X), \
         vertex: Draw_TriangleVerts,\
         triangle: Draw_TriangleStruct, \
-        i8: Draw_TriangleInt, i16: Draw_TriangleInt, i32: Draw_TriangleInt, i64: Draw_TriangleInt, \
-        u8: Draw_TriangleInt, u16: Draw_TriangleInt, u32: Draw_TriangleInt, u64: Draw_TriangleInt \
+        ivec2: Draw_TriangleIVec2, \
+        vec3: Draw_TriangleVec3, \
+        vec2: Draw_TriangleVec2 \
     ), \
     bitmap: Draw_TriangleTexturedVerts, \
     const bitmap: Draw_TriangleTexturedVerts \
-)(BUFFER, COLOR, X, __VA_ARGS__)
-
-
-#define Draw_QuadColor(BUFFER, COLOR, X, ...) _Generic((X), \
-    vertex: Draw_QuadVerts, \
-)(BUFFER, COLOR, X, __VA_ARGS__)
-
-#define Draw_QuadTextured(BUFFER, COLOR, X, ...) _Generic((X), \
-    vertex: Draw_QuadTexturedVerts \
 )(BUFFER, COLOR, X, __VA_ARGS__)
 
 #define Draw_Quad(BUFFER, COLOR, X, ...) _Generic((COLOR), \
@@ -127,14 +125,19 @@ void Draw_QuadTexturedVerts(bitmap Target, const bitmap Texture, vertex A, verte
     const bitmap: Draw_QuadTexturedVerts \
 )(BUFFER, COLOR, X, __VA_ARGS__)
 
+// Util
+inline vec3 Draw__PerspectiveDivide(bitmap Target, vec3 Position)
+{
+    f32 HalfWidth = Target.Width * 0.5f;
+    f32 HalfHeight = Target.Height * 0.5f;
+    Position.x = (Position.x - HalfWidth) / Position.z + HalfWidth;
+    Position.y = (Position.y - HalfHeight) / Position.z + HalfHeight;
+    return Position;
+}
 
-#define Draw_Rect(BUFFER, COLOR, X, ...) _Generic((X), \
-    rect: Draw_RectStruct, \
-    i8: Draw_RectInt, i16: Draw_RectInt, i32: Draw_RectInt, i64: Draw_RectInt, \
-    u8: Draw_RectInt, u16: Draw_RectInt, u32: Draw_RectInt, u64: Draw_RectInt \
-)(BUFFER, COLOR, X, __VA_ARGS__)
-
-
+/************/
+/*  Bitmap  */
+/************/
 
 bitmap Bitmap_Create(u32 Width, u32 Height)
 {
@@ -220,12 +223,42 @@ void Bitmap_Clear(bitmap Bitmap, color Color)
         Bitmap__SetPixelFast(Bitmap, Color, x, y);
 }
 
+void Draw_Bitmap(bitmap Target, const bitmap Bitmap, i32 X, i32 Y)
+{
+    bitmap Src = Bitmap_Section(Bitmap,-X,-Y, Target.Width, Target.Height);
+    bitmap Dst = Bitmap_Section(Target, X, Y, Bitmap.Width, Bitmap.Height);
+    Bitmap_Blit(Dst, Src);
+}
 
+/*************/
+/*   Point   */
+/*************/
 
 void Draw_PointStruct(bitmap Target, color Color, point Point)
 {
     Bitmap_SetPixel(Target, Color, F32_FloorToI32(Point.x), F32_FloorToI32(Point.y));
 }
+
+void Draw_PointIVec2(bitmap Target, color Color, ivec2 Point)
+{
+    Bitmap_SetPixel(Target, Color, Point.x, Point.y);
+}
+
+void Draw_PointVec2(bitmap Target, color Color, vec2 Point)
+{
+    Bitmap_SetPixel(Target, Color, F32_FloorToI32(Point.x), F32_FloorToI32(Point.y));
+}
+
+void Draw_PointVec3(bitmap Target, color Color, vec3 Point)
+{
+    if (Point.z <= 0) return;
+    Point = Draw__PerspectiveDivide(Target, Point);
+    Bitmap_SetPixel(Target, Color, F32_FloorToI32(Point.x), F32_FloorToI32(Point.y));
+}
+
+/************/
+/*   Line   */
+/************/
 
 inline void Draw__VerticalLine(bitmap Target, color Color, i32 X, i32 Y0, i32 Y1)
 {
@@ -249,6 +282,29 @@ inline void Draw__HorizontalLine(bitmap Target, color Color, i32 X0, i32 X1, i32
         Bitmap__SetPixelFast(Target, Color, x, Y);
 }
 
+inline bool Draw__ClipLine(vec2 Min, vec2 Max, vec2 *A, vec2 *B)
+{
+    vec2 a = *A;
+    vec2 b = *B;
+
+    vec2 One = (vec2) { 1, 1 };
+    vec2 Inv = Div(One, Sub(b, a));
+    vec2 t0 = Mul(Sub(Min, a), Inv);
+    vec2 t1 = Mul(Sub(Max, a), Inv);
+    vec2 tt0 = Min(t0, t1);
+    vec2 tt1 = Max(t0, t1);
+    f32 tmin = Max(tt0.x, tt0.y);
+    f32 tmax = Min(tt1.x, tt1.y);
+
+    if ((tmax < 0) || (tmin > tmax) || (1 < tmin))
+        return false;
+    
+    if (0 < tmin) *A = Lerp(a, b, tmin);
+    if (tmax < 1) *B = Lerp(a, b, tmax);
+
+    return true;
+}
+
 void Draw_LineStruct(bitmap Target, color Color, line Line)
 {
     rect Clip = (rect){ .x = 0.0f, .y = 0.0f, .w = (f32)Target.Width, .h = (f32)Target.Height };
@@ -265,8 +321,8 @@ void Draw_LineStruct(bitmap Target, color Color, line Line)
         const i32 ix1 = F32_CeilToI32(Max(Line.a.x, Line.b.x));
         const i32 iy0 = F32_CeilToI32(Min(Line.a.y, Line.b.y));
         const i32 iy1 = F32_CeilToI32(Max(Line.a.y, Line.b.y));
-        if (ix0 == ix1) Draw__VerticalLine(Target, Color, ix0, iy0, iy1);
-        if (iy0 == iy1) Draw__HorizontalLine(Target, Color, ix0, ix1, iy0);
+        if (ix0 == ix1) { Draw__VerticalLine(Target, Color, ix0, iy0, iy1); return; }
+        if (iy0 == iy1) { Draw__HorizontalLine(Target, Color, ix0, ix1, iy0); return; }
     }
 
     f32 dx = Line.b.x - Line.a.x;
@@ -324,6 +380,36 @@ void Draw_LineStruct(bitmap Target, color Color, line Line)
         }
     }
 }
+
+void Draw_LineIVec2(bitmap Target, color Color, ivec2 A, ivec2 B)
+{
+    Draw_LineStruct(Target, Color, (line){
+        .a = { .x = (A.x + 0.5f), .y = (A.y + 0.5f) },
+        .b = { .x = (B.x + 0.5f), .y = (B.y + 0.5f) }
+    });
+}
+
+void Draw_LineVec2(bitmap Target, color Color, vec2 A, vec2 B)
+{
+    Draw_LineStruct(Target, Color, (line){
+        .a = { .x = A.x, .y = A.y },
+        .b = { .x = B.x, .y = B.y }
+    });
+}
+
+void Draw_LineVec3(bitmap Target, color Color, vec3 A, vec3 B)
+{
+    if (A.z <= CAMERA_NEAR && B.z <= CAMERA_NEAR) return;
+    if (A.z <= CAMERA_NEAR) A = Vec3_Lerp(B, A, (B.z - CAMERA_NEAR) / (B.z - A.z));
+    if (B.z <= CAMERA_NEAR) B = Vec3_Lerp(A, B, (A.z - CAMERA_NEAR) / (A.z - B.z));
+    A = Draw__PerspectiveDivide(Target, A);
+    B = Draw__PerspectiveDivide(Target, B);
+    Draw_LineVec2(Target, Color, A.xy, B.xy);
+}
+
+/**************/
+/*  Triangle  */
+/**************/
 
 void Draw_TriangleStruct(bitmap Target, color Color, triangle Triangle)
 {
@@ -383,6 +469,30 @@ void Draw_TriangleStruct(bitmap Target, color Color, triangle Triangle)
     }
 }
 
+void Draw_TriangleIVec2(bitmap Target, color Color, ivec2 A, ivec2 B, ivec2 C)
+{
+    triangle Triangle = (triangle){ 
+        .a = { .x = (A.x + 0.5f), .y = (A.y + 0.5f) },
+        .b = { .x = (B.x + 0.5f), .y = (B.y + 0.5f) },
+        .c = { .x = (C.x + 0.5f), .y = (C.y + 0.5f) }
+    };
+    Draw_TriangleStruct(Target, Color, Triangle);
+}
+
+void Draw_TriangleVec2(bitmap Target, color Color, vec2 A, vec2 B, vec2 C)
+{
+    triangle Triangle = (triangle){ 
+        .a = { .x = A.x, .y = A.y },
+        .b = { .x = B.x, .y = B.y },
+        .c = { .x = C.x, .y = C.y }
+    };
+    Draw_TriangleStruct(Target, Color, Triangle);
+}
+
+/************/
+/*   Rect   */
+/************/
+
 void Draw_RectStruct(bitmap Target, color Color, rect Rect)
 {
     bitmap ClearRect = Bitmap_Section(Target, F32_FloorToI32(Rect.x), 
@@ -392,261 +502,46 @@ void Draw_RectStruct(bitmap Target, color Color, rect Rect)
     Bitmap_Clear(ClearRect, Color);
 }
 
-
-
-void Draw_PointInt(bitmap Target, color Color, i32 X, i32 Y)
+void Draw_RectIVec2(bitmap Target, color Color, ivec2 Min, ivec2 Dim)
 {
-    Bitmap_SetPixel(Target, Color, X, Y);
+    bitmap ClearRect = Bitmap_Section(Target, Min.x, Min.y, Dim.x, Dim.y);
+    Bitmap_Clear(ClearRect, Color);
 }
 
-void Draw_LineInt(bitmap Target, color Color, i32 X0, i32 Y0, i32 X1, i32 Y1)
+void Draw_RectVec2(bitmap Target, color Color, vec2 Min, vec2 Dim)
 {
-    line Line = (line){ 
-        .a = { .x = (X0 + 0.5f), .y = (Y0 + 0.5f) },
-        .b = { .x = (X1 + 0.5f), .y = (Y1 + 0.5f) }
-    };
-    Draw_LineStruct(Target, Color, Line);
+    bitmap ClearRect = Bitmap_Section(Target, F32_FloorToI32(Min.x), 
+                                              F32_FloorToI32(Min.y),
+                                              F32_FloorToI32(Dim.x),
+                                              F32_FloorToI32(Dim.y));
+    Bitmap_Clear(ClearRect, Color);
 }
 
-void Draw_TriangleInt(bitmap Target, color Color, i32 X0, i32 Y0, i32 X1, i32 Y1, i32 X2, i32 Y2)
+/**************/
+/*   String   */
+/**************/
+
+void Draw_String(bitmap Target, const bitmap Font, color Color, ivec2 Position, const char *String)
 {
-    triangle Triangle = (triangle){ 
-        .a = { .x = (X0 + 0.5f), .y = (Y0 + 0.5f) },
-        .b = { .x = (X1 + 0.5f), .y = (Y1 + 0.5f) },
-        .c = { .x = (X2 + 0.5f), .y = (Y2 + 0.5f) }
-    };
-    Draw_TriangleStruct(Target, Color, Triangle);
-}
-
-void Draw_RectInt(bitmap Target, color Color, i32 X, i32 Y, i32 W, i32 H)
-{
-    bitmap Rect = Bitmap_Section(Target, X, Y, W, H);
-    Bitmap_Clear(Rect, Color);
-}
-
-
-
-void Draw_Bitmap(bitmap Target, const bitmap Bitmap, i32 X, i32 Y)
-{
-    bitmap Src = Bitmap_Section(Bitmap,-X,-Y, Target.Width, Target.Height);
-    bitmap Dst = Bitmap_Section(Target, X, Y, Bitmap.Width, Bitmap.Height);
-    Bitmap_Blit(Dst, Src);
-}
-
-void Draw_String(bitmap Target, const bitmap Font, color Color, i32 X, i32 Y, const char *String)
-{
-    i32 XX = X;
+    i32 X = Position.x;
+    i32 Y = Position.y;
     i32 CW = Font.Width / 8;
     i32 CH = Font.Height / 8;
     while (*String)
     {
         char C = *String++;
-        if (C == '\n') { XX = X; Y -= 8; continue; }
+        if (C == '\n') { X = Position.x; Y -= 8; continue; }
         i32 CX = (C % CW) * 8;
         i32 CY = (C / CW) * 8;
         struct bitmap Char = Bitmap_Section(Font, CX, CY, 8, 8);
-        Draw_Bitmap(Target, Char, XX, Y);
-        XX += 8;
+        Draw_Bitmap(Target, Char, X, Y);
+        X += 8;
     }
 }
 
-
-
-// struct tri_grad
-// {
-//     f32 t, dt_dy;
-// };
-
-// struct tri_attr
-// {
-//     struct tri_grad l, r;
-// };
-
-#if defined(USE_SCANLINE_RASTERIZER)
-
-inline void Draw__TriangleTexturedShadedVerts3DInternal(bitmap Target, const bitmap Texture, 
-                                                        f32 y0, f32 y1, 
-                                                        f32 x0, f32 x1,f32 dx0_dy, f32 dx1_dy, 
-                                                        f32 invz0, f32 invz1, f32 d1_dyz0, f32 d1_dyz1, 
-                                                        f32 u0_z0, f32 u1_z1, f32 du0_dyz0, f32 du1_dyz1,
-                                                        f32 v0_z0, f32 v1_z1, f32 dv0_dyz0, f32 dv1_dyz1,
-                                                        f32 s0_z0, f32 s1_z1, f32 ds0_dyz0, f32 ds1_dyz1)
-{
-    const f32 minx = 0;
-    const f32 miny = 0;
-    const f32 maxx = (f32)Target.Width;
-    const f32 maxy = (f32)Target.Height;
-
-    const i32 umask = Texture.Width - 1;
-    const i32 vmask = Texture.Height - 1;
-
-    const f32 invdx = 1.0f / (dx1_dy - dx0_dy);
-    const f32 d1_dxz = (d1_dyz1 - d1_dyz0) * invdx;
-    const f32 du_dxz = (du1_dyz1 - du0_dyz0) * invdx;
-    const f32 dv_dxz = (dv1_dyz1 - dv0_dyz0) * invdx;
-    const f32 ds_dxz = (ds1_dyz1 - ds0_dyz0) * invdx;
-
-    const f32 yy0 = Ceil(Max(y0, miny));
-    const f32 yy1 = Ceil(Min(y1, maxy));
-    const i32 iy0 = Float_toInt(yy0);
-    const i32 iy1 = Float_toInt(yy1);
-    const f32 dy = yy0 - y0;
-
-    x0 += dx0_dy * dy;
-    x1 += dx1_dy * dy;
-    invz0 += d1_dyz0 * dy;
-    invz1 += d1_dyz1 * dy;
-
-    u0_z0 += du0_dyz0 * dy;
-    u1_z1 += du1_dyz1 * dy;
-    v0_z0 += dv0_dyz0 * dy;
-    v1_z1 += dv1_dyz1 * dy;
-    s0_z0 += ds0_dyz0 * dy;
-    s1_z1 += ds1_dyz1 * dy;
-
-    if ((x0 > x1) || ((x0 == x1) && (dx0_dy > dx1_dy)))
-    {
-        f32 xt = x0; x0 = x1; x1 = xt;
-        f32 invzt = invz0; invz0 = invz1; invz1 = invzt;
-        f32 ut_zt = u0_z0; u0_z0 = u1_z1; u1_z1 = ut_zt;
-        f32 vt_zt = v0_z0; v0_z0 = v1_z1; v1_z1 = vt_zt;
-        f32 st_zt = s0_z0; s0_z0 = s1_z1; s1_z1 = st_zt;
-
-        f32 dxt_dy   = dx0_dy;   dx0_dy   = dx1_dy;   dx1_dy   = dxt_dy;
-        f32 d1_dyzt  = d1_dyz0;  d1_dyz0  = d1_dyz1;  d1_dyz1  = d1_dyzt;
-        f32 dut_dyzt = du0_dyz0; du0_dyz0 = du1_dyz1; du1_dyz1 = dut_dyzt;
-        f32 dvt_dyzt = dv0_dyz0; dv0_dyz0 = dv1_dyz1; dv1_dyz1 = dvt_dyzt;
-        f32 dst_dyzt = ds0_dyz0; ds0_dyz0 = ds1_dyz1; ds1_dyz1 = dst_dyzt;
-    }
-
-    i32 height = iy1 - iy0;
-    color *DstRow = Target.Pixels + Target.Pitch * iy0;
-
-    while (height-- > 0)
-    {
-        const f32 xx0 = Ceil(Max(x0, minx));
-        const f32 xx1 = Ceil(Min(x1, maxx));
-        const i32 ix0 = Float_toInt(xx0);
-        const i32 ix1 = Float_toInt(xx1);
-        const f32 dx = xx0 - x0;
-
-        f32 invz = invz0 + d1_dxz * dx;
-        f32 u_z = u0_z0 + du_dxz * dx;
-        f32 v_z = v0_z0 + dv_dxz * dx;
-        f32 s_z = s0_z0 + ds_dxz * dx;
-
-        i32 width = ix1 - ix0;
-        color *Dst = DstRow + ix0;
-        
-        while (width-- > 0)
-        {
-            f32 z = 1.0f / invz;
-            const i32 iu = Floor_toInt(u_z * z) & umask;
-            const i32 iv = Floor_toInt(v_z * z) & vmask;
-            const u8 is = Floor_toInt(s_z * z * 15.999f) & 15;
-            color Color = *(Texture.Pixels + Texture.Pitch * iv + iu);
-            if (Color.Value) Dst->Value = Color.Value | is;
-            ++Dst;
-
-            invz += d1_dxz;
-            u_z += du_dxz;
-            v_z += dv_dxz;
-            s_z += ds_dxz;
-        }
-
-        DstRow += Target.Pitch;
-
-        x0 += dx0_dy;
-        x1 += dx1_dy;
-        invz0 += d1_dyz0;
-        u0_z0 += du0_dyz0;
-        v0_z0 += dv0_dyz0;
-        s0_z0 += ds0_dyz0;
-    }
-}
-
-inline void Draw__TriangleTexturedShadedVerts3D(bitmap Target, const bitmap Texture, vertex A, vertex B, vertex C)
-{
-    const f32 d1_dy02 = 1.0f / (C.Position.y - A.Position.y);
-    const f32 dx02_dy = (C.Position.x - A.Position.x) * d1_dy02;
-    const f32 d1_dyz02 = (1.0f / C.Position.z - 1.0f / A.Position.z) * d1_dy02;
-    const f32 du02_dyz02 = (C.TexCoord.u / C.Position.z - A.TexCoord.u / A.Position.z) * d1_dy02;
-    const f32 dv02_dyz02 = (C.TexCoord.v / C.Position.z - A.TexCoord.v / A.Position.z) * d1_dy02;
-    const f32 ds02_dyz02 = (C.Shadow / C.Position.z - A.Shadow / A.Position.z) * d1_dy02;
-
-    // bottom triangle
-    if (B.Position.y > 0)
-    {
-        const f32 d1_dy01 = 1.0f / (B.Position.y - A.Position.y);
-        const f32 dx01_dy = (B.Position.x - A.Position.x) * d1_dy01;
-        const f32 d1_dyz01 = (1.0f / B.Position.z - 1.0f / A.Position.z) * d1_dy01;
-        const f32 du01_dyz01 = (B.TexCoord.u / B.Position.z - A.TexCoord.u / A.Position.z) * d1_dy01;
-        const f32 dv01_dyz01 = (B.TexCoord.v / B.Position.z - A.TexCoord.v / A.Position.z) * d1_dy01;
-        const f32 ds01_dyz01 = (B.Shadow / B.Position.z - A.Shadow / A.Position.z) * d1_dy01;
-
-        f32 x0 = A.Position.x;
-        f32 x1 = A.Position.x;
-        f32 y0 = A.Position.y;
-        f32 y1 = B.Position.y;
-        f32 invz0 = 1.0f / A.Position.z;
-        f32 invz1 = 1.0f / A.Position.z;
-        f32 u0_z0 = A.TexCoord.u * invz0;
-        f32 u1_z1 = A.TexCoord.u * invz1;
-        f32 v0_z0 = A.TexCoord.v * invz0;
-        f32 v1_z1 = A.TexCoord.v * invz1;
-        f32 s0_z0 = A.Shadow * invz0;
-        f32 s1_z1 = A.Shadow * invz1;
-
-        Draw__TriangleTexturedShadedVerts3DInternal(Target, Texture, 
-                                                    y0, y1,
-                                                    x0, x1, dx01_dy, dx02_dy,
-                                                    invz0, invz1, d1_dyz01, d1_dyz02, 
-                                                    u0_z0, u1_z1, du01_dyz01, du02_dyz02,
-                                                    v0_z0, v1_z1, dv01_dyz01, dv02_dyz02,
-                                                    s0_z0, s1_z1, ds01_dyz01, ds02_dyz02);
-    }
-
-    // top triangle
-    if (B.Position.y < (f32)Target.Height)
-    {
-        const f32 d1_dy12 = 1.0f / (C.Position.y - B.Position.y);
-        const f32 dx12_dy = (C.Position.x - B.Position.x) * d1_dy12;
-        const f32 d1_dyz12 = (1.0f / C.Position.z - 1.0f / B.Position.z) * d1_dy12;
-        const f32 du12_dyz12 = (C.TexCoord.u / C.Position.z - B.TexCoord.u / B.Position.z) * d1_dy12;
-        const f32 dv12_dyz12 = (C.TexCoord.v / C.Position.z - B.TexCoord.v / B.Position.z) * d1_dy12;
-        const f32 ds12_dyz12 = (C.Shadow / C.Position.z - B.Shadow / B.Position.z) * d1_dy12;
-
-        f32 x0 = A.Position.x;
-        f32 x1 = B.Position.x;
-        f32 y0 = B.Position.y;
-        f32 y1 = C.Position.y;
-        f32 invz0 = 1.0f / A.Position.z;
-        f32 invz1 = 1.0f / B.Position.z;
-        f32 u0_z0 = A.TexCoord.u * invz0;
-        f32 u1_z1 = B.TexCoord.u * invz1;
-        f32 v0_z0 = A.TexCoord.v * invz0;
-        f32 v1_z1 = B.TexCoord.v * invz1;
-        f32 s0_z0 = A.Shadow * invz0;
-        f32 s1_z1 = B.Shadow * invz1;
-
-        const f32 dy = (B.Position.y - A.Position.y);
-        x0 += dx02_dy * dy;
-        invz0 += d1_dyz02 * dy;
-        u0_z0 += du02_dyz02 * dy;
-        v0_z0 += dv02_dyz02 * dy;
-        s0_z0 += ds02_dyz02 * dy;
-
-        Draw__TriangleTexturedShadedVerts3DInternal(Target, Texture, 
-                                                    y0, y1,
-                                                    x0, x1, dx02_dy, dx12_dy,
-                                                    invz0, invz1, d1_dyz02, d1_dyz12, 
-                                                    u0_z0, u1_z1, du02_dyz02, du12_dyz12,
-                                                    v0_z0, v1_z1, dv02_dyz02, dv12_dyz12,
-                                                    s0_z0, s1_z1, ds02_dyz02, ds12_dyz12);
-    }
-}
-
-#else
+/**/
+/**/
+/**/
 
 void Draw__TriangleTexturedShadedVerts3D(bitmap Target, const bitmap Texture, vertex A, vertex B, vertex C)
 {
@@ -805,7 +700,7 @@ void Draw__TriangleTexturedShadedVerts3D(bitmap Target, const bitmap Texture, ve
 
                         for (i32 p = 0; p < 4; ++p)
                         {
-                            color *Dst = (Target.Pixels + Index);
+                            color *Dst = Target.Pixels + Index;
                             color Texel = *(Texture.Pixels + Texture.Pitch * iv[p] + iu[p]);
                             Texel.Value &= 0xF8;
                             Texel.Value &= M[p];
@@ -831,8 +726,6 @@ void Draw__TriangleTexturedShadedVerts3D(bitmap Target, const bitmap Texture, ve
     }
 }
 
-#endif
-
 inline vertex Vertex_Lerp(vertex A, vertex B, f32 t)
 {
     A.Position = Lerp(A.Position, B.Position, t);
@@ -843,11 +736,9 @@ inline vertex Vertex_Lerp(vertex A, vertex B, f32 t)
 
 inline u32 Draw__TriangleClipZ(vertex *V)
 {
-#define CAMERA_FAR 256.0f
     if (Max(Max(V[0].Position.z, V[1].Position.z), V[2].Position.z) > CAMERA_FAR)
         return 0;
 
-#define CAMERA_NEAR 0.1f
     vertex T;
     u32 Z = ((V[0].Position.z < CAMERA_NEAR) ? 1 : 0) |
             ((V[1].Position.z < CAMERA_NEAR) ? 2 : 0) |
@@ -916,38 +807,8 @@ inline bool Draw__PrepareTriangleVerts(const bitmap Target, vertex *A, vertex *B
     // triangle too small
     if (Abs(Floor(MaxX) - Floor(MinX)) < 1.0f) return false;
     if (Abs(Floor(MaxY) - Floor(MinY)) < 1.0f) return false;
-
-#if defined(USE_SCANLINE_RASTERIZER)
-    // sort vertices vertically
-    if (A->Position.y > B->Position.y)
-    {
-        if (B->Position.y > C->Position.y) { vertex T = *A; *A = *C; *C = T; }
-        else
-        {
-            if (A->Position.y > C->Position.y) { vertex T = *A; *A = *B; *B = *C; *C = T; }
-            else                               { vertex T = *A; *A = *B; *B = T; }
-        }
-    }
-    else
-    {
-        if (B->Position.y > C->Position.y)
-        {
-            if (A->Position.y > C->Position.y) { vertex T = *C; *C = *B; *B = *A; *A = T; }
-            else                               { vertex T = *B; *B = *C; *C = T; }
-        }
-    }
-#endif
     
     return true;
-}
-
-inline vec3 Draw__PerspectiveDivide(bitmap Target, vec3 Position)
-{
-    f32 HalfWidth = Target.Width * 0.5f;
-    f32 HalfHeight = Target.Height * 0.5f;
-    Position.x = (Position.x - HalfWidth) / Position.z + HalfWidth;
-    Position.y = (Position.y - HalfHeight) / Position.z + HalfHeight;
-    return Position;
 }
 
 void Draw_TriangleTexturedVerts(bitmap Target, const bitmap Texture, vertex A, vertex B, vertex C)

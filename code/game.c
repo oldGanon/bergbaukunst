@@ -85,7 +85,7 @@ void Game_Update(game *Game, const input Input)
 
     f32 Speed = 0.5f;
     f32 TurnSpeed = 0.05f;
-    f32 Sensitivity = 0.01f;
+    f32 Sensitivity = 1.0f / 3500.0f;
 
     if (Input.MoveForward) {
         NewCameraPosition.x += Forward.x * Speed;
@@ -133,7 +133,16 @@ void Game_Draw(game *Game, bitmap Buffer)
 
     World_Draw(&Game->World, Buffer, Game->Terrain, Game->Camera);
 
-    Draw_String(Buffer, Game->Font, COLOR_WHITE, 32, 32, "ASFIDJH\nasdasd");
+    Draw_String(Buffer, Game->Font, COLOR_WHITE, (ivec2){32,32}, "ASFIDJH\nasdasd");
+
+    vec3 A = Camera_WorldToScreen(Game->Camera, Buffer, (vec3) {0,1,0});
+    vec3 B = Camera_WorldToScreen(Game->Camera, Buffer, (vec3) {16,1,0});
+    vec3 C = Camera_WorldToScreen(Game->Camera, Buffer, (vec3) {16,1,16});
+    vec3 D = Camera_WorldToScreen(Game->Camera, Buffer, (vec3) {0,1,16});
+    Draw_Line(Buffer, COLOR_WHITE, A, B);
+    Draw_Line(Buffer, COLOR_WHITE, B, C);
+    Draw_Line(Buffer, COLOR_WHITE, C, D);
+    Draw_Line(Buffer, COLOR_WHITE, D, A);
 
 /*
     //bitmap GrasTop = Bitmap_Section(Game->Image, 0, 0, 16, 16);

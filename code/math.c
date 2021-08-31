@@ -123,9 +123,9 @@ f32 Cos(f32 x)
     return (x - 1.0f) * (x + 1.0f) * x3 * x;
 }
 
-/**************/
-/* F32 -> I32 */
-/**************/
+/***************/
+/* F32 <-> I32 */
+/***************/
 inline i32 F32_RoundToI32(f32 A) { return _mm_cvt_ss2si(_mm_round_ps(_mm_set_ss(A), _MM_FROUND_TO_NEAREST_INT|_MM_FROUND_NO_EXC)); }
 inline i32 F32_TruncToI32(f32 A) { return _mm_cvt_ss2si(_mm_round_ps(_mm_set_ss(A), _MM_FROUND_TO_ZERO|_MM_FROUND_NO_EXC)); }
 inline i32 F32_CeilToI32(f32 A)  { return _mm_cvt_ss2si(_mm_ceil_ps(_mm_set_ss(A))); }
@@ -245,6 +245,16 @@ inline vec3 Vec3_Cross(vec3 A, vec3 B)
 }
 
 /*************/
+/*   iVec2   */
+/*************/
+#define LOAD_IVEC2(V) _mm_loadu_si64(V.E)
+#define STORE_IVEC2(V,M) _mm_storeu_si64(V.E,M)
+inline ivec2 iVec2_Add(ivec2 A, ivec2 B) { STORE_IVEC2(A, _mm_add_epi32(LOAD_IVEC2(A), LOAD_IVEC2(B))); return A; }
+inline ivec2 iVec2_Sub(ivec2 A, ivec2 B) { STORE_IVEC2(A, _mm_sub_epi32(LOAD_IVEC2(A), LOAD_IVEC2(B))); return A; }
+inline ivec2 iVec2_Mul(ivec2 A, ivec2 B) { STORE_IVEC2(A, _mm_mul_epi32(LOAD_IVEC2(A), LOAD_IVEC2(B))); return A; }
+inline ivec2 iVec2_Div(ivec2 A, ivec2 B) { STORE_IVEC2(A, _mm_div_epi32(LOAD_IVEC2(A), LOAD_IVEC2(B))); return A; }
+
+/*************/
 /*   iVec3   */
 /*************/
 #define LOAD_IVEC3(V) _mm_loadu_si128((__m128i *)V.E)
@@ -257,9 +267,9 @@ inline ivec3 iVec3_Div(ivec3 A, ivec3 B) { STORE_IVEC3(A, _mm_div_epi32(LOAD_IVE
 inline ivec3 iVec3_Min(ivec3 A, ivec3 B) { STORE_IVEC3(A, _mm_min_epi32(LOAD_IVEC3(A), LOAD_IVEC3(B))); return A; }
 inline ivec3 iVec3_Max(ivec3 A, ivec3 B) { STORE_IVEC3(A, _mm_max_epi32(LOAD_IVEC3(A), LOAD_IVEC3(B))); return A; }
 
-/*****************/
-/* Vec3 -> iVec3 */
-/*****************/
+/******************/
+/* Vec3 <-> iVec3 */
+/******************/
 inline ivec3 Vec3_RoundToIVec3(vec3 A) { ivec3 B; STORE_IVEC3(B, _mm_cvtps_epi32(_mm_round_ps(LOAD_VEC3(A), _MM_FROUND_TO_NEAREST_INT|_MM_FROUND_NO_EXC))); return B; }
 inline ivec3 Vec3_TruncToIVec3(vec3 A) { ivec3 B; STORE_IVEC3(B, _mm_cvtps_epi32(_mm_round_ps(LOAD_VEC3(A), _MM_FROUND_TO_ZERO|_MM_FROUND_NO_EXC))); return B; }
 inline ivec3 Vec3_CeilToIVec3(vec3 A)  { ivec3 B; STORE_IVEC3(B, _mm_cvtps_epi32(_mm_ceil_ps(LOAD_VEC3(A)))); return B; }
@@ -269,6 +279,32 @@ inline ivec3 Vec3_FloatToIVec3(vec3 A) { ivec3 B; STORE_IVEC3(B, _mm_cvtps_epi32
 /************/
 /* Generics */
 /************/
+
+#define Add(A,B) _Generic((A), \
+    vec2: Vec2_Add, \
+    vec3: Vec3_Add, \
+    ivec2: iVec2_Add, \
+    ivec3: iVec3_Add \
+)(A,B)
+#define Sub(A,B) _Generic((A), \
+    vec2: Vec2_Sub, \
+    vec3: Vec3_Sub, \
+    ivec2: iVec2_Sub, \
+    ivec3: iVec3_Sub \
+)(A,B)
+#define Mul(A,B) _Generic((A), \
+    vec2: Vec2_Mul, \
+    vec3: Vec3_Mul, \
+    ivec2: iVec2_Mul, \
+    ivec3: iVec3_Mul \
+)(A,B)
+
+#define Div(A,B) _Generic((A), \
+    vec2: Vec2_Div, \
+    vec3: Vec3_Div, \
+    ivec2: iVec2_Div, \
+    ivec3: iVec3_Div \
+)(A,B)
 
 #define Round(A) _Generic((A), \
     f32: F32_Round, \

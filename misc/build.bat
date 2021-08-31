@@ -2,9 +2,9 @@
 
 set NOCRT=-nodefaultlib kernel32.lib
 
-set DebugFlags=-O2 -MTd -Z7
+set DebugFlags=-Od -MTd -Z7
 set ReleaseFlags=-O2 -MT -Zi
-set CompilerFlags=%DebugFlags% -c -nologo -TC -std:c11 -GS- -Gs9999999 -Gm- -GR- -Gr -EHa- -Oi -W4 -wd4100 -wd4189 -wd4201 -wd4505
+set CompilerFlags=%ReleaseFlags% -c -nologo -TC -std:c11 -GS- -Gs9999999 -Gm- -GR- -Gr -EHa- -Oi -W4 -wd4100 -wd4189 -wd4201 -wd4505
 
 set DebugFlags=-debug -pdb:msvc.pdb -map:msvc.map -subsystem:console
 set ReleaseFlags=-subsystem:windows -incremental:no
