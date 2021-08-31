@@ -24,6 +24,7 @@ typedef struct world_block
     u8 Id;
 } world_block;
 
+#include "mesh.c"
 #include "chunk.c"
 #include "chunkmap.c"
 
@@ -61,11 +62,11 @@ void World_Update(world *World, const camera Camera)
     }
 }
 
-void Chunk_Draw(chunk *Chunk, const bitmap Target, bitmap TerrainTexture, const camera Camera)
+void World_DrawChunk(chunk *Chunk, const bitmap Target, bitmap TerrainTexture, const camera Camera)
 {
     if (!Chunk) return;
-    Chunk_SortQuadsInsertion(Camera, Chunk);
-    Draw_ChunkQuads(Camera, Target, TerrainTexture, Chunk);
+    // Chunk_SortQuadsInsertion(Camera, Chunk);
+    Chunk_Draw(Camera, Target, TerrainTexture, Chunk);
 }
 
 void World_Draw(world *World, const bitmap Target, bitmap TerrainTexture, const camera Camera)
@@ -85,22 +86,22 @@ void World_Draw(world *World, const bitmap Target, bitmap TerrainTexture, const 
         {
             for (i32 x = xMin; x < xMid; ++x)
             {
-                Chunk_Draw(ChunkMap_GetChunk(&World->ChunkMap, x, z), Target, TerrainTexture, Camera);
+                World_DrawChunk(ChunkMap_GetChunk(&World->ChunkMap, x, z), Target, TerrainTexture, Camera);
             }
             for (i32 x = xMax; x >= xMid; --x)
             {
-                Chunk_Draw(ChunkMap_GetChunk(&World->ChunkMap, x, z), Target, TerrainTexture, Camera);
+                World_DrawChunk(ChunkMap_GetChunk(&World->ChunkMap, x, z), Target, TerrainTexture, Camera);
             }
         }
         for (i32 z = zMax; z >= zMid; --z)
         {
             for (i32 x = xMin; x < xMid; ++x)
             {
-                Chunk_Draw(ChunkMap_GetChunk(&World->ChunkMap, x, z), Target, TerrainTexture, Camera);
+                World_DrawChunk(ChunkMap_GetChunk(&World->ChunkMap, x, z), Target, TerrainTexture, Camera);
             }
             for (i32 x = xMax; x >= xMid; --x)
             {
-                Chunk_Draw(ChunkMap_GetChunk(&World->ChunkMap, x, z), Target, TerrainTexture, Camera);
+                World_DrawChunk(ChunkMap_GetChunk(&World->ChunkMap, x, z), Target, TerrainTexture, Camera);
             }
         }
     }
@@ -110,22 +111,22 @@ void World_Draw(world *World, const bitmap Target, bitmap TerrainTexture, const 
         {
             for (i32 z = zMin; z < zMid; ++z)
             {
-                Chunk_Draw(ChunkMap_GetChunk(&World->ChunkMap, x, z), Target, TerrainTexture, Camera);
+                World_DrawChunk(ChunkMap_GetChunk(&World->ChunkMap, x, z), Target, TerrainTexture, Camera);
             }
             for (i32 z = zMax; z >= zMid; --z)
             {
-                Chunk_Draw(ChunkMap_GetChunk(&World->ChunkMap, x, z), Target, TerrainTexture, Camera);
+                World_DrawChunk(ChunkMap_GetChunk(&World->ChunkMap, x, z), Target, TerrainTexture, Camera);
             }
         }
         for (i32 x = xMax; x >= xMid; --x)
         {
             for (i32 z = zMin; z < zMid; ++z)
             {
-                Chunk_Draw(ChunkMap_GetChunk(&World->ChunkMap, x, z), Target, TerrainTexture, Camera);
+                World_DrawChunk(ChunkMap_GetChunk(&World->ChunkMap, x, z), Target, TerrainTexture, Camera);
             }
             for (i32 z = zMax; z >= zMid; --z)
             {
-                Chunk_Draw(ChunkMap_GetChunk(&World->ChunkMap, x, z), Target, TerrainTexture, Camera);
+                World_DrawChunk(ChunkMap_GetChunk(&World->ChunkMap, x, z), Target, TerrainTexture, Camera);
             }
         }
     }
