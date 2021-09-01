@@ -230,15 +230,16 @@ void Block_PlayerLookingAt(world* World, camera Camera)
     i32 zMid = F32_FloorToI32(Camera.Position.z / CHUNK_WIDTH);
 
 
-    for (i32 i = 0; i < 200; i++)
+    for (i32 i = 0; i < 10; i++)
     {
 
         chunk *Chunk = ChunkMap_GetChunk(&World->ChunkMap, xMid, zMid);
 
-        if (RayLen < 50 && MapSection.y < 256 && MapSection.y >= 0 && Chunk->Blocks[(i32)MapSection.x][(i32)MapSection.z][(i32)MapSection.y].Id != 0)
+        if (RayLen < 5 && MapSection.y < 256 && MapSection.y >= 0 && Chunk->Blocks[(i32)MapSection.x][(i32)MapSection.z][(i32)MapSection.y].Id != 0)
         {
             Chunk->Blocks[(i32)MapSection.x][(i32)MapSection.z][(i32)MapSection.y].Id = 0;
             //Chunk_GatherQuads(Chunk);
+            Mesh_Delete(&Chunk->Mesh);
             Chunk->Mesh = Mesh_Create();
             Chunk_GenerateMesh(Chunk);
             return;
