@@ -78,14 +78,13 @@ void Game_Update(game *Game, const input Input)
 {
     camera* Camera = &Game->Camera;
 
-    vec3 Forward = Camera_Direction(*Camera);
-     
+    vec3 Forward = Camera_Forward(*Camera);
     vec3 Right = Camera_Right(*Camera);
     vec3 NewCameraPosition = Camera->Position;
     f32 NewYaw = Camera->Yaw;
     f32 NewPitch = Camera->Pitch;
 
-    f32 Speed = 0.5f;
+    f32 Speed = 0.25f;
     f32 TurnSpeed = 0.05f;
     f32 Sensitivity = 1.0f / 3500.0f;
 
@@ -107,6 +106,14 @@ void Game_Update(game *Game, const input Input)
         NewCameraPosition.x -= Right.x * Speed;
         NewCameraPosition.z -= Right.z * Speed;
     }
+    if (Input.Jump)
+    {
+        NewCameraPosition.y += Speed;
+    }
+    if (Input.Crouch)
+    {
+        NewCameraPosition.y -= Speed;
+    }
     if (Input.LookUp) {
         NewPitch += TurnSpeed;
     }
@@ -126,18 +133,18 @@ void Game_Update(game *Game, const input Input)
     
     if (Input.Punch)
     {
-        block_info BlockInfo = Block_PlayerLookingAt(&Game->World, Game->Camera);
-        if (BlockInfo.BlockFound)
+        trace_result TraceResult = World_TraceCameraRay(&Game->World, Game->Camera, 5.0f);
+        if (TraceResult.BlockHit)
         {
-            World_SetBlock(&Game->World, BlockInfo.Position, (world_block) { 0 });
+            World_SetBlock(&Game->World, TraceResult.BlockPosition, (world_block) { 0 });
         }
     }
     else if (Input.Place)
     {
-        block_info BlockInfo = Block_PlayerLookingAt(&Game->World, Game->Camera);
-        if (BlockInfo.BlockFound)
+        trace_result TraceResult = World_TraceCameraRay(&Game->World, Game->Camera, 5.0f);
+        if (TraceResult.BlockHit)
         {
-            Block_PlaceOnSide(&Game->World, BlockInfo);
+            Block_PlaceOnSide(&Game->World, TraceResult);
         }
         //World_SetBlock(&Game->World, BlockInfo.Position, (world_block) { 0 });
     }
@@ -166,10 +173,10 @@ void Game_Draw(game *Game, bitmap Buffer)
     Draw_Line(Buffer, COLOR_WHITE, C, D);
     Draw_Line(Buffer, COLOR_WHITE, D, A);
 
-    block_info BlockInfo = Block_PlayerLookingAt(&Game->World, Game->Camera);
-    if (BlockInfo.BlockFound) 
+    trace_result TraceResult = World_TraceCameraRay(&Game->World, Game->Camera, 5.0f);
+    if (TraceResult.BlockHit) 
     {
-        Block_Highlight(Buffer, Game->Camera, BlockInfo);
+        Block_Highlight(Buffer, Game->Camera, TraceResult);
     }
 
     Draw_RectIVec2(Buffer, COLOR_BLACK, (ivec2) { Buffer.Width / 2 - 1, Buffer.Height / 2 - 1}, (ivec2) {1, 1});

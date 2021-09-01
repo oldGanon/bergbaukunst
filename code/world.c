@@ -30,23 +30,24 @@ typedef struct world
     chunk_map ChunkMap;
 } world;
 
-enum
+typedef enum block_face
 {
-    Top,
-    Front,
-    Right,
-    Back,
-    Left,
-    Bottom
-}side;
+    BLOCK_FACE_LEFT,
+    BLOCK_FACE_RIGHT,
+    BLOCK_FACE_FRONT,
+    BLOCK_FACE_BACK,
+    BLOCK_FACE_BOTTOM,
+    BLOCK_FACE_TOP,
+} block_face;
 
-typedef struct block_info
+typedef struct trace_result
 {
     world_block Block;
-    vec3 Position;
-    enum side BlockSide;
-    u8 BlockFound;
-}block_info;
+    block_face BlockFace;
+    vec3 BlockPosition;
+    bool BlockHit;
+} trace_result;
+
 
 
 void World_Create(world *World)
@@ -204,162 +205,112 @@ void World_SetBlock(world *World, vec3 Position, world_block Block)
     Chunk_GenerateMesh(Chunk);
 }
 
-block_info Block_PlayerLookingAt(world* World, camera Camera)
+trace_result World_TraceRay(world *World, vec3 Origin, vec3 Direction, f32 Length)
 {
-    vec3 Dir = Camera_Direction(Camera);
-    block_info BlockInfo = {0};
-    vec3 RayDir = Sign(Dir);
-    vec3 RayStepSize = { 1 / Abs(Dir.x), 1 / Abs(Dir.y), 1 / Abs(Dir.z)};
+    f32 RayLength = Length;
+    vec3 RayDirection = Direction;
+    vec3 RayPosition = Origin;
+    vec3 RaySign = Sign(RayDirection);
 
-#if 0
-    // doesnt work for xyz == 0
-    vec3 RayStepSizeFirst = Fract(Mul(Camera.Position, Negate(RayDir)));
-#else
-    vec3 RayStepSizeFirst = { 0 };
-    vec3 FractPos = Fract(Camera.Position);
-    if (Dir.x > 0)
-    {
-        RayStepSizeFirst.x = (1 - FractPos.x);
-    }
-    else
-    {
-        RayStepSizeFirst.x = FractPos.x;
-    }
+    f32 t = 0;
+    vec3 tDelta = Min(Inverse(Abs(RayDirection)), Vec3_Set1(0x100000));
+    vec3 tInit = Fract(RayPosition);
+    if (RaySign.x > 0) tInit.x = (1 - tInit.x);
+    if (RaySign.y > 0) tInit.y = (1 - tInit.y);
+    if (RaySign.z > 0) tInit.z = (1 - tInit.z);
+    vec3 tMax = Mul(tInit, tDelta);
 
-    if (Dir.y > 0) 
-    {
-        RayStepSizeFirst.y = (1 - FractPos.y);
-    }
-    else
-    {
-        RayStepSizeFirst.y = FractPos.y;
-    }
-    
-    if(Dir.z > 0)
-    {
-        RayStepSizeFirst.z = (1 - FractPos.z);
-    }
-    else
-    {
-        RayStepSizeFirst.z = FractPos.z;
-    }    
-#endif
-    RayStepSizeFirst = Mul(RayStepSizeFirst, RayStepSize);
+    block_face LastFace = 0;
 
-    f32 RayLength = 0;
-    f32 MaxLength = 5.0f;
-    vec3 RayPosition = Camera.Position;
-    for (i32 i = 0; i < 10; i++)
+    for (;;)
     {
-        if ((RayPosition.y < 0) && (RayDir.y < 0)) return BlockInfo;
-        if ((RayPosition.y > CHUNK_HEIGHT - 1) && (RayDir.y > 0)) return BlockInfo;
-        if (RayLength > MaxLength) return BlockInfo;
+        if (t > RayLength)
+            return (trace_result){ 0 };
+        if ((RaySign.y < 0) && (RayPosition.y < 0))
+            return (trace_result){ 0 };
+        if ((RaySign.y > 0) && (RayPosition.y > CHUNK_HEIGHT - 1))
+            return (trace_result){ 0 };
 
         world_block Block = World_GetBlock(World, RayPosition);
-
-        if (Block.Id != 0)
+        if (Block.Id != BLOCK_ID_AIR)
         {
-            BlockInfo.Position = RayPosition;
-            BlockInfo.Block = Block;
-            BlockInfo.BlockFound = 1;
-            //World_SetBlock(World, RayPosition, (world_block){ 0 });
-            return BlockInfo;
+            return (trace_result) {
+                .Block = Block,
+                .BlockFace = LastFace,
+                .BlockPosition = RayPosition,
+                .BlockHit = true,
+            };
         }
 
-        if (RayStepSizeFirst.x <= RayStepSizeFirst.y && RayStepSizeFirst.x <= RayStepSizeFirst.z)
+        if ((tMax.x <= tMax.y) && (tMax.x <= tMax.z))
         {
-            RayPosition.x += RayDir.x;
-            RayLength = RayStepSizeFirst.x;
-            RayStepSizeFirst.x += RayStepSize.x;
-            if(RayDir.x > 0)
+            t = tMax.x;
+            tMax.x += tDelta.x;
+            RayPosition.x += RaySign.x;
+            if(RaySign.x > 0)
             {
-                BlockInfo.BlockSide = Left;
+                LastFace = BLOCK_FACE_LEFT;
             }
             else
             {
-                BlockInfo.BlockSide = Right;
-
+                LastFace = BLOCK_FACE_RIGHT;
             }
         }
-        else if (RayStepSizeFirst.y <= RayStepSizeFirst.x && RayStepSizeFirst.y <= RayStepSizeFirst.z)
+        else if ((tMax.z <= tMax.x) && (tMax.z <= tMax.y))
         {
-            RayPosition.y += RayDir.y;
-            RayLength = RayStepSizeFirst.y;
-            RayStepSizeFirst.y += RayStepSize.y;
-            if (RayDir.y > 0)
+            t = tMax.z;
+            tMax.z += tDelta.z;
+            RayPosition.z += RaySign.z;
+            if (RaySign.z > 0)
             {
-                BlockInfo.BlockSide = Bottom;
+                LastFace = BLOCK_FACE_FRONT;
             }
             else
             {
-                BlockInfo.BlockSide = Top;
-
+                LastFace = BLOCK_FACE_BACK;
             }
         }
-        else if (RayStepSizeFirst.z <= RayStepSizeFirst.x && RayStepSizeFirst.z <= RayStepSizeFirst.y)
+        else if ((tMax.y <= tMax.x) && (tMax.y <= tMax.z))
         {
-            RayPosition.z += RayDir.z;
-            RayLength = RayStepSizeFirst.z;
-            RayStepSizeFirst.z += RayStepSize.z;
-            if (RayDir.z > 0)
+            t = tMax.y;
+            tMax.y += tDelta.y;
+            RayPosition.y += RaySign.y;
+            if (RaySign.y > 0)
             {
-                BlockInfo.BlockSide = Front;
+                LastFace = BLOCK_FACE_BOTTOM;
             }
             else
             {
-                BlockInfo.BlockSide = Back;
-
+                LastFace = BLOCK_FACE_TOP;
             }
         }
     }
-    return BlockInfo;
 }
 
-void Block_PlaceOnSide(world *World, block_info BlockInfo)
+trace_result World_TraceCameraRay(world *World, camera Camera, f32 Length)
 {
-    switch (BlockInfo.BlockSide)
+    return World_TraceRay(World, Camera.Position, Camera_Direction(Camera), Length);
+}
+
+void Block_PlaceOnSide(world *World, trace_result TraceResult)
+{
+    switch (TraceResult.BlockFace)
     {
-        case Top: 
-        {
-            BlockInfo.Position.y += 1;
-            break;
-        }
-        case Front:
-        {
-            BlockInfo.Position.z -= 1;
-            break;
-        }
-        case Right:
-        {
-            BlockInfo.Position.x += 1;
-            break;
-        }
-        case Back:
-        {
-            BlockInfo.Position.z += 1;
-            break;
-        }
-        case Left:
-        {
-            BlockInfo.Position.x -= 1;
-            break;
-        }
-        case Bottom:
-        {
-            BlockInfo.Position.y -= 1;
-            break;
-        }
-        default:
-            break;
+        case BLOCK_FACE_LEFT:   TraceResult.BlockPosition.x -= 1; break;
+        case BLOCK_FACE_RIGHT:  TraceResult.BlockPosition.x += 1; break;
+        case BLOCK_FACE_FRONT:  TraceResult.BlockPosition.z -= 1; break;
+        case BLOCK_FACE_BACK:   TraceResult.BlockPosition.z += 1; break;
+        case BLOCK_FACE_BOTTOM: TraceResult.BlockPosition.y -= 1; break;
+        case BLOCK_FACE_TOP:    TraceResult.BlockPosition.y += 1; break;
+        default: break;
     }
-    world_block Block = { 0 };
-    Block.Id = BLOCK_ID_GRAS;
-    World_SetBlock(World, BlockInfo.Position, Block);
+    world_block Block = { .Id = BLOCK_ID_GRAS };
+    World_SetBlock(World, TraceResult.BlockPosition, Block);
 }
 
-void Block_Highlight(bitmap Buffer,camera Camera ,block_info BlockInfo)
+void Block_Highlight(bitmap Buffer, camera Camera, trace_result TraceResult)
 {
-    vec3 BlockCorner = Vec3_Floor(BlockInfo.Position);
+    vec3 BlockCorner = Vec3_Floor(TraceResult.BlockPosition);
 
     Draw_Line(Buffer, COLOR_WHITE, Camera_WorldToScreen(Camera, Buffer, BlockCorner),
                                    Camera_WorldToScreen(Camera, Buffer, (vec3) { BlockCorner.x + 1, BlockCorner.y, BlockCorner.z }));

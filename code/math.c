@@ -157,6 +157,7 @@ inline u32 U32_Modulo(u32 N, u32 D) { return N % D; }
 /************/
 #define LOAD_VEC2(V) _mm_castpd_ps(_mm_load_sd((f64*)&V.E[0]))
 #define STORE_VEC2(V,M) _mm_store_sd((f64*)V.E,_mm_castps_pd(M))
+inline vec2 Vec2_Set1(f32 A) { return (vec2){ .x = A, .y = A }; }
 inline vec2 Vec2_Add(vec2 A, vec2 B) { STORE_VEC2(A, _mm_add_ps(LOAD_VEC2(A), LOAD_VEC2(B))); return A; }
 inline vec2 Vec2_Sub(vec2 A, vec2 B) { STORE_VEC2(A, _mm_sub_ps(LOAD_VEC2(A), LOAD_VEC2(B))); return A; }
 inline vec2 Vec2_Mul(vec2 A, vec2 B) { STORE_VEC2(A, _mm_mul_ps(LOAD_VEC2(A), LOAD_VEC2(B))); return A; }
@@ -168,7 +169,7 @@ inline vec2 Vec2_Ceil(vec2 A)  { STORE_VEC2(A, (_mm_ceil_ps(LOAD_VEC2(A)))); ret
 inline vec2 Vec2_Floor(vec2 A) { STORE_VEC2(A, (_mm_floor_ps(LOAD_VEC2(A)))); return A; }
 inline vec2 Vec2_Sqrt(vec2 A) { STORE_VEC2(A, _mm_sqrt_ps(LOAD_VEC2(A))); return A; }
 inline vec2 Vec2_Lerp(vec2 A, vec2 B, f32 t) { STORE_VEC2(A, _mm_add_ps(_mm_mul_ps(_mm_set1_ps(1.0f-t),LOAD_VEC2(A)),_mm_mul_ps(_mm_set1_ps(t),LOAD_VEC2(B)))); return A; }
-inline vec2 Vec2_Fract(vec2 A) { __m128 m = LOAD_VEC2(A); STORE_VEC2(A, _mm_sub_ps(m, _mm_floor_ps(m))); return A; }
+inline vec2 Vec2_Fract(vec2 A) { __m128 mA = LOAD_VEC2(A); STORE_VEC2(A, _mm_sub_ps(mA, _mm_floor_ps(mA))); return A; }
 inline vec2 Vec2_Inverse(vec2 A) { STORE_VEC2(A, _mm_div_ps(_mm_set1_ps(1), LOAD_VEC2(A))); return A; }
 
 inline vec2 Vec2_Sign(vec2 A)   { STORE_VEC2(A, _mm_or_ps(_mm_and_ps(LOAD_VEC2(A), _mm_set1_ps(-0.0f)), _mm_set1_ps(1.0f))); return A; }
@@ -184,6 +185,7 @@ inline vec2 Vec2_Modulo(vec2 N, vec2 D) { return Vec2_Sub(N, Vec2_Mul(D, Vec2_Fl
 /************/
 #define LOAD_VEC3(V) _mm_loadu_ps(V.E)
 #define STORE_VEC3(V,M) _mm_storeu_ps(V.E,M)
+inline vec3 Vec3_Set1(f32 A) { return (vec3){ .x = A, .y = A, .z = A }; }
 inline vec3 Vec3_Add(vec3 A, vec3 B) { STORE_VEC3(A, _mm_add_ps(LOAD_VEC3(A), LOAD_VEC3(B))); return A; }
 inline vec3 Vec3_Sub(vec3 A, vec3 B) { STORE_VEC3(A, _mm_sub_ps(LOAD_VEC3(A), LOAD_VEC3(B))); return A; }
 inline vec3 Vec3_Mul(vec3 A, vec3 B) { STORE_VEC3(A, _mm_mul_ps(LOAD_VEC3(A), LOAD_VEC3(B))); return A; }
@@ -252,6 +254,7 @@ inline vec3 Vec3_Cross(vec3 A, vec3 B)
 /*************/
 #define LOAD_IVEC2(V) _mm_loadu_si64(V.E)
 #define STORE_IVEC2(V,M) _mm_storeu_si64(V.E,M)
+inline ivec2 iVec2_Set1(i32 A) { return (ivec2){ .x = A, .y = A }; }
 inline ivec2 iVec2_Add(ivec2 A, ivec2 B) { STORE_IVEC2(A, _mm_add_epi32(LOAD_IVEC2(A), LOAD_IVEC2(B))); return A; }
 inline ivec2 iVec2_Sub(ivec2 A, ivec2 B) { STORE_IVEC2(A, _mm_sub_epi32(LOAD_IVEC2(A), LOAD_IVEC2(B))); return A; }
 inline ivec2 iVec2_Mul(ivec2 A, ivec2 B) { STORE_IVEC2(A, _mm_mul_epi32(LOAD_IVEC2(A), LOAD_IVEC2(B))); return A; }
@@ -262,6 +265,7 @@ inline ivec2 iVec2_Div(ivec2 A, ivec2 B) { STORE_IVEC2(A, _mm_div_epi32(LOAD_IVE
 /*************/
 #define LOAD_IVEC3(V) _mm_loadu_si128((__m128i *)V.E)
 #define STORE_IVEC3(V,M) _mm_storeu_si128((__m128i *)V.E,M)
+inline ivec3 iVec3_Set1(i32 A) { return (ivec3){ .x = A, .y = A, .z = A}; }
 inline ivec3 iVec3_Add(ivec3 A, ivec3 B) { STORE_IVEC3(A, _mm_add_epi32(LOAD_IVEC3(A), LOAD_IVEC3(B))); return A; }
 inline ivec3 iVec3_Sub(ivec3 A, ivec3 B) { STORE_IVEC3(A, _mm_sub_epi32(LOAD_IVEC3(A), LOAD_IVEC3(B))); return A; }
 inline ivec3 iVec3_Mul(ivec3 A, ivec3 B) { STORE_IVEC3(A, _mm_mul_epi32(LOAD_IVEC3(A), LOAD_IVEC3(B))); return A; }

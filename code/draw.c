@@ -108,7 +108,7 @@ void Draw_QuadTexturedVerts(bitmap, const bitmap, vertex, vertex, vertex, vertex
 )(BUFFER, COLOR, X, __VA_ARGS__)
 
 #define Draw_Triangle(BUFFER, COLOR, X, ...) _Generic((COLOR), \
-    color:  _Generic((X), \
+    color: _Generic((X), \
         vertex: Draw_TriangleVerts,\
         triangle: Draw_TriangleStruct, \
         ivec2: Draw_TriangleIVec2, \
@@ -307,7 +307,7 @@ inline bool Draw__ClipLine(vec2 Min, vec2 Max, vec2 *A, vec2 *B)
 
 void Draw_LineStruct(bitmap Target, color Color, line Line)
 {
-    rect Clip = (rect){ .x = 0.0f, .y = 0.0f, .w = (f32)Target.Width, .h = (f32)Target.Height };
+    rect Clip = (rect){ .x = 0.0625f, .y = 0.0625f, .w = (f32)Target.Width-0.125f, .h = (f32)Target.Height-0.125f };
     
     if (!Line_Clip(&Line, Clip)) return;
     
