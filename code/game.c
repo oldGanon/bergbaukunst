@@ -126,7 +126,20 @@ void Game_Update(game *Game, const input Input)
     
     if (Input.Punch)
     {
-        Block_PlayerLookingAt(&Game->World, Game->Camera);
+        block_info BlockInfo = Block_PlayerLookingAt(&Game->World, Game->Camera);
+        if (BlockInfo.BlockFound)
+        {
+            World_SetBlock(&Game->World, BlockInfo.Position, (world_block) { 0 });
+        }
+    }
+    else if (Input.Place)
+    {
+        block_info BlockInfo = Block_PlayerLookingAt(&Game->World, Game->Camera);
+        if (BlockInfo.BlockFound)
+        {
+            Block_PlaceOnSide(&Game->World, BlockInfo);
+        }
+        //World_SetBlock(&Game->World, BlockInfo.Position, (world_block) { 0 });
     }
     
     Camera_SetPosition(Camera, NewCameraPosition);
@@ -152,6 +165,12 @@ void Game_Draw(game *Game, bitmap Buffer)
     Draw_Line(Buffer, COLOR_WHITE, B, C);
     Draw_Line(Buffer, COLOR_WHITE, C, D);
     Draw_Line(Buffer, COLOR_WHITE, D, A);
+
+    block_info BlockInfo = Block_PlayerLookingAt(&Game->World, Game->Camera);
+    if (BlockInfo.BlockFound) 
+    {
+        Block_Highlight(Buffer, Game->Camera, BlockInfo);
+    }
 
     Draw_RectIVec2(Buffer, COLOR_BLACK, (ivec2) { Buffer.Width / 2 - 1, Buffer.Height / 2 - 1}, (ivec2) {1, 1});
     //Draw_RectInt(Buffer, COLOR_BLACK, Buffer.Width/2 - 3, Buffer.Height / 2 - 3, 5, 5 );

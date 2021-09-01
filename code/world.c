@@ -13,7 +13,7 @@ typedef struct world_block
 } world_block;
 
 #define LOADED_CHUNKS 16
-#define VIEW_DISTANCE 8
+#define VIEW_DISTANCE 2
 
 #include "mesh.c"
 #include "chunk.c"
@@ -30,6 +30,23 @@ typedef struct world
     chunk_map ChunkMap;
 } world;
 
+enum
+{
+    Top,
+    Front,
+    Right,
+    Back,
+    Left,
+    Bottom
+}side;
+
+typedef struct block_info
+{
+    world_block Block;
+    vec3 Position;
+    enum side BlockSide;
+    u8 BlockFound;
+}block_info;
 
 
 void World_Create(world *World)
@@ -187,9 +204,10 @@ void World_SetBlock(world *World, vec3 Position, world_block Block)
     Chunk_GenerateMesh(Chunk);
 }
 
-void Block_PlayerLookingAt(world* World, camera Camera)
+block_info Block_PlayerLookingAt(world* World, camera Camera)
 {
     vec3 Dir = Camera_Direction(Camera);
+    block_info BlockInfo = {0};
     vec3 RayDir = Sign(Dir);
     vec3 RayStepSize = { 1 / Abs(Dir.x), 1 / Abs(Dir.y), 1 / Abs(Dir.z)};
 
@@ -233,16 +251,19 @@ void Block_PlayerLookingAt(world* World, camera Camera)
     vec3 RayPosition = Camera.Position;
     for (i32 i = 0; i < 10; i++)
     {
-        if ((RayPosition.y < 0) && (RayDir.y < 0)) return;
-        if ((RayPosition.y > CHUNK_HEIGHT - 1) && (RayDir.y > 0)) return;
-        if (RayLength > MaxLength) return;
+        if ((RayPosition.y < 0) && (RayDir.y < 0)) return BlockInfo;
+        if ((RayPosition.y > CHUNK_HEIGHT - 1) && (RayDir.y > 0)) return BlockInfo;
+        if (RayLength > MaxLength) return BlockInfo;
 
         world_block Block = World_GetBlock(World, RayPosition);
 
         if (Block.Id != 0)
         {
-            World_SetBlock(World, RayPosition, (world_block){ 0 });
-            return;
+            BlockInfo.Position = RayPosition;
+            BlockInfo.Block = Block;
+            BlockInfo.BlockFound = 1;
+            //World_SetBlock(World, RayPosition, (world_block){ 0 });
+            return BlockInfo;
         }
 
         if (RayStepSizeFirst.x <= RayStepSizeFirst.y && RayStepSizeFirst.x <= RayStepSizeFirst.z)
@@ -250,18 +271,96 @@ void Block_PlayerLookingAt(world* World, camera Camera)
             RayPosition.x += RayDir.x;
             RayLength = RayStepSizeFirst.x;
             RayStepSizeFirst.x += RayStepSize.x;
+            if(RayDir.x > 0)
+            {
+                BlockInfo.BlockSide = Left;
+            }
+            else
+            {
+                BlockInfo.BlockSide = Right;
+
+            }
         }
         else if (RayStepSizeFirst.y <= RayStepSizeFirst.x && RayStepSizeFirst.y <= RayStepSizeFirst.z)
         {
             RayPosition.y += RayDir.y;
             RayLength = RayStepSizeFirst.y;
             RayStepSizeFirst.y += RayStepSize.y;
+            if (RayDir.y > 0)
+            {
+                BlockInfo.BlockSide = Bottom;
+            }
+            else
+            {
+                BlockInfo.BlockSide = Top;
+
+            }
         }
         else if (RayStepSizeFirst.z <= RayStepSizeFirst.x && RayStepSizeFirst.z <= RayStepSizeFirst.y)
         {
             RayPosition.z += RayDir.z;
             RayLength = RayStepSizeFirst.z;
             RayStepSizeFirst.z += RayStepSize.z;
+            if (RayDir.z > 0)
+            {
+                BlockInfo.BlockSide = Front;
+            }
+            else
+            {
+                BlockInfo.BlockSide = Back;
+
+            }
         }
     }
+    return BlockInfo;
+}
+
+void Block_PlaceOnSide(world *World, block_info BlockInfo)
+{
+    switch (BlockInfo.BlockSide)
+    {
+        case Top: 
+        {
+            BlockInfo.Position.y += 1;
+            break;
+        }
+        case Front:
+        {
+            BlockInfo.Position.z -= 1;
+            break;
+        }
+        case Right:
+        {
+            BlockInfo.Position.x += 1;
+            break;
+        }
+        case Back:
+        {
+            BlockInfo.Position.z += 1;
+            break;
+        }
+        case Left:
+        {
+            BlockInfo.Position.x -= 1;
+            break;
+        }
+        case Bottom:
+        {
+            BlockInfo.Position.y -= 1;
+            break;
+        }
+        default:
+            break;
+    }
+    world_block Block = { 0 };
+    Block.Id = BLOCK_ID_GRAS;
+    World_SetBlock(World, BlockInfo.Position, Block);
+}
+
+void Block_Highlight(bitmap Buffer,camera Camera ,block_info BlockInfo)
+{
+    vec3 BlockCorner = Vec3_Floor(BlockInfo.Position);
+
+    Draw_Line(Buffer, COLOR_WHITE, Camera_WorldToScreen(Camera, Buffer, BlockCorner),
+                                   Camera_WorldToScreen(Camera, Buffer, (vec3) { BlockCorner.x + 1, BlockCorner.y, BlockCorner.z }));
 }

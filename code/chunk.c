@@ -17,6 +17,8 @@ typedef struct chunk
 } chunk;
 
 
+
+
 quad Quad_MovePosition(quad Quad, vec3 Offset)
 {
     Quad.Verts[0].Position = Vec3_Add(Quad.Verts[0].Position, Offset);
