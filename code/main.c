@@ -500,14 +500,20 @@ int WINAPI CALLBACK WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR 
                     GlobalRunning = false;
                 } break;
 
-                case WM_MBUTTONDOWN:
-                case WM_MBUTTONUP:
+                case WM_LBUTTONDOWN: { Input.Punch = true; } break;
+                case WM_RBUTTONDOWN: { Input.Place = true; } break;
+                case WM_MBUTTONDOWN: break;
+
+                case WM_LBUTTONUP: { Input.Punch = false; } break;
+                case WM_RBUTTONUP: { Input.Place = false; } break;
+                case WM_MBUTTONUP: break;
+
                 case WM_SYSKEYDOWN:
                 case WM_SYSKEYUP:
                 case WM_KEYDOWN:
                 case WM_KEYUP:
                 {
-                    WPARAM Code = Message.wParam;    
+                    WPARAM Code = Message.wParam;
                     bool WasDown = (((Message.lParam >> 30) & 1) != 0);
                     bool IsDown = (((Message.lParam >> 31) & 1) == 0);
                     bool AltDown = (Message.lParam & (1 << 29)) != 0;
@@ -536,8 +542,6 @@ int WINAPI CALLBACK WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR 
                             case 'E': Input.Interact = IsDown; break;
                             case VK_SPACE: Input.Jump = IsDown; break;
                             case VK_SHIFT: Input.Crouch = IsDown; break;
-                            case VK_LBUTTON: Input.Punch = IsDown; break;
-                            case VK_RBUTTON: Input.Place = IsDown; break;
                         }
                     }
                 } break;
