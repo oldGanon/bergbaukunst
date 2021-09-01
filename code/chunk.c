@@ -1,6 +1,10 @@
 
-#define CHUNK_WIDTH 16
-#define CHUNK_HEIGHT 128
+#define CHUNK_WIDTH_SHIFT 4
+#define CHUNK_WIDTH (1 << CHUNK_WIDTH_SHIFT)
+#define CHUNK_WIDTH_MASK (CHUNK_WIDTH - 1)
+#define CHUNK_HEIGHT_SHIFT 7
+#define CHUNK_HEIGHT (1 << CHUNK_HEIGHT_SHIFT)
+#define CHUNK_HEIGHT_MASK (CHUNK_HEIGHT - 1)
 
 typedef struct chunk
 {
@@ -43,11 +47,12 @@ quad Quad_RotateVerts(quad Quad)
 
 quad Block_LeftFace(u32 Index, vec3 Position, u32 OpaqueMask)
 {
+    f32 DefaultShadow = 0.25f;
     quad Quad = {
-        .Verts[0] = { .Position = { 0,0,1 }, .TexCoord = {  0,  0 }, .Shadow = 0.25f },
-        .Verts[1] = { .Position = { 0,0,0 }, .TexCoord = { 16,  0 }, .Shadow = 0.25f },
-        .Verts[2] = { .Position = { 0,1,0 }, .TexCoord = { 16, 16 }, .Shadow = 0.25f },
-        .Verts[3] = { .Position = { 0,1,1 }, .TexCoord = {  0, 16 }, .Shadow = 0.25f },
+        .Verts[0] = { .Position = { 0,0,1 }, .TexCoord = {  0,  0 }, .Shadow = DefaultShadow },
+        .Verts[1] = { .Position = { 0,0,0 }, .TexCoord = { 16,  0 }, .Shadow = DefaultShadow },
+        .Verts[2] = { .Position = { 0,1,0 }, .TexCoord = { 16, 16 }, .Shadow = DefaultShadow },
+        .Verts[3] = { .Position = { 0,1,1 }, .TexCoord = {  0, 16 }, .Shadow = DefaultShadow },
     };
     Quad = Quad_MovePosition(Quad, Position);
     
@@ -59,10 +64,10 @@ quad Block_LeftFace(u32 Index, vec3 Position, u32 OpaqueMask)
     if (OpaqueMask & (1 << 21)) { Quad.Verts[2].Shadow += 0.25f; Quad.Verts[3].Shadow += 0.25f; }
     if (OpaqueMask & (1 << 15)) { Quad.Verts[3].Shadow += 0.25f; Quad.Verts[0].Shadow += 0.25f; }
 
-    if ((OpaqueMask & (1 <<  6)) && (Quad.Verts[0].Shadow == 0.0f)) Quad.Verts[0].Shadow += 0.25f;
-    if ((OpaqueMask & (1 <<  0)) && (Quad.Verts[1].Shadow == 0.0f)) Quad.Verts[1].Shadow += 0.25f;
-    if ((OpaqueMask & (1 << 18)) && (Quad.Verts[2].Shadow == 0.0f)) Quad.Verts[2].Shadow += 0.25f;
-    if ((OpaqueMask & (1 << 24)) && (Quad.Verts[3].Shadow == 0.0f)) Quad.Verts[3].Shadow += 0.25f;
+    if ((OpaqueMask & (1 <<  6)) && (Quad.Verts[0].Shadow == DefaultShadow)) Quad.Verts[0].Shadow += 0.25f;
+    if ((OpaqueMask & (1 <<  0)) && (Quad.Verts[1].Shadow == DefaultShadow)) Quad.Verts[1].Shadow += 0.25f;
+    if ((OpaqueMask & (1 << 18)) && (Quad.Verts[2].Shadow == DefaultShadow)) Quad.Verts[2].Shadow += 0.25f;
+    if ((OpaqueMask & (1 << 24)) && (Quad.Verts[3].Shadow == DefaultShadow)) Quad.Verts[3].Shadow += 0.25f;
     
     if (OpaqueMask & ((1 << 6) | (1 << 18)))
         return Quad_RotateVerts(Quad);
@@ -71,11 +76,12 @@ quad Block_LeftFace(u32 Index, vec3 Position, u32 OpaqueMask)
 
 quad Block_RightFace(u32 Index, vec3 Position, u32 OpaqueMask)
 {
+    f32 DefaultShadow = 0.25f;
     quad Quad = {
-        .Verts[0] = { .Position = { 1,0,0 }, .TexCoord = {  0,  0 }, .Shadow = 0.25f },
-        .Verts[1] = { .Position = { 1,0,1 }, .TexCoord = { 16,  0 }, .Shadow = 0.25f },
-        .Verts[2] = { .Position = { 1,1,1 }, .TexCoord = { 16, 16 }, .Shadow = 0.25f },
-        .Verts[3] = { .Position = { 1,1,0 }, .TexCoord = {  0, 16 }, .Shadow = 0.25f },
+        .Verts[0] = { .Position = { 1,0,0 }, .TexCoord = {  0,  0 }, .Shadow = DefaultShadow },
+        .Verts[1] = { .Position = { 1,0,1 }, .TexCoord = { 16,  0 }, .Shadow = DefaultShadow },
+        .Verts[2] = { .Position = { 1,1,1 }, .TexCoord = { 16, 16 }, .Shadow = DefaultShadow },
+        .Verts[3] = { .Position = { 1,1,0 }, .TexCoord = {  0, 16 }, .Shadow = DefaultShadow },
     };
     Quad = Quad_MovePosition(Quad, Position);
     
@@ -87,10 +93,10 @@ quad Block_RightFace(u32 Index, vec3 Position, u32 OpaqueMask)
     if (OpaqueMask & (1 << 23)) { Quad.Verts[2].Shadow += 0.25f; Quad.Verts[3].Shadow += 0.25f; }
     if (OpaqueMask & (1 << 11)) { Quad.Verts[3].Shadow += 0.25f; Quad.Verts[0].Shadow += 0.25f; }
 
-    if ((OpaqueMask & (1 << 2)) && (Quad.Verts[0].Shadow == 0.0f)) Quad.Verts[0].Shadow += 0.25f;
-    if ((OpaqueMask & (1 << 8)) && (Quad.Verts[1].Shadow == 0.0f)) Quad.Verts[1].Shadow += 0.25f;
-    if ((OpaqueMask & (1 << 26)) && (Quad.Verts[2].Shadow == 0.0f)) Quad.Verts[2].Shadow += 0.25f;
-    if ((OpaqueMask & (1 << 20)) && (Quad.Verts[3].Shadow == 0.0f)) Quad.Verts[3].Shadow += 0.25f;
+    if ((OpaqueMask & (1 <<  2)) && (Quad.Verts[0].Shadow == DefaultShadow)) Quad.Verts[0].Shadow += 0.25f;
+    if ((OpaqueMask & (1 <<  8)) && (Quad.Verts[1].Shadow == DefaultShadow)) Quad.Verts[1].Shadow += 0.25f;
+    if ((OpaqueMask & (1 << 26)) && (Quad.Verts[2].Shadow == DefaultShadow)) Quad.Verts[2].Shadow += 0.25f;
+    if ((OpaqueMask & (1 << 20)) && (Quad.Verts[3].Shadow == DefaultShadow)) Quad.Verts[3].Shadow += 0.25f;
     
     if (OpaqueMask & ((1 << 2) | (1 << 26)))
         return Quad_RotateVerts(Quad);
@@ -99,11 +105,12 @@ quad Block_RightFace(u32 Index, vec3 Position, u32 OpaqueMask)
 
 quad Block_FrontFace(u32 Index, vec3 Position, u32 OpaqueMask)
 {
+    f32 DefaultShadow = 0.125f;
     quad Quad = {
-        .Verts[0] = { .Position = { 0,0,0 }, .TexCoord = {  0,  0 }, .Shadow = 0.125f },
-        .Verts[1] = { .Position = { 1,0,0 }, .TexCoord = { 16,  0 }, .Shadow = 0.125f },
-        .Verts[2] = { .Position = { 1,1,0 }, .TexCoord = { 16, 16 }, .Shadow = 0.125f },
-        .Verts[3] = { .Position = { 0,1,0 }, .TexCoord = {  0, 16 }, .Shadow = 0.125f },
+        .Verts[0] = { .Position = { 0,0,0 }, .TexCoord = {  0,  0 }, .Shadow = DefaultShadow },
+        .Verts[1] = { .Position = { 1,0,0 }, .TexCoord = { 16,  0 }, .Shadow = DefaultShadow },
+        .Verts[2] = { .Position = { 1,1,0 }, .TexCoord = { 16, 16 }, .Shadow = DefaultShadow },
+        .Verts[3] = { .Position = { 0,1,0 }, .TexCoord = {  0, 16 }, .Shadow = DefaultShadow },
     };
     Quad = Quad_MovePosition(Quad, Position);
     
@@ -115,10 +122,10 @@ quad Block_FrontFace(u32 Index, vec3 Position, u32 OpaqueMask)
     if (OpaqueMask & (1 << 19)) { Quad.Verts[2].Shadow += 0.25f; Quad.Verts[3].Shadow += 0.25f; }
     if (OpaqueMask & (1 <<  9)) { Quad.Verts[3].Shadow += 0.25f; Quad.Verts[0].Shadow += 0.25f; }
 
-    if ((OpaqueMask & (1 <<  0)) && (Quad.Verts[0].Shadow == 0.0f)) Quad.Verts[0].Shadow += 0.25f;
-    if ((OpaqueMask & (1 <<  2)) && (Quad.Verts[1].Shadow == 0.0f)) Quad.Verts[1].Shadow += 0.25f;
-    if ((OpaqueMask & (1 << 20)) && (Quad.Verts[2].Shadow == 0.0f)) Quad.Verts[2].Shadow += 0.25f;
-    if ((OpaqueMask & (1 << 18)) && (Quad.Verts[3].Shadow == 0.0f)) Quad.Verts[3].Shadow += 0.25f;
+    if ((OpaqueMask & (1 <<  0)) && (Quad.Verts[0].Shadow == DefaultShadow)) Quad.Verts[0].Shadow += 0.25f;
+    if ((OpaqueMask & (1 <<  2)) && (Quad.Verts[1].Shadow == DefaultShadow)) Quad.Verts[1].Shadow += 0.25f;
+    if ((OpaqueMask & (1 << 20)) && (Quad.Verts[2].Shadow == DefaultShadow)) Quad.Verts[2].Shadow += 0.25f;
+    if ((OpaqueMask & (1 << 18)) && (Quad.Verts[3].Shadow == DefaultShadow)) Quad.Verts[3].Shadow += 0.25f;
     
     if (OpaqueMask & ((1 << 0) | (1 << 20)))
         return Quad_RotateVerts(Quad);
@@ -127,11 +134,12 @@ quad Block_FrontFace(u32 Index, vec3 Position, u32 OpaqueMask)
 
 quad Block_BackFace(u32 Index, vec3 Position, u32 OpaqueMask)
 {
+    f32 DefaultShadow = 0.125f;
     quad Quad = {
-        .Verts[0] = { .Position = { 1,0,1 }, .TexCoord = {  0,  0 }, .Shadow = 0.125f },
-        .Verts[1] = { .Position = { 0,0,1 }, .TexCoord = { 16,  0 }, .Shadow = 0.125f },
-        .Verts[2] = { .Position = { 0,1,1 }, .TexCoord = { 16, 16 }, .Shadow = 0.125f },
-        .Verts[3] = { .Position = { 1,1,1 }, .TexCoord = {  0, 16 }, .Shadow = 0.125f },
+        .Verts[0] = { .Position = { 1,0,1 }, .TexCoord = {  0,  0 }, .Shadow = DefaultShadow },
+        .Verts[1] = { .Position = { 0,0,1 }, .TexCoord = { 16,  0 }, .Shadow = DefaultShadow },
+        .Verts[2] = { .Position = { 0,1,1 }, .TexCoord = { 16, 16 }, .Shadow = DefaultShadow },
+        .Verts[3] = { .Position = { 1,1,1 }, .TexCoord = {  0, 16 }, .Shadow = DefaultShadow },
     };
     Quad = Quad_MovePosition(Quad, Position);
     
@@ -143,10 +151,10 @@ quad Block_BackFace(u32 Index, vec3 Position, u32 OpaqueMask)
     if (OpaqueMask & (1 << 25)) { Quad.Verts[2].Shadow += 0.25f; Quad.Verts[3].Shadow += 0.25f; }
     if (OpaqueMask & (1 << 17)) { Quad.Verts[3].Shadow += 0.25f; Quad.Verts[0].Shadow += 0.25f; }
 
-    if ((OpaqueMask & (1 <<  8)) && (Quad.Verts[0].Shadow == 0.0f)) Quad.Verts[0].Shadow += 0.25f;
-    if ((OpaqueMask & (1 <<  6)) && (Quad.Verts[1].Shadow == 0.0f)) Quad.Verts[1].Shadow += 0.25f;
-    if ((OpaqueMask & (1 << 24)) && (Quad.Verts[2].Shadow == 0.0f)) Quad.Verts[2].Shadow += 0.25f;
-    if ((OpaqueMask & (1 << 26)) && (Quad.Verts[3].Shadow == 0.0f)) Quad.Verts[3].Shadow += 0.25f;
+    if ((OpaqueMask & (1 <<  8)) && (Quad.Verts[0].Shadow == DefaultShadow)) Quad.Verts[0].Shadow += 0.25f;
+    if ((OpaqueMask & (1 <<  6)) && (Quad.Verts[1].Shadow == DefaultShadow)) Quad.Verts[1].Shadow += 0.25f;
+    if ((OpaqueMask & (1 << 24)) && (Quad.Verts[2].Shadow == DefaultShadow)) Quad.Verts[2].Shadow += 0.25f;
+    if ((OpaqueMask & (1 << 26)) && (Quad.Verts[3].Shadow == DefaultShadow)) Quad.Verts[3].Shadow += 0.25f;
     
     if (OpaqueMask & ((1 << 6) | (1 << 26)))
         return Quad_RotateVerts(Quad);
@@ -155,11 +163,12 @@ quad Block_BackFace(u32 Index, vec3 Position, u32 OpaqueMask)
 
 quad Block_BottomFace(u32 Index, vec3 Position, u32 OpaqueMask)
 {
+    f32 DefaultShadow = 0.375f;
     quad Quad = {
-        .Verts[0] = { .Position = { 0,0,1 }, .TexCoord = {  0,  0 }, .Shadow = 0.375f },
-        .Verts[1] = { .Position = { 1,0,1 }, .TexCoord = { 16,  0 }, .Shadow = 0.375f },
-        .Verts[2] = { .Position = { 1,0,0 }, .TexCoord = { 16, 16 }, .Shadow = 0.375f },
-        .Verts[3] = { .Position = { 0,0,0 }, .TexCoord = {  0, 16 }, .Shadow = 0.375f },
+        .Verts[0] = { .Position = { 0,0,1 }, .TexCoord = {  0,  0 }, .Shadow = DefaultShadow },
+        .Verts[1] = { .Position = { 1,0,1 }, .TexCoord = { 16,  0 }, .Shadow = DefaultShadow },
+        .Verts[2] = { .Position = { 1,0,0 }, .TexCoord = { 16, 16 }, .Shadow = DefaultShadow },
+        .Verts[3] = { .Position = { 0,0,0 }, .TexCoord = {  0, 16 }, .Shadow = DefaultShadow },
     };
     Quad = Quad_MovePosition(Quad, Position);
     
@@ -171,10 +180,10 @@ quad Block_BottomFace(u32 Index, vec3 Position, u32 OpaqueMask)
     if (OpaqueMask & (1 << 1)) { Quad.Verts[2].Shadow += 0.25f; Quad.Verts[3].Shadow += 0.25f; }
     if (OpaqueMask & (1 << 3)) { Quad.Verts[3].Shadow += 0.25f; Quad.Verts[0].Shadow += 0.25f; }
 
-    if ((OpaqueMask & (1 << 6)) && (Quad.Verts[0].Shadow == 0.0f)) Quad.Verts[0].Shadow += 0.25f;
-    if ((OpaqueMask & (1 << 8)) && (Quad.Verts[1].Shadow == 0.0f)) Quad.Verts[1].Shadow += 0.25f;
-    if ((OpaqueMask & (1 << 2)) && (Quad.Verts[2].Shadow == 0.0f)) Quad.Verts[2].Shadow += 0.25f;
-    if ((OpaqueMask & (1 << 0)) && (Quad.Verts[3].Shadow == 0.0f)) Quad.Verts[3].Shadow += 0.25f;
+    if ((OpaqueMask & (1 << 6)) && (Quad.Verts[0].Shadow == DefaultShadow)) Quad.Verts[0].Shadow += 0.25f;
+    if ((OpaqueMask & (1 << 8)) && (Quad.Verts[1].Shadow == DefaultShadow)) Quad.Verts[1].Shadow += 0.25f;
+    if ((OpaqueMask & (1 << 2)) && (Quad.Verts[2].Shadow == DefaultShadow)) Quad.Verts[2].Shadow += 0.25f;
+    if ((OpaqueMask & (1 << 0)) && (Quad.Verts[3].Shadow == DefaultShadow)) Quad.Verts[3].Shadow += 0.25f;
     
     if (OpaqueMask & ((1 << 6) | (1 << 2)))
         return Quad_RotateVerts(Quad);
@@ -183,11 +192,12 @@ quad Block_BottomFace(u32 Index, vec3 Position, u32 OpaqueMask)
 
 quad Block_TopFace(u32 Index, vec3 Position, u32 OpaqueMask)
 {
+    f32 DefaultShadow = 0.0f;
     quad Quad = {
-        .Verts[0] = { .Position = { 0,1,0 }, .TexCoord = {  0,  0 }, },
-        .Verts[1] = { .Position = { 1,1,0 }, .TexCoord = { 16,  0 }, },
-        .Verts[2] = { .Position = { 1,1,1 }, .TexCoord = { 16, 16 }, },
-        .Verts[3] = { .Position = { 0,1,1 }, .TexCoord = {  0, 16 }, },
+        .Verts[0] = { .Position = { 0,1,0 }, .TexCoord = {  0,  0 }, .Shadow = DefaultShadow },
+        .Verts[1] = { .Position = { 1,1,0 }, .TexCoord = { 16,  0 }, .Shadow = DefaultShadow },
+        .Verts[2] = { .Position = { 1,1,1 }, .TexCoord = { 16, 16 }, .Shadow = DefaultShadow },
+        .Verts[3] = { .Position = { 0,1,1 }, .TexCoord = {  0, 16 }, .Shadow = DefaultShadow },
     };
     Quad = Quad_MovePosition(Quad, Position);
     
@@ -199,10 +209,10 @@ quad Block_TopFace(u32 Index, vec3 Position, u32 OpaqueMask)
     if (OpaqueMask & (1 << 25)) { Quad.Verts[2].Shadow += 0.25f; Quad.Verts[3].Shadow += 0.25f; }
     if (OpaqueMask & (1 << 21)) { Quad.Verts[3].Shadow += 0.25f; Quad.Verts[0].Shadow += 0.25f; }
 
-    if ((OpaqueMask & (1 << 18)) && (Quad.Verts[0].Shadow == 0.0f)) Quad.Verts[0].Shadow += 0.25f;
-    if ((OpaqueMask & (1 << 20)) && (Quad.Verts[1].Shadow == 0.0f)) Quad.Verts[1].Shadow += 0.25f;
-    if ((OpaqueMask & (1 << 26)) && (Quad.Verts[2].Shadow == 0.0f)) Quad.Verts[2].Shadow += 0.25f;
-    if ((OpaqueMask & (1 << 24)) && (Quad.Verts[3].Shadow == 0.0f)) Quad.Verts[3].Shadow += 0.25f;
+    if ((OpaqueMask & (1 << 18)) && (Quad.Verts[0].Shadow == DefaultShadow)) Quad.Verts[0].Shadow += 0.25f;
+    if ((OpaqueMask & (1 << 20)) && (Quad.Verts[1].Shadow == DefaultShadow)) Quad.Verts[1].Shadow += 0.25f;
+    if ((OpaqueMask & (1 << 26)) && (Quad.Verts[2].Shadow == DefaultShadow)) Quad.Verts[2].Shadow += 0.25f;
+    if ((OpaqueMask & (1 << 24)) && (Quad.Verts[3].Shadow == DefaultShadow)) Quad.Verts[3].Shadow += 0.25f;
     
     if (OpaqueMask & ((1 << 18) | (1 << 26)))
         return Quad_RotateVerts(Quad);
@@ -249,7 +259,7 @@ void Chunk_AddBlockQuads(quad_mesh *Mesh, vec3 Position, u32 OpaqueMask,
     }
 }
 
-u32 Chunk_BlockMask(chunk *Chunk, vec3 Position)
+u32 Chunk_OpaqueMask(chunk *Chunk, vec3 Position)
 {
     u32 Mask = 0;
     ivec3 One = (ivec3) { 1, 1, 1 };
@@ -270,6 +280,26 @@ u32 Chunk_BlockMask(chunk *Chunk, vec3 Position)
     return Mask;
 }
 
+u32 Chunk_BlockMask(chunk *Chunk, vec3 Position, u8 Block)
+{
+    u32 Mask = 0;
+    ivec3 One = (ivec3) { 1, 1, 1 };
+    ivec3 iPos = Vec3_FloorToIVec3(Position);
+    ivec3 iMin = iVec3_Max(iVec3_Sub(iPos, One), (ivec3) {  0,  0,  0 });
+    ivec3 iMax = iVec3_Min(iVec3_Add(iPos, One), (ivec3) { 15, 15, 15 });
+    for (i32 y = iMin.y; y <= iMax.y; ++y)
+    for (i32 z = iMin.z; z <= iMax.z; ++z)
+    for (i32 x = iMin.x; x <= iMax.x; ++x)
+    {
+        u8 BlockId = Chunk->Blocks[x][z][y].Id;
+        if (BlockId == Block)
+        {
+            Mask |= 1 << ((x+1-iPos.x) + (z+1-iPos.z)*3 + (y+1-iPos.y)*9);
+        }
+    }
+    return Mask;
+}
+
 void Chunk_GenerateMesh(chunk *Chunk)
 {
     Mesh_Clear(&Chunk->Mesh);
@@ -281,22 +311,25 @@ void Chunk_GenerateMesh(chunk *Chunk)
         world_block *CurrentBlock = &Chunk->Blocks[x][z][y];
         
         vec3 BlockPosition = (vec3){ (f32)x, (f32)y, (f32)z };
-        u32 OpaqueMask = Chunk_BlockMask(Chunk, BlockPosition);
 
         switch (CurrentBlock->Id)
         {
             case BLOCK_ID_GRAS:
             {
+                u32 OpaqueMask = Chunk_OpaqueMask(Chunk, BlockPosition);
                 Chunk_AddBlockQuads(&Chunk->Mesh, BlockPosition, OpaqueMask, 1, 1, 1, 1, 2, 0);
             } break;
 
             case BLOCK_ID_WOOD:
             {
+                u32 OpaqueMask = Chunk_OpaqueMask(Chunk, BlockPosition);
                 Chunk_AddBlockQuads(&Chunk->Mesh, BlockPosition, OpaqueMask, 7, 7, 7, 7, 15, 15);
             } break;
 
             case BLOCK_ID_LEAVES:
             {
+                u32 OpaqueMask = Chunk_OpaqueMask(Chunk, BlockPosition);
+                // u32 LeaveMask = Chunk_BlockMask(Chunk, BlockPosition, BLOCK_ID_LEAVES);
                 Chunk_AddBlockQuads(&Chunk->Mesh, BlockPosition, OpaqueMask, 3, 3, 3, 3, 3, 3);
             } break;
         }
@@ -337,7 +370,10 @@ void Chunk_Create(chunk *Chunk, i32 x, i32 z)
         {
             Current_Block->Id = BLOCK_ID_WOOD;
         }
-        else if ((zz >= 3) && (zz <= 7) && (xx >= 3) && (xx <= 7) && (yy >= 3) && (yy <= 6))
+        else if (((zz >= 3) && (zz <= 7) && (xx >= 4) && (xx <= 6) && (yy >= 3) && (yy <= 5)) ||
+                 ((zz >= 4) && (zz <= 6) && (xx >= 3) && (xx <= 7) && (yy >= 3) && (yy <= 5)) ||
+                 ((zz == 5) && (xx >= 4) && (xx <= 6) && (yy == 6)) ||
+                 ((zz >= 4) && (zz <= 6) && (xx == 5) && (yy == 6)))
         {
             Current_Block->Id = BLOCK_ID_LEAVES;
         }

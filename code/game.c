@@ -124,7 +124,7 @@ void Game_Update(game *Game, const input Input)
     NewYaw += Input.Look.x * Sensitivity;
     NewPitch += Input.Look.y * Sensitivity;
     
-    if (Input.Interact)
+    if (Input.Punch)
     {
         Block_PlayerLookingAt(&Game->World, Game->Camera);
     }
