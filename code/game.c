@@ -153,7 +153,7 @@ void Game_Draw(game *Game, bitmap Buffer)
     Draw_Line(Buffer, COLOR_WHITE, C, D);
     Draw_Line(Buffer, COLOR_WHITE, D, A);
 
-    Draw_RectIVec2(Buffer, COLOR_BLACK, (ivec2) { Buffer.Width / 2 - 3, Buffer.Height / 2 - 3}, (ivec2) {5, 5});
+    Draw_RectIVec2(Buffer, COLOR_BLACK, (ivec2) { Buffer.Width / 2 - 1, Buffer.Height / 2 - 1}, (ivec2) {1, 1});
     //Draw_RectInt(Buffer, COLOR_BLACK, Buffer.Width/2 - 3, Buffer.Height / 2 - 3, 5, 5 );
 
     /*

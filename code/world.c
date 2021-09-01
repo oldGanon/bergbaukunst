@@ -186,10 +186,11 @@ void Block_PlayerLookingAt(world* World, camera Camera)
     {
         Dir.z = 0.00000001f;
     }
-    vec3 RayStepSize = { Sqrt(1 + ((ABS(Dir.z) + ABS(Dir.y)) / Dir.x) * ((ABS(Dir.z) + ABS(Dir.y)) / Dir.x)),
+    /*vec3 RayStepSize = {Sqrt(1 + ((ABS(Dir.z) + ABS(Dir.y)) / Dir.x) * ((ABS(Dir.z) + ABS(Dir.y)) / Dir.x)),
                          Sqrt(1 + ((ABS(Dir.x) + ABS(Dir.z)) / Dir.y) * ((ABS(Dir.x) + ABS(Dir.z)) / Dir.y)),
-                         Sqrt(1 + ((ABS(Dir.x) + ABS(Dir.y)) / Dir.z) * ((ABS(Dir.x) + ABS(Dir.y)) / Dir.z))};
+                         Sqrt(1 + ((ABS(Dir.x) + ABS(Dir.y)) / Dir.z) * ((ABS(Dir.x) + ABS(Dir.y)) / Dir.z))};*/
 
+    vec3 RayStepSize = {1/ABS(Dir.x),1/ABS(Dir.y),1/ABS(Dir.z)};
     vec3 RayStepSizeFirst = {0};
 
 
@@ -229,12 +230,12 @@ void Block_PlayerLookingAt(world* World, camera Camera)
     i32 zMid = F32_FloorToI32(Camera.Position.z / CHUNK_WIDTH);
 
 
-    for (i32 i = 0; i < 10; i++)
+    for (i32 i = 0; i < 200; i++)
     {
 
         chunk *Chunk = ChunkMap_GetChunk(&World->ChunkMap, xMid, zMid);
 
-        if (RayLen < 5 && MapSection.y < 256 && MapSection.y >= 0 && Chunk->Blocks[(i32)MapSection.x][(i32)MapSection.z][(i32)MapSection.y].Id != 0)
+        if (RayLen < 50 && MapSection.y < 256 && MapSection.y >= 0 && Chunk->Blocks[(i32)MapSection.x][(i32)MapSection.z][(i32)MapSection.y].Id != 0)
         {
             Chunk->Blocks[(i32)MapSection.x][(i32)MapSection.z][(i32)MapSection.y].Id = 0;
             //Chunk_GatherQuads(Chunk);
