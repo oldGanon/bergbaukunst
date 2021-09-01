@@ -85,7 +85,8 @@ inline f32 F32_Ceil(f32 A)  { return _mm_cvtss_f32(_mm_ceil_ps(_mm_set_ss(A))); 
 inline f32 F32_Floor(f32 A) { return _mm_cvtss_f32(_mm_floor_ps(_mm_set_ss(A))); }
 inline f32 F32_Sqrt(f32 A) { return _mm_cvtss_f32(_mm_sqrt_ps(_mm_set_ss(A)));}
 inline f32 F32_Lerp(f32 A, f32 B, f32 t) { return (1.0f-t)*A + t*B; }
-inline f32 F32_Fract(f32 A) { return A - F32_Floor(A); }
+inline f32 F32_Fract(f32 A) { __m128 mA = _mm_set_ss(A); return _mm_cvtss_f32(_mm_sub_ps(mA, _mm_floor_ps(mA))); }
+inline f32 F32_Inverse(f32 A) { return _mm_cvtss_f32(_mm_div_ps(_mm_set_ss(1), _mm_set_ss(A)));}
 
 inline f32 F32_Abs(f32 A)    { return _mm_cvtss_f32(_mm_and_ps(_mm_set_ss(A), _mm_castsi128_ps(_mm_set1_epi32(0x7FFFFFFF)))); }
 inline f32 F32_Sign(f32 A)   { return _mm_cvtss_f32(_mm_or_ps(_mm_and_ps(_mm_set_ss(A), _mm_set_ss(-0.0f)), _mm_set_ss(1.0f))); }
@@ -168,6 +169,7 @@ inline vec2 Vec2_Floor(vec2 A) { STORE_VEC2(A, (_mm_floor_ps(LOAD_VEC2(A)))); re
 inline vec2 Vec2_Sqrt(vec2 A) { STORE_VEC2(A, _mm_sqrt_ps(LOAD_VEC2(A))); return A; }
 inline vec2 Vec2_Lerp(vec2 A, vec2 B, f32 t) { STORE_VEC2(A, _mm_add_ps(_mm_mul_ps(_mm_set1_ps(1.0f-t),LOAD_VEC2(A)),_mm_mul_ps(_mm_set1_ps(t),LOAD_VEC2(B)))); return A; }
 inline vec2 Vec2_Fract(vec2 A) { __m128 m = LOAD_VEC2(A); STORE_VEC2(A, _mm_sub_ps(m, _mm_floor_ps(m))); return A; }
+inline vec2 Vec2_Inverse(vec2 A) { STORE_VEC2(A, _mm_div_ps(_mm_set1_ps(1), LOAD_VEC2(A))); return A; }
 
 inline vec2 Vec2_Sign(vec2 A)   { STORE_VEC2(A, _mm_or_ps(_mm_and_ps(LOAD_VEC2(A), _mm_set1_ps(-0.0f)), _mm_set1_ps(1.0f))); return A; }
 inline vec2 Vec2_Abs(vec2 A)    { STORE_VEC2(A, _mm_and_ps(LOAD_VEC2(A), _mm_castsi128_ps(_mm_set1_epi32(0x7FFFFFFF)))); return A; }
@@ -194,6 +196,7 @@ inline vec3 Vec3_Floor(vec3 A) { STORE_VEC3(A, (_mm_floor_ps(LOAD_VEC3(A)))); re
 inline vec3 Vec3_Sqrt(vec3 A) { STORE_VEC3(A, _mm_sqrt_ps(LOAD_VEC3(A))); return A; }
 inline vec3 Vec3_Lerp(vec3 A, vec3 B, f32 t) { STORE_VEC3(A, _mm_add_ps(_mm_mul_ps(_mm_set1_ps(1.0f-t),LOAD_VEC3(A)),_mm_mul_ps(_mm_set1_ps(t),LOAD_VEC3(B)))); return A; }
 inline vec3 Vec3_Fract(vec3 A) { __m128 m = LOAD_VEC3(A); STORE_VEC3(A, _mm_sub_ps(m, _mm_floor_ps(m))); return A; }
+inline vec3 Vec3_Inverse(vec3 A) { STORE_VEC3(A, _mm_div_ps(_mm_set1_ps(1), LOAD_VEC3(A))); return A; }
 
 inline vec3 Vec3_Sign(vec3 A)   { STORE_VEC3(A, _mm_or_ps(_mm_and_ps(LOAD_VEC3(A), _mm_set1_ps(-0.0f)), _mm_set1_ps(1.0f))); return A; }
 inline vec3 Vec3_Abs(vec3 A)    { STORE_VEC3(A, _mm_and_ps(LOAD_VEC3(A), _mm_castsi128_ps(_mm_set1_epi32(0x7FFFFFFF)))); return A; }
@@ -346,6 +349,12 @@ inline ivec3 Vec3_FloatToIVec3(vec3 A) { ivec3 B; STORE_IVEC3(B, _mm_cvtps_epi32
     f32: F32_Fract, \
     vec2: Vec2_Fract, \
     vec3: Vec3_Fract \
+)(A)
+
+#define Inverse(A) _Generic((A), \
+    f32: F32_Inverse, \
+    vec2: Vec2_Inverse, \
+    vec3: Vec3_Inverse \
 )(A)
 
 
