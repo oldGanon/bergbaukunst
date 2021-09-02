@@ -1,24 +1,14 @@
 
-enum
-{
-    BLOCK_ID_AIR = 0,
-    BLOCK_ID_GRAS = 1,
-    BLOCK_ID_WOOD = 2,
-    BLOCK_ID_LEAVES = 3,
-} block_id;
+inline ivec3 World_ToBlockPosition(ivec3 WorldPosition);
+inline ivec2 World_ToChunkPosition(ivec3 WorldPosition);
 
-typedef struct block
-{
-    u8 Id;
-    u8 Light;
-} block;
+#include "mesh.c"
+#include "block.c"
+#include "chunk.c"
+#include "chunkmap.c"
 
 #define LOADED_CHUNKS 16
 #define VIEW_DISTANCE 2
-
-#include "mesh.c"
-#include "chunk.c"
-#include "chunkmap.c"
 
 typedef struct entity
 {
@@ -33,23 +23,23 @@ typedef struct world
 
 typedef enum block_face
 {
-    BLOCK_FACE_LEFT,   // -x
-    BLOCK_FACE_RIGHT,  // +x
-    BLOCK_FACE_FRONT,  // -y
-    BLOCK_FACE_BACK,   // +y
-    BLOCK_FACE_BOTTOM, // +z
-    BLOCK_FACE_TOP,    // -z
+    BLOCK_FACE_LEFT,   // -x WEST
+    BLOCK_FACE_RIGHT,  // +x EAST
+    BLOCK_FACE_FRONT,  // -y SOUTH
+    BLOCK_FACE_BACK,   // +y NORTH
+    BLOCK_FACE_BOTTOM, // +z UP
+    BLOCK_FACE_TOP,    // -z DOWN
 } block_face;
 
-typedef enum world_direction
-{
-    DIR_WEST,  // -x
-    DIR_EAST,  // +x
-    DIR_SOUTH, // -y
-    DIR_NORTH, // +y
-    DIR_UP,    // +z
-    DIR_DOWN,  // -z
-} world_direction;
+// typedef enum world_direction
+// {
+//     WEST,  // -x
+//     EAST,  // +x
+//     SOUTH, // -y
+//     NORTH, // +y
+//     UP,    // +z
+//     DOWN,  // -z
+// } world_direction;
 
 typedef struct trace_result
 {
@@ -68,42 +58,19 @@ void World_Create(world *World)
 
 void World_Update(world *World, const camera Camera)
 {
-    i32 xMin = F32_FloorToI32(Camera.Position.x / CHUNK_WIDTH) - LOADED_CHUNKS / 2;
-    i32 yMin = F32_FloorToI32(Camera.Position.y / CHUNK_WIDTH) - LOADED_CHUNKS / 2;
+    ivec2 HalfLoadedDim = iVec2_Set1(LOADED_CHUNKS >> 1);
+    ivec2 CenterChunk = World_ToChunkPosition(Vec3_FloorToIVec3(Camera.Position));
+    ivec2 MinPos = iVec2_Sub(CenterChunk, HalfLoadedDim);
+    ivec2 MaxPos = iVec2_Add(CenterChunk, HalfLoadedDim);
 
-    for (i32 x = 0; x < LOADED_CHUNKS; x++)
+    for (i32 x = MinPos.x; x <= MaxPos.x; x++)
     {
-        for (i32 y = 0; y < LOADED_CHUNKS; y++)
+        for (i32 y = MinPos.y; y <= MaxPos.y; y++)
         {
-            chunk *Chunk = ChunkMap_GetChunk(&World->ChunkMap, x + xMin, y + yMin);
-            if (Chunk) continue;
-            ChunkMap_AllocateChunk(&World->ChunkMap, x + xMin, y + yMin);
+            chunk *Chunk = ChunkMap_GetChunk(&World->ChunkMap, x, y);
+            if (!Chunk) ChunkMap_AllocateChunk(&World->ChunkMap, x, y);
         }
     }
-}
-
-bool World_GetChunkGroup(const world *World, const chunk *Chunk, chunk_group *Result)
-{
-    Result->Chunks[0][0] = ChunkMap_GetChunk(&World->ChunkMap, Chunk->x - 1, Chunk->y - 1);
-    if (!Result->Chunks[0][0]) return false;
-    Result->Chunks[0][1] = ChunkMap_GetChunk(&World->ChunkMap, Chunk->x - 1, Chunk->y);
-    if (!Result->Chunks[0][1]) return false;
-    Result->Chunks[0][2] = ChunkMap_GetChunk(&World->ChunkMap, Chunk->x - 1, Chunk->y + 1);
-    if (!Result->Chunks[0][2]) return false;
-    Result->Chunks[1][0] = ChunkMap_GetChunk(&World->ChunkMap, Chunk->x, Chunk->y - 1);
-    if (!Result->Chunks[1][0]) return false;
-    Result->Chunks[1][1] = ChunkMap_GetChunk(&World->ChunkMap, Chunk->x, Chunk->y);
-    if (!Result->Chunks[1][1]) return false;
-    Result->Chunks[1][2] = ChunkMap_GetChunk(&World->ChunkMap, Chunk->x, Chunk->y + 1);
-    if (!Result->Chunks[1][2]) return false;
-    Result->Chunks[2][0] = ChunkMap_GetChunk(&World->ChunkMap, Chunk->x + 1, Chunk->y - 1);
-    if (!Result->Chunks[2][0]) return false;
-    Result->Chunks[2][1] = ChunkMap_GetChunk(&World->ChunkMap, Chunk->x + 1, Chunk->y);
-    if (!Result->Chunks[2][1]) return false;
-    Result->Chunks[2][2] = ChunkMap_GetChunk(&World->ChunkMap, Chunk->x + 1, Chunk->y + 1);
-    if (!Result->Chunks[2][2]) return false;
-
-    return true;
 }
 
 void World_DrawChunk(world *World, i32 x, i32 y, const bitmap Target, bitmap TerrainTexture, const camera Camera)
@@ -111,47 +78,39 @@ void World_DrawChunk(world *World, i32 x, i32 y, const bitmap Target, bitmap Ter
     chunk *Chunk = ChunkMap_GetChunk(&World->ChunkMap, x, y);
     if (!Chunk) return;
 
-    if (Chunk->MeshDirty)
-    {
-        chunk_group ChunkGroup;
-        if (!World_GetChunkGroup(World, Chunk, &ChunkGroup))
-            return;
-        Chunk_GenerateMesh(ChunkGroup);
-    }
+    if (Chunk->MeshDirty) Chunk_GenerateMesh(Chunk);
     Chunk_Draw(Camera, Target, TerrainTexture, Chunk);
 }
 
 void World_Draw(world *World, const bitmap Target, bitmap TerrainTexture, const camera Camera)
 {
-    i32 xMid = F32_FloorToI32(Camera.Position.x / CHUNK_WIDTH);
-    i32 yMid = F32_FloorToI32(Camera.Position.y / CHUNK_WIDTH);
-    i32 xMin = xMid - VIEW_DISTANCE;
-    i32 yMin = yMid - VIEW_DISTANCE;
-    i32 xMax = xMid + VIEW_DISTANCE;
-    i32 yMax = yMid + VIEW_DISTANCE;
+    ivec3 iWorldPosition = Vec3_FloorToIVec3(Camera.Position);
+    ivec2 Mid = World_ToChunkPosition(iWorldPosition);
+    ivec2 Min = iVec2_Sub(Mid, iVec2_Set1(VIEW_DISTANCE));
+    ivec2 Max = iVec2_Add(Mid, iVec2_Set1(VIEW_DISTANCE));
 
     vec3 Forward = Camera_Forward(Camera);
 
     if (Abs(Forward.x) < Abs(Forward.y))
     {
-        for (i32 y = yMin; y < yMid; ++y)
+        for (i32 y = Min.y; y < Mid.y; ++y)
         {
-            for (i32 x = xMin; x < xMid; ++x)
+            for (i32 x = Min.x; x < Mid.x; ++x)
             {
                 World_DrawChunk(World, x, y, Target, TerrainTexture, Camera);
             }
-            for (i32 x = xMax; x >= xMid; --x)
+            for (i32 x = Max.x; x >= Mid.x; --x)
             {
                 World_DrawChunk(World, x, y, Target, TerrainTexture, Camera);
             }
         }
-        for (i32 y = yMax; y >= yMid; --y)
+        for (i32 y = Max.y; y >= Mid.y; --y)
         {
-            for (i32 x = xMin; x < xMid; ++x)
+            for (i32 x = Min.x; x < Mid.x; ++x)
             {
                 World_DrawChunk(World, x, y, Target, TerrainTexture, Camera);
             }
-            for (i32 x = xMax; x >= xMid; --x)
+            for (i32 x = Max.x; x >= Mid.x; --x)
             {
                 World_DrawChunk(World, x, y, Target, TerrainTexture, Camera);
             }
@@ -159,24 +118,24 @@ void World_Draw(world *World, const bitmap Target, bitmap TerrainTexture, const 
     }
     else
     {
-        for (i32 x = xMin; x < xMid; ++x)
+        for (i32 x = Min.x; x < Mid.x; ++x)
         {
-            for (i32 y = yMin; y < yMid; ++y)
+            for (i32 y = Min.y; y < Mid.y; ++y)
             {
                 World_DrawChunk(World, x, y, Target, TerrainTexture, Camera);
             }
-            for (i32 y = yMax; y >= yMid; --y)
+            for (i32 y = Max.y; y >= Mid.y; --y)
             {
                 World_DrawChunk(World, x, y, Target, TerrainTexture, Camera);
             }
         }
-        for (i32 x = xMax; x >= xMid; --x)
+        for (i32 x = Max.x; x >= Mid.x; --x)
         {
-            for (i32 y = yMin; y < yMid; ++y)
+            for (i32 y = Min.y; y < Mid.y; ++y)
             {
                 World_DrawChunk(World, x, y, Target, TerrainTexture, Camera);
             }
-            for (i32 y = yMax; y >= yMid; --y)
+            for (i32 y = Max.y; y >= Mid.y; --y)
             {
                 World_DrawChunk(World, x, y, Target, TerrainTexture, Camera);
             }
@@ -207,36 +166,39 @@ void Chunk_BlockUnderPlayer(world *World, camera Camera)
     }
 }*/
 
-block World_GetBlock(const world *World, vec3 Position)
+inline ivec3 World_ToBlockPosition(ivec3 WorldPosition)
 {
-    if ((Position.z < 0) || (Position.z > CHUNK_HEIGHT - 1))
-        return (block){ 0 };
-
-    ivec3 iPosition = Vec3_FloorToIVec3(Position);
-
-    i32 ChunkX = iPosition.x >> CHUNK_WIDTH_SHIFT;
-    i32 ChunkY = iPosition.y >> CHUNK_WIDTH_SHIFT;
-
-    const chunk *Chunk = ChunkMap_GetChunk(&World->ChunkMap, ChunkX, ChunkY);
-    if (!Chunk) return (block){ 0 }; // maybe generate chunk instead?
-
-    return Chunk_GetBlock(Chunk, iPosition);
+    ivec3 Mask = (ivec3){ CHUNK_WIDTH_MASK, CHUNK_WIDTH_MASK, CHUNK_HEIGHT_MASK };
+    return iVec3_And(WorldPosition, Mask);
 }
 
-void World_SetBlock(world *World, vec3 Position, block Block)
+inline ivec2 World_ToChunkPosition(ivec3 WorldPosition)
 {
-    if ((Position.z < 0) || (Position.z > CHUNK_HEIGHT - 1))
+    return iVec2_ShiftRight(WorldPosition.xy, CHUNK_WIDTH_SHIFT);
+}
+
+block World_GetBlock(const world *World, vec3 WorldPosition)
+{
+    if (WorldPosition.z < 0)                return DEFAULT_SKY_BLOCK;
+    if (WorldPosition.z > CHUNK_HEIGHT - 1) return DEFAULT_HELL_BLOCK;
+
+    ivec3 iWorldPosition = Vec3_FloorToIVec3(WorldPosition);
+    ivec2 ChunkPosition = World_ToChunkPosition(iWorldPosition);
+    const chunk *Chunk = ChunkMap_GetChunk(&World->ChunkMap, ChunkPosition.x, ChunkPosition.y);
+    if (!Chunk) return (block){ 0 }; // maybe generate chunk instead?
+    return Chunk_GetBlock(Chunk, iWorldPosition);
+}
+
+void World_SetBlock(world *World, vec3 WorldPosition, block Block)
+{
+    if ((WorldPosition.z < 0) || (WorldPosition.z > CHUNK_HEIGHT - 1))
         return;
 
-    ivec3 iPosition = Vec3_FloorToIVec3(Position);
-
-    i32 ChunkX = iPosition.x >> CHUNK_WIDTH_SHIFT;
-    i32 ChunkY = iPosition.y >> CHUNK_WIDTH_SHIFT;
-
-    chunk *Chunk = ChunkMap_GetChunk(&World->ChunkMap, ChunkX, ChunkY);
+    ivec3 iWorldPosition = Vec3_FloorToIVec3(WorldPosition);
+    ivec2 ChunkPosition = World_ToChunkPosition(iWorldPosition);
+    chunk *Chunk = ChunkMap_GetChunk(&World->ChunkMap, ChunkPosition.x, ChunkPosition.y);
     if (!Chunk) return; // maybe generate chunk instead?
-
-    Chunk_SetBlock(Chunk, iPosition, Block);
+    Chunk_SetBlock(Chunk, iWorldPosition, Block);
 }
 
 bool World_TraceRay(world *World, vec3 Origin, vec3 Direction, f32 Length, trace_result *Result)
@@ -285,42 +247,24 @@ bool World_TraceRay(world *World, vec3 Origin, vec3 Direction, f32 Length, trace
             t = tMax.x;
             tMax.x += tDelta.x;
             RayPosition.x += RaySign.x;
-            if(RaySign.x > 0)
-            {
-                LastFace = BLOCK_FACE_LEFT;
-            }
-            else
-            {
-                LastFace = BLOCK_FACE_RIGHT;
-            }
+            if(RaySign.x > 0) LastFace = BLOCK_FACE_LEFT;
+            else              LastFace = BLOCK_FACE_RIGHT;
         }
         else if ((tMax.y <= tMax.x) && (tMax.y <= tMax.z))
         {
             t = tMax.y;
             tMax.y += tDelta.y;
             RayPosition.y += RaySign.y;
-            if (RaySign.y > 0)
-            {
-                LastFace = BLOCK_FACE_FRONT;
-            }
-            else
-            {
-                LastFace = BLOCK_FACE_BACK;
-            }
+            if (RaySign.y > 0) LastFace = BLOCK_FACE_FRONT;
+            else               LastFace = BLOCK_FACE_BACK;
         }
         else if ((tMax.z <= tMax.x) && (tMax.z <= tMax.y))
         {
             t = tMax.z;
             tMax.z += tDelta.z;
             RayPosition.z += RaySign.z;
-            if (RaySign.z > 0)
-            {
-                LastFace = BLOCK_FACE_BOTTOM;
-            }
-            else
-            {
-                LastFace = BLOCK_FACE_TOP;
-            }
+            if (RaySign.z > 0) LastFace = BLOCK_FACE_BOTTOM;
+            else               LastFace = BLOCK_FACE_TOP;
         }
     }
 }

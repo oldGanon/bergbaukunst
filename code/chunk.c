@@ -6,6 +6,11 @@
 #define CHUNK_HEIGHT (1 << CHUNK_HEIGHT_SHIFT)
 #define CHUNK_HEIGHT_MASK (CHUNK_HEIGHT - 1)
 
+typedef struct chunk_group
+{
+    struct chunk *Chunks[3][3];
+} chunk_group;
+
 typedef struct chunk
 {
     bool Allocated;
@@ -14,23 +19,10 @@ typedef struct chunk
     bool MeshDirty;
     quad_mesh Mesh;
 
+    chunk_group Neighbors;
+
     block Blocks[CHUNK_HEIGHT][CHUNK_WIDTH][CHUNK_WIDTH];
 } chunk;
-
-typedef struct chunk_group
-{
-    chunk *Chunks[3][3];
-} chunk_group;
-
-inline quad Quad_RotateVerts(quad Quad)
-{
-    vertex T = Quad.Verts[0];
-    Quad.Verts[0] = Quad.Verts[1];
-    Quad.Verts[1] = Quad.Verts[2];
-    Quad.Verts[2] = Quad.Verts[3];
-    Quad.Verts[3] = T;
-    return Quad;
-}
 
 inline quad Quad_Face(vec3 Pos, vec3 Right, vec3 Up, vec2 UV, vec2 U, vec2 V, f32 Shadow)
 {
@@ -214,69 +206,80 @@ void Chunk_AddBlockQuads(quad_mesh *Mesh, vec3 Position, u32 OpaqueMask,
     }
 }
 
-inline block Chunk_GetBlock(const chunk *Chunk, ivec3 Position)
+#define DEFAULT_BLOCK (block){ .Id = BLOCK_ID_AIR, .Light = 0x0 }
+#define DEFAULT_SKY_BLOCK (block){ .Id = BLOCK_ID_AIR, .Light = 0x0 }
+#define DEFAULT_HELL_BLOCK (block){ .Id = BLOCK_ID_AIR, .Light = 0xF }
+
+block Chunk_GetBlock(const chunk *Chunk, ivec3 WorldPosition)
 {
-    ivec3 ChunkMask = (ivec3){ CHUNK_WIDTH_MASK, CHUNK_WIDTH_MASK, CHUNK_HEIGHT_MASK };
-    ivec3 BlockPosition = And(Position, ChunkMask);
+    if (WorldPosition.z < 0)                return DEFAULT_SKY_BLOCK;
+    if (WorldPosition.z > CHUNK_HEIGHT - 1) return DEFAULT_HELL_BLOCK;
+
+    ivec3 BlockPosition = World_ToBlockPosition(WorldPosition);
     return Chunk->Blocks[BlockPosition.z][BlockPosition.y][BlockPosition.x];
 }
 
-inline void Chunk_SetBlock(chunk *Chunk, ivec3 Position, block Block)
+void Chunk_SetBlock(chunk *Chunk, ivec3 WorldPosition, block Block)
 {
-    ivec3 ChunkMask = (ivec3){ CHUNK_WIDTH_MASK, CHUNK_WIDTH_MASK, CHUNK_HEIGHT_MASK };
-    ivec3 BlockPosition = And(Position, ChunkMask);
+    if ((WorldPosition.z < 0) || (WorldPosition.z > CHUNK_HEIGHT - 1))
+        return;
+
+    ivec3 BlockPosition = World_ToBlockPosition(WorldPosition);
     Chunk->Blocks[BlockPosition.z][BlockPosition.y][BlockPosition.x] = Block;
     Chunk->MeshDirty = true;
+
+    if ((BlockPosition.x == 0) && (Chunk->Neighbors.Chunks[1][0]))
+        Chunk->Neighbors.Chunks[1][0]->MeshDirty = true;
+    if ((BlockPosition.y == 0) && (Chunk->Neighbors.Chunks[0][1]))
+        Chunk->Neighbors.Chunks[0][1]->MeshDirty = true;
+    if ((BlockPosition.x == CHUNK_WIDTH - 1) && (Chunk->Neighbors.Chunks[1][2]))
+        Chunk->Neighbors.Chunks[1][2]->MeshDirty = true;
+    if ((BlockPosition.y == CHUNK_WIDTH - 1) && (Chunk->Neighbors.Chunks[2][1]))
+        Chunk->Neighbors.Chunks[2][1]->MeshDirty = true;
+    if ((BlockPosition.x == 0) && (BlockPosition.y == 0) && (Chunk->Neighbors.Chunks[0][0]))
+        Chunk->Neighbors.Chunks[0][0]->MeshDirty = true;
+    if ((BlockPosition.x == 0) && (BlockPosition.y == CHUNK_WIDTH - 1) && (Chunk->Neighbors.Chunks[2][0]))
+        Chunk->Neighbors.Chunks[2][0]->MeshDirty = true;
+    if ((BlockPosition.x == CHUNK_WIDTH - 1) && (BlockPosition.y == 0) && (Chunk->Neighbors.Chunks[0][2]))
+        Chunk->Neighbors.Chunks[0][2]->MeshDirty = true;
+    if ((BlockPosition.x == CHUNK_WIDTH - 1) && (BlockPosition.y == CHUNK_WIDTH - 1) && (Chunk->Neighbors.Chunks[2][2]))
+        Chunk->Neighbors.Chunks[2][2]->MeshDirty = true;
 }
 
-inline block ChunkGroup_GetBlock(const chunk_group *ChunkGroup, ivec3 Position)
+block ChunkGroup_GetBlock(const chunk_group *ChunkGroup, ivec3 WorldPosition)
 {
-    ivec3 ChunkPosition = ShiftRight(Position, CHUNK_WIDTH_SHIFT);
-    chunk *Chunk = ChunkGroup->Chunks[ChunkPosition.y + 1][ChunkPosition.x + 1];
-    return Chunk_GetBlock(Chunk, Position);
+    ivec2 ChunkPosition = World_ToChunkPosition(WorldPosition);
+    const chunk *Chunk = ChunkGroup->Chunks[ChunkPosition.y + 1][ChunkPosition.x + 1];
+    if (!Chunk) return DEFAULT_BLOCK;
+    return Chunk_GetBlock(Chunk, WorldPosition);
 }
 
-u32 ChunkGroup_OpaqueMask(const chunk_group *ChunkGroup, ivec3 Position)
+block_group ChunkGroup_GetBlockGroup(const chunk_group *ChunkGroup, ivec3 WorldPosition)
 {
-    u32 Mask = 0;
-    for (i32 z = Position.z - 1; z <= Position.z + 1; ++z)
-    for (i32 y = Position.y - 1; y <= Position.y + 1; ++y)
-    for (i32 x = Position.x - 1; x <= Position.x + 1; ++x)
+    block_group BlockGroup;
+    WorldPosition = iVec3_Sub(WorldPosition, iVec3_Set1(1));
+    for (i32 z = 0; z < 3; ++z)
+    for (i32 y = 0; y < 3; ++y)
+    for (i32 x = 0; x < 3; ++x)
     {
         ivec3 BlockPosition = (ivec3){ x, y, z };
-        block Block = ChunkGroup_GetBlock(ChunkGroup, BlockPosition);
-        if ((Block.Id != BLOCK_ID_AIR) &&
-            (Block.Id != BLOCK_ID_LEAVES))
-        {
-            Mask |= 1 << ((x+1-Position.x) + (y+1-Position.y)*3 + (z+1-Position.z)*9);
-        }
+        BlockPosition = iVec3_Add(BlockPosition, WorldPosition);
+        BlockGroup.Blocks[z][y][x] = ChunkGroup_GetBlock(ChunkGroup, BlockPosition);
     }
-    return Mask;
+    return BlockGroup;
 }
 
-u32 Chunk_BlockMask(chunk *Chunk, vec3 Position, u8 Block)
+u32 BlockGroup_OpaqueMask(const block_group *BlockGroup)
 {
     u32 Mask = 0;
-    ivec3 One = (ivec3) { 1, 1, 1 };
-    ivec3 iPos = Vec3_FloorToIVec3(Position);
-    ivec3 iMin = iVec3_Max(iVec3_Sub(iPos, One), (ivec3) {  0,  0,  0 });
-    ivec3 iMax = iVec3_Min(iVec3_Add(iPos, One), (ivec3) { 15, 15, 15 });
-    for (i32 z = iMin.z; z <= iMax.z; ++z)
-    for (i32 y = iMin.y; y <= iMax.y; ++y)
-    for (i32 x = iMin.x; x <= iMax.x; ++x)
-    {
-        u8 BlockId = Chunk->Blocks[z][y][x].Id;
-        if (BlockId == Block)
-        {
-            Mask |= 1 << ((x+1-iPos.x) + (y+1-iPos.y)*3 + (z+1-iPos.z)*9);
-        }
-    }
+    for (i32 i = 0; i < 27; ++i)
+    if (Block_Opaque[BlockGroup->Blocks[0][0][i].Id])
+        Mask |= 1 << i;
     return Mask;
 }
 
-void Chunk_GenerateMesh(chunk_group ChunkGroup)
+void Chunk_GenerateMesh(chunk *Chunk)
 {
-    chunk *Chunk = ChunkGroup.Chunks[1][1];
     Mesh_Clear(&Chunk->Mesh);
 
     for (i32 z = 0; z < CHUNK_HEIGHT; ++z)
@@ -284,10 +287,14 @@ void Chunk_GenerateMesh(chunk_group ChunkGroup)
     for (i32 x = 0; x < CHUNK_WIDTH; ++x)
     {
         ivec3 iBlockPosition = (ivec3){ x, y, z };
-        vec3 BlockPosition = iVec3_ToVec3(iBlockPosition);
         block Block = Chunk_GetBlock(Chunk, iBlockPosition);
-        u32 OpaqueMask = ChunkGroup_OpaqueMask(&ChunkGroup, iBlockPosition);
+        if (Block.Id == BLOCK_ID_AIR) continue;
 
+        block_group BlockGroup = ChunkGroup_GetBlockGroup(&Chunk->Neighbors, iBlockPosition);
+        u32 OpaqueMask = BlockGroup_OpaqueMask(&BlockGroup);
+        if ((OpaqueMask & 0x7FFDFFF) == 0x7FFDFFF) continue;
+
+        vec3 BlockPosition = iVec3_ToVec3(iBlockPosition);
         switch (Block.Id)
         {
             case BLOCK_ID_GRAS:
@@ -311,24 +318,8 @@ void Chunk_GenerateMesh(chunk_group ChunkGroup)
     Chunk->MeshDirty = false;
 }
 
-void Chunk_Draw(const camera Camera, const bitmap Target, bitmap TerrainTexture, chunk *Chunk)
+void Chunk_GenerateBlocks(chunk *Chunk, i32 x, i32 y)
 {
-    vec3 ChunkDim = (vec3) { CHUNK_WIDTH, CHUNK_WIDTH, CHUNK_HEIGHT };
-    vec3 ChunkMin = Vec3_Mul(ChunkDim, (vec3) { (f32)Chunk->x, (f32)Chunk->y, 0 });
-    vec3 ChunkMax = Vec3_Add(ChunkDim, ChunkMin);
-    if (!Camera_BoxVisible(Camera, Target, ChunkMin, ChunkMax)) return;
-    Mesh_Draw(Target, Camera, TerrainTexture, ChunkMin, &Chunk->Mesh);
-}
-
-void Chunk_Create(chunk *Chunk, i32 x, i32 y)
-{
-    Chunk->Allocated = true;
-    Chunk->x = x;
-    Chunk->y = y;
-
-    Chunk->MeshDirty = true;
-
-    // place blocks
     for (i32 zz = 0; zz < CHUNK_HEIGHT; zz++)
     for (i32 yy = 0; yy < CHUNK_WIDTH; yy++)
     for (i32 xx = 0; xx < CHUNK_WIDTH; xx++)
@@ -360,10 +351,46 @@ void Chunk_Create(chunk *Chunk, i32 x, i32 y)
             CurrentBlock->Id = BLOCK_ID_AIR;
         }
     }
+}
 
+void Chunk_Light(chunk *Chunk)
+{
+    for (i32 z = 0; z < CHUNK_HEIGHT; z++)
+    for (i32 y = 0; y < CHUNK_WIDTH; y++)
+    for (i32 x = 0; x < CHUNK_WIDTH; x++)
+    {
+        ivec3 Position = (ivec3){ x, y, z };
+        block Block = Chunk_GetBlock(Chunk, Position);
+
+        Position.z += 1;
+        block Top = Chunk_GetBlock(Chunk, Position);
+        if (Top.Light == 0xF)
+        {
+            Block.Light = Top.Light;
+            Chunk_SetBlock(Chunk, Position, Block);
+        }
+    }
+}
+
+void Chunk_Draw(const camera Camera, const bitmap Target, bitmap TerrainTexture, chunk *Chunk)
+{
+    vec3 ChunkDim = (vec3) { CHUNK_WIDTH, CHUNK_WIDTH, CHUNK_HEIGHT };
+    vec3 ChunkMin = Vec3_Mul(ChunkDim, (vec3) { (f32)Chunk->x, (f32)Chunk->y, 0 });
+    vec3 ChunkMax = Vec3_Add(ChunkDim, ChunkMin);
+    if (!Camera_BoxVisible(Camera, Target, ChunkMin, ChunkMax)) return;
+    Mesh_Draw(Target, Camera, TerrainTexture, ChunkMin, &Chunk->Mesh);
+}
+
+void Chunk_Create(chunk *Chunk, i32 x, i32 y)
+{
+    Chunk->Allocated = true;
+    Chunk->x = x;
+    Chunk->y = y;
+
+    Chunk->MeshDirty = true;
     Chunk->Mesh = Mesh_Create();
 
-    // TODO: creation code
+    Chunk_GenerateBlocks(Chunk, x, y);
 }
 
 void Chunk_Delete(chunk *Chunk, i32 x, i32 y)
@@ -373,6 +400,4 @@ void Chunk_Delete(chunk *Chunk, i32 x, i32 y)
     assert(Chunk->y == y);
 
     Mesh_Delete(&Chunk->Mesh);
-
-    // TODO: deletion code
 }

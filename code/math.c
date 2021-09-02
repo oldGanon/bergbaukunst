@@ -266,6 +266,16 @@ inline ivec2 iVec2_And(ivec2 A, ivec2 B) { STORE_IVEC2(A, _mm_and_si128(LOAD_IVE
 inline ivec2 iVec2_Or(ivec2 A, ivec2 B) { STORE_IVEC2(A, _mm_or_si128(LOAD_IVEC2(A), LOAD_IVEC2(B))); return A; }
 inline ivec2 iVec2_Xor(ivec2 A, ivec2 B) { STORE_IVEC2(A, _mm_xor_si128(LOAD_IVEC2(A), LOAD_IVEC2(B))); return A; }
 
+/******************/
+/* Vec2 <-> iVec2 */
+/******************/
+inline vec2 iVec2_ToVec2(ivec2 A) { vec2 B; STORE_VEC2(B, _mm_cvtepi32_ps(LOAD_IVEC2(A))); return B; }
+inline ivec2 Vec2_ToIVec2(vec2 A) { ivec2 B; STORE_IVEC2(B, _mm_cvtps_epi32(LOAD_VEC2(A))); return B; }
+inline ivec2 Vec2_RoundToIVec2(vec2 A) { ivec2 B; STORE_IVEC2(B, _mm_cvtps_epi32(_mm_round_ps(LOAD_VEC2(A), _MM_FROUND_TO_NEAREST_INT|_MM_FROUND_NO_EXC))); return B; }
+inline ivec2 Vec2_TruncToIVec2(vec2 A) { ivec2 B; STORE_IVEC2(B, _mm_cvtps_epi32(_mm_round_ps(LOAD_VEC2(A), _MM_FROUND_TO_ZERO|_MM_FROUND_NO_EXC))); return B; }
+inline ivec2 Vec2_CeilToIVec2(vec2 A)  { ivec2 B; STORE_IVEC2(B, _mm_cvtps_epi32(_mm_ceil_ps(LOAD_VEC2(A)))); return B; }
+inline ivec2 Vec2_FloorToIVec2(vec2 A) { ivec2 B; STORE_IVEC2(B, _mm_cvtps_epi32(_mm_floor_ps(LOAD_VEC2(A)))); return B; }
+
 /*************/
 /*   iVec3   */
 /*************/
