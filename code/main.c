@@ -79,9 +79,11 @@ __declspec(restrict) void * malloc(size_t);
 __declspec(restrict) void * realloc(void *, size_t);
 void free(void *);
 
+void Win32_LockMouse(bool Lock);
 struct bitmap Win32_LoadBitmap(const char*);
 void Win32_DeleteBitmap(struct bitmap);
-void Win32_LockMouse(bool Lock);
+struct palette Win32_LoadPalette(const char *);
+void Win32_SetPalette(const struct palette *);
 
 #include "math.c"
 #include "geom.c"
@@ -296,10 +298,17 @@ bitmap Win32_LoadBitmap(const char* Name)
     return Bitmap;
 }
 
-void Win32_LoadPalette(const char* Name)
+void Win32_SetPalette(const palette *Palette)
 {
+    memcpy(GlobalBackbufferInfo.bmiColors, Palette->Colors, sizeof(RGBQUAD) * 256);
+}
+
+palette Win32_LoadPalette(const char* Name)
+{
+    palette Palette = { 0 };
+
     HBITMAP hImage = LoadImageA(GetModuleHandle(0), Name, IMAGE_BITMAP, 0, 0, LR_CREATEDIBSECTION);
-    if (!hImage) return;
+    if (!hImage) return Palette;
 
     BITMAP Image;
     GetObject(hImage, sizeof(BITMAP), &Image);
@@ -321,10 +330,12 @@ void Win32_LoadPalette(const char* Name)
         HDC DeviceContext = GetDC(GlobalWindow);
         GetDIBits(DeviceContext, hImage, 0, 16, Bitmap, (BITMAPINFO*)&BitmapInfo, DIB_RGB_COLORS);
         ReleaseDC(GlobalWindow, DeviceContext);
-        memcpy(GlobalBackbufferInfo.bmiColors, BitmapInfo.bmiColors, sizeof(RGBQUAD) * 256);
+        memcpy(Palette.Colors, BitmapInfo.bmiColors, sizeof(RGBQUAD) * 256);
     }
     
     DeleteObject(hImage);
+
+    return Palette;
 }
 
 u64 Win32_GetTime(void)
@@ -456,7 +467,6 @@ int WINAPI CALLBACK WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR 
             .biCompression = BI_RGB
         }
     };
-    Win32_LoadPalette("PALETTE");
 
     // AUDIO
     DWORD AudioCursor = 0;

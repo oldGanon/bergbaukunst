@@ -13,7 +13,7 @@ typedef struct chunk
 
     quad_mesh Mesh;
 
-    world_block Blocks[CHUNK_WIDTH][CHUNK_WIDTH][CHUNK_HEIGHT];
+    block Blocks[CHUNK_WIDTH][CHUNK_WIDTH][CHUNK_HEIGHT];
 } chunk;
 
 
@@ -310,7 +310,7 @@ void Chunk_GenerateMesh(chunk *Chunk)
     for (i32 z = 0; z < CHUNK_WIDTH; ++z)
     for (i32 y = 0; y < CHUNK_HEIGHT; ++y)
     {
-        world_block *CurrentBlock = &Chunk->Blocks[x][z][y];
+        block *CurrentBlock = &Chunk->Blocks[x][z][y];
         
         vec3 BlockPosition = (vec3){ (f32)x, (f32)y, (f32)z };
 
@@ -357,7 +357,7 @@ void Chunk_Create(chunk *Chunk, i32 x, i32 z)
     for (i32 zz = 0; zz < CHUNK_WIDTH; zz++)
     for (i32 yy = 0; yy < CHUNK_HEIGHT; yy++)
     {
-        world_block* Current_Block = &Chunk->Blocks[xx][zz][yy];
+        block* Current_Block = &Chunk->Blocks[xx][zz][yy];
 
         if ((yy == 0) || 
             (zz == 1 && xx == 2 && yy == 1) ||  

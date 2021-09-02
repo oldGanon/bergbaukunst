@@ -38,6 +38,11 @@ typedef struct bitmap
     color *Pixels;
 } bitmap;
 
+typedef struct palette
+{
+    u32 Colors[256];
+} palette;
+
 typedef struct vertex
 {
     vec3 Position;

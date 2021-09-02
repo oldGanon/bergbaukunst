@@ -5,12 +5,12 @@ enum
     BLOCK_ID_GRAS = 1,
     BLOCK_ID_WOOD = 2,
     BLOCK_ID_LEAVES = 3,
-} world_block_id;
+} block_id;
 
-typedef struct world_block
+typedef struct block
 {
     u8 Id;
-} world_block;
+} block;
 
 #define LOADED_CHUNKS 16
 #define VIEW_DISTANCE 2
@@ -42,10 +42,10 @@ typedef enum block_face
 
 typedef struct trace_result
 {
-    world_block Block;
+    block Block;
     block_face BlockFace;
     vec3 BlockPosition;
-    bool BlockHit;
+    vec3 HitPosition;
 } trace_result;
 
 
@@ -163,10 +163,10 @@ void Chunk_BlockUnderPlayer(world *World, camera Camera)
     }
 }*/
 
-world_block World_GetBlock(world *World, vec3 Position)
+block World_GetBlock(world *World, vec3 Position)
 {
     if ((Position.y < 0) || (Position.y > CHUNK_HEIGHT - 1))
-        return (world_block){ 0 };
+        return (block){ 0 };
 
     ivec3 iPosition = Vec3_FloorToIVec3(Position);
 
@@ -174,7 +174,7 @@ world_block World_GetBlock(world *World, vec3 Position)
     i32 ChunkZ = iPosition.z >> CHUNK_WIDTH_SHIFT;
 
     chunk *Chunk = ChunkMap_GetChunk(&World->ChunkMap, ChunkX, ChunkZ);
-    if (!Chunk) return (world_block){ 0 }; // maybe generate chunk instead?
+    if (!Chunk) return (block){ 0 }; // maybe generate chunk instead?
 
     i32 BlockX = iPosition.x & CHUNK_WIDTH_MASK;
     i32 BlockY = iPosition.y & CHUNK_HEIGHT_MASK;
@@ -183,7 +183,7 @@ world_block World_GetBlock(world *World, vec3 Position)
     return Chunk->Blocks[BlockX][BlockZ][BlockY];
 }
 
-void World_SetBlock(world *World, vec3 Position, world_block Block)
+void World_SetBlock(world *World, vec3 Position, block Block)
 {
     if ((Position.y < 0) || (Position.y > CHUNK_HEIGHT - 1))
         return;
@@ -205,7 +205,7 @@ void World_SetBlock(world *World, vec3 Position, world_block Block)
     Chunk_GenerateMesh(Chunk);
 }
 
-trace_result World_TraceRay(world *World, vec3 Origin, vec3 Direction, f32 Length)
+bool World_TraceRay(world *World, vec3 Origin, vec3 Direction, f32 Length, trace_result *Result)
 {
     f32 RayLength = Length;
     vec3 RayDirection = Direction;
@@ -225,21 +225,22 @@ trace_result World_TraceRay(world *World, vec3 Origin, vec3 Direction, f32 Lengt
     for (;;)
     {
         if (t > RayLength)
-            return (trace_result){ 0 };
+            return false;
         if ((RaySign.y < 0) && (RayPosition.y < 0))
-            return (trace_result){ 0 };
+            return false;
         if ((RaySign.y > 0) && (RayPosition.y > CHUNK_HEIGHT - 1))
-            return (trace_result){ 0 };
+            return false;
 
-        world_block Block = World_GetBlock(World, RayPosition);
+        block Block = World_GetBlock(World, RayPosition);
         if (Block.Id != BLOCK_ID_AIR)
         {
-            return (trace_result) {
+            *Result = (trace_result) {
+                .HitPosition = Add(Origin, Mul(Direction, Vec3_Set1(t))),
                 .Block = Block,
                 .BlockFace = LastFace,
                 .BlockPosition = RayPosition,
-                .BlockHit = true,
             };
+            return true;
         }
 
         if ((tMax.x <= tMax.y) && (tMax.x <= tMax.z))
@@ -287,9 +288,9 @@ trace_result World_TraceRay(world *World, vec3 Origin, vec3 Direction, f32 Lengt
     }
 }
 
-trace_result World_TraceCameraRay(world *World, camera Camera, f32 Length)
+bool World_TraceCameraRay(world *World, camera Camera, f32 Length, trace_result *Result)
 {
-    return World_TraceRay(World, Camera.Position, Camera_Direction(Camera), Length);
+    return World_TraceRay(World, Camera.Position, Camera_Direction(Camera), Length, Result);
 }
 
 void Block_PlaceOnSide(world *World, trace_result TraceResult)
@@ -304,7 +305,7 @@ void Block_PlaceOnSide(world *World, trace_result TraceResult)
         case BLOCK_FACE_TOP:    TraceResult.BlockPosition.y += 1; break;
         default: break;
     }
-    world_block Block = { .Id = BLOCK_ID_GRAS };
+    block Block = { .Id = BLOCK_ID_GRAS };
     World_SetBlock(World, TraceResult.BlockPosition, Block);
 }
 
