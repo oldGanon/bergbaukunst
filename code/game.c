@@ -75,19 +75,19 @@ void Game_Update(game *Game, const input Input)
     }
     if (Input.MoveRight) {
         NewCameraPosition.x += Right.x * Speed;
-        NewCameraPosition.z += Right.z * Speed;
+        NewCameraPosition.y += Right.y * Speed;
     }
     if (Input.MoveLeft) {
         NewCameraPosition.x -= Right.x * Speed;
-        NewCameraPosition.z -= Right.z * Speed;
+        NewCameraPosition.y -= Right.y * Speed;
     }
     if (Input.Jump)
     {
-        NewCameraPosition.y += Speed;
+        NewCameraPosition.z += Speed;
     }
     if (Input.Crouch)
     {
-        NewCameraPosition.y -= Speed;
+        NewCameraPosition.z -= Speed;
     }
     if (Input.LookUp) {
         NewPitch += TurnSpeed;
@@ -126,7 +126,6 @@ void Game_Update(game *Game, const input Input)
     Camera_SetRotation(Camera, NewYaw, NewPitch);
 
     World_Update(&Game->World, Game->Camera);
-
 }
 
 void Game_Draw(game *Game, bitmap Buffer)
@@ -137,10 +136,10 @@ void Game_Draw(game *Game, bitmap Buffer)
 
     Draw_String(Buffer, Game->Font, COLOR_WHITE, (ivec2){8,8}, "ver. 0.001a");
 
-    vec3 A = Camera_WorldToScreen(Game->Camera, Buffer, (vec3) {0,1,0});
-    vec3 B = Camera_WorldToScreen(Game->Camera, Buffer, (vec3) {16,1,0});
-    vec3 C = Camera_WorldToScreen(Game->Camera, Buffer, (vec3) {16,1,16});
-    vec3 D = Camera_WorldToScreen(Game->Camera, Buffer, (vec3) {0,1,16});
+    vec3 A = Camera_WorldToScreen(Game->Camera, Buffer, (vec3) { 0, 0,1});
+    vec3 B = Camera_WorldToScreen(Game->Camera, Buffer, (vec3) {16, 0,1});
+    vec3 C = Camera_WorldToScreen(Game->Camera, Buffer, (vec3) {16,16,1});
+    vec3 D = Camera_WorldToScreen(Game->Camera, Buffer, (vec3) { 0,16,1});
     Draw_Line(Buffer, COLOR_WHITE, A, B);
     Draw_Line(Buffer, COLOR_WHITE, B, C);
     Draw_Line(Buffer, COLOR_WHITE, C, D);

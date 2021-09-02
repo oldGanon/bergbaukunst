@@ -260,6 +260,12 @@ inline ivec2 iVec2_Sub(ivec2 A, ivec2 B) { STORE_IVEC2(A, _mm_sub_epi32(LOAD_IVE
 inline ivec2 iVec2_Mul(ivec2 A, ivec2 B) { STORE_IVEC2(A, _mm_mul_epi32(LOAD_IVEC2(A), LOAD_IVEC2(B))); return A; }
 inline ivec2 iVec2_Div(ivec2 A, ivec2 B) { STORE_IVEC2(A, _mm_div_epi32(LOAD_IVEC2(A), LOAD_IVEC2(B))); return A; }
 
+inline ivec2 iVec2_ShiftLeft(ivec2 A, i32 S) { STORE_IVEC2(A, _mm_slli_epi32(LOAD_IVEC2(A), S)); return A; }
+inline ivec2 iVec2_ShiftRight(ivec2 A, i32 S) { STORE_IVEC2(A, _mm_srai_epi32(LOAD_IVEC2(A), S)); return A; }
+inline ivec2 iVec2_And(ivec2 A, ivec2 B) { STORE_IVEC2(A, _mm_and_si128(LOAD_IVEC2(A), LOAD_IVEC2(B))); return A; }
+inline ivec2 iVec2_Or(ivec2 A, ivec2 B) { STORE_IVEC2(A, _mm_or_si128(LOAD_IVEC2(A), LOAD_IVEC2(B))); return A; }
+inline ivec2 iVec2_Xor(ivec2 A, ivec2 B) { STORE_IVEC2(A, _mm_xor_si128(LOAD_IVEC2(A), LOAD_IVEC2(B))); return A; }
+
 /*************/
 /*   iVec3   */
 /*************/
@@ -271,34 +277,44 @@ inline ivec3 iVec3_Sub(ivec3 A, ivec3 B) { STORE_IVEC3(A, _mm_sub_epi32(LOAD_IVE
 inline ivec3 iVec3_Mul(ivec3 A, ivec3 B) { STORE_IVEC3(A, _mm_mul_epi32(LOAD_IVEC3(A), LOAD_IVEC3(B))); return A; }
 inline ivec3 iVec3_Div(ivec3 A, ivec3 B) { STORE_IVEC3(A, _mm_div_epi32(LOAD_IVEC3(A), LOAD_IVEC3(B))); return A; }
 
+inline ivec3 iVec3_ShiftLeft(ivec3 A, i32 S) { STORE_IVEC3(A, _mm_slli_epi32(LOAD_IVEC3(A), S)); return A; }
+inline ivec3 iVec3_ShiftRight(ivec3 A, i32 S) { STORE_IVEC3(A, _mm_srai_epi32(LOAD_IVEC3(A), S)); return A; }
+inline ivec3 iVec3_And(ivec3 A, ivec3 B) { STORE_IVEC3(A, _mm_and_si128(LOAD_IVEC3(A), LOAD_IVEC3(B))); return A; }
+inline ivec3 iVec3_Or(ivec3 A, ivec3 B) { STORE_IVEC3(A, _mm_or_si128(LOAD_IVEC3(A), LOAD_IVEC3(B))); return A; }
+inline ivec3 iVec3_Xor(ivec3 A, ivec3 B) { STORE_IVEC3(A, _mm_xor_si128(LOAD_IVEC3(A), LOAD_IVEC3(B))); return A; }
+
 inline ivec3 iVec3_Min(ivec3 A, ivec3 B) { STORE_IVEC3(A, _mm_min_epi32(LOAD_IVEC3(A), LOAD_IVEC3(B))); return A; }
 inline ivec3 iVec3_Max(ivec3 A, ivec3 B) { STORE_IVEC3(A, _mm_max_epi32(LOAD_IVEC3(A), LOAD_IVEC3(B))); return A; }
 
 /******************/
 /* Vec3 <-> iVec3 */
 /******************/
+inline vec3 iVec3_ToVec3(ivec3 A) { vec3 B; STORE_VEC3(B, _mm_cvtepi32_ps(LOAD_IVEC3(A))); return B; }
+inline ivec3 Vec3_ToIVec3(vec3 A) { ivec3 B; STORE_IVEC3(B, _mm_cvtps_epi32(LOAD_VEC3(A))); return B; }
 inline ivec3 Vec3_RoundToIVec3(vec3 A) { ivec3 B; STORE_IVEC3(B, _mm_cvtps_epi32(_mm_round_ps(LOAD_VEC3(A), _MM_FROUND_TO_NEAREST_INT|_MM_FROUND_NO_EXC))); return B; }
 inline ivec3 Vec3_TruncToIVec3(vec3 A) { ivec3 B; STORE_IVEC3(B, _mm_cvtps_epi32(_mm_round_ps(LOAD_VEC3(A), _MM_FROUND_TO_ZERO|_MM_FROUND_NO_EXC))); return B; }
 inline ivec3 Vec3_CeilToIVec3(vec3 A)  { ivec3 B; STORE_IVEC3(B, _mm_cvtps_epi32(_mm_ceil_ps(LOAD_VEC3(A)))); return B; }
 inline ivec3 Vec3_FloorToIVec3(vec3 A) { ivec3 B; STORE_IVEC3(B, _mm_cvtps_epi32(_mm_floor_ps(LOAD_VEC3(A)))); return B; }
-inline ivec3 Vec3_FloatToIVec3(vec3 A) { ivec3 B; STORE_IVEC3(B, _mm_cvtps_epi32(LOAD_VEC3(A))); return B; }
 
 /************/
 /* Generics */
 /************/
 
+// ARITHMETIC FUNCTIONS
 #define Add(A,B) _Generic((A), \
     vec2: Vec2_Add, \
     vec3: Vec3_Add, \
     ivec2: iVec2_Add, \
     ivec3: iVec3_Add \
 )(A,B)
+
 #define Sub(A,B) _Generic((A), \
     vec2: Vec2_Sub, \
     vec3: Vec3_Sub, \
     ivec2: iVec2_Sub, \
     ivec3: iVec3_Sub \
 )(A,B)
+
 #define Mul(A,B) _Generic((A), \
     vec2: Vec2_Mul, \
     vec3: Vec3_Mul, \
@@ -313,6 +329,7 @@ inline ivec3 Vec3_FloatToIVec3(vec3 A) { ivec3 B; STORE_IVEC3(B, _mm_cvtps_epi32
     ivec3: iVec3_Div \
 )(A,B)
 
+// FLOATING POINT FUNCTIONS
 #define Round(A) _Generic((A), \
     f32: F32_Round, \
     vec2: Vec2_Round, \
@@ -361,8 +378,30 @@ inline ivec3 Vec3_FloatToIVec3(vec3 A) { ivec3 B; STORE_IVEC3(B, _mm_cvtps_epi32
     vec3: Vec3_Inverse \
 )(A)
 
+// INTEGER FUNCTIONS
+#define ShiftLeft(A,S)_Generic((A), \
+    ivec2: iVec2_ShiftLeft, \
+    ivec3: iVec3_ShiftLeft \
+)(A,S)
+#define ShiftRight(A,S)_Generic((A), \
+    ivec2: iVec2_ShiftRight, \
+    ivec3: iVec3_ShiftRight \
+)(A,S)
+#define And(A,B)_Generic((A), \
+    ivec2: iVec2_And, \
+    ivec3: iVec3_And \
+)(A,B)
+#define Or(A,B)_Generic((A), \
+    ivec2: iVec2_Or, \
+    ivec3: iVec3_Or \
+)(A,B)
+#define Xor(A,B)_Generic((A), \
+    ivec2: iVec2_Xor, \
+    ivec3: iVec3_Xor \
+)(A,B)
 
 
+// GENERAL FUNCTIONS
 #define Abs(A) _Generic((A), \
     f32: F32_Abs, \
     i32: I32_Abs, \

@@ -454,7 +454,6 @@ int WINAPI CALLBACK WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR 
                                    0, 0, hInstance, 0);
     if(!GlobalWindow) return 1;
 
-
     // BACKBUFFER
     GlobalBackbuffer = Bitmap_Create(SCREEN_WIDTH, SCREEN_HEIGHT);
     GlobalBackbufferInfo = (BITMAPINFO_AND_PALETTE){

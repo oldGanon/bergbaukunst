@@ -10,9 +10,9 @@ typedef struct chunk_map
 
 chunk_map ChunkMap_Create(void);
 void ChunkMap_Delete(chunk_map *Map);
-chunk *ChunkMap_AllocateChunk(chunk_map *Map, i32 x, i32 z);
-void ChunkMap_DeleteChunk(chunk_map *Map, i32 x, i32 z);
-chunk *ChunkMap_GetChunk(chunk_map *Map, i32 x, i32 z);
+chunk *ChunkMap_AllocateChunk(chunk_map *Map, i32 x, i32 y);
+void ChunkMap_DeleteChunk(chunk_map *Map, i32 x, i32 y);
+chunk *ChunkMap_GetChunk(const chunk_map *Map, i32 x, i32 y);
 
 //
 //
@@ -35,9 +35,9 @@ inline u64 ChunkMap_FNV1a(const void *Data, size Length)
     return Hash;
 }
 
-inline u64 ChunkMap_Coord(i32 x, i32 z)
+inline u64 ChunkMap_Coord(i32 x, i32 y)
 {
-    return ((u64)x & 0xFFFFFFFF)  | ((u64)z << 32);
+    return ((u64)x & 0xFFFFFFFF)  | ((u64)y << 32);
 }
 
 inline u64 ChunkMap_Hash(u64 Coord)
@@ -45,19 +45,19 @@ inline u64 ChunkMap_Hash(u64 Coord)
     return ChunkMap_FNV1a(&Coord, 8);
 }
 
-inline index ChunkMap_HashIndex(chunk_map *Map, u64 Hash)
+inline index ChunkMap_HashIndex(const chunk_map *Map, u64 Hash)
 {
     return Hash & Map->Mask;
 }
 
-inline u64 ChunkMap_ProbeDist(chunk_map *Map, u64 Pos)
+inline u64 ChunkMap_ProbeDist(const chunk_map *Map, u64 Pos)
 {
     return (Pos - ChunkMap_HashIndex(Map, Map->Values[Pos].Hash)) & Map->Mask;
 }
 
-inline u64 ChunkMap_GetIndex(chunk_map *Map, i32 x, i32 z)
+inline u64 ChunkMap_GetIndex(const chunk_map *Map, i32 x, i32 y)
 {
-    u64 Coord = ChunkMap_Coord(x, z);
+    u64 Coord = ChunkMap_Coord(x, y);
     u64 Hash = ChunkMap_Hash(Coord);
 
     if (!Hash) Hash = 1;
@@ -181,9 +181,9 @@ void ChunkMap_Delete(chunk_map *Map)
     free(Map->Values);
 }
 
-chunk *ChunkMap_AllocateChunk(chunk_map *Map, i32 x, i32 z)
+chunk *ChunkMap_AllocateChunk(chunk_map *Map, i32 x, i32 y)
 {
-    assert(ChunkMap_GetIndex(Map, x, z) == SIZE_MAX);
+    assert(ChunkMap_GetIndex(Map, x, y) == SIZE_MAX);
 
     ChunkMap_Grow(Map);
 
@@ -192,8 +192,8 @@ chunk *ChunkMap_AllocateChunk(chunk_map *Map, i32 x, i32 z)
         chunk *Chunk = Map->Chunks + i;
         if (!Chunk->Allocated)
         {
-            ChunkMap_InsertChunkId(Map, i, x, z);
-            Chunk_Create(Chunk, x, z);
+            ChunkMap_InsertChunkId(Map, i, x, y);
+            Chunk_Create(Chunk, x, y);
             return Chunk;
         }
     }
@@ -202,19 +202,19 @@ chunk *ChunkMap_AllocateChunk(chunk_map *Map, i32 x, i32 z)
     return 0;
 }
 
-void ChunkMap_DeleteChunk(chunk_map *Map, i32 x, i32 z)
+void ChunkMap_DeleteChunk(chunk_map *Map, i32 x, i32 y)
 {
-    u64 Index = ChunkMap_GetIndex(Map, x, z);
+    u64 Index = ChunkMap_GetIndex(Map, x, y);
 
     chunk *Chunk = Map->Chunks + Map->Values[Index].ChunkId;
-    Chunk_Delete(Chunk, x, z);
+    Chunk_Delete(Chunk, x, y);
 
     ChunkMap_RemoveIndex(Map, Index);
 }
 
-chunk *ChunkMap_GetChunk(chunk_map *Map, i32 x, i32 z)
+chunk *ChunkMap_GetChunk(const chunk_map *Map, i32 x, i32 y)
 {
-    u64 Index = ChunkMap_GetIndex(Map, x, z);
+    u64 Index = ChunkMap_GetIndex(Map, x, y);
     if (Index == SIZE_MAX) return 0;
     return Map->Chunks + Map->Values[Index].ChunkId;
 }

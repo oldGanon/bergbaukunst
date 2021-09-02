@@ -10,6 +10,7 @@ enum
 typedef struct block
 {
     u8 Id;
+    u8 Light;
 } block;
 
 #define LOADED_CHUNKS 16
@@ -32,13 +33,23 @@ typedef struct world
 
 typedef enum block_face
 {
-    BLOCK_FACE_LEFT,
-    BLOCK_FACE_RIGHT,
-    BLOCK_FACE_FRONT,
-    BLOCK_FACE_BACK,
-    BLOCK_FACE_BOTTOM,
-    BLOCK_FACE_TOP,
+    BLOCK_FACE_LEFT,   // -x
+    BLOCK_FACE_RIGHT,  // +x
+    BLOCK_FACE_FRONT,  // -y
+    BLOCK_FACE_BACK,   // +y
+    BLOCK_FACE_BOTTOM, // +z
+    BLOCK_FACE_TOP,    // -z
 } block_face;
+
+typedef enum world_direction
+{
+    DIR_WEST,  // -x
+    DIR_EAST,  // +x
+    DIR_SOUTH, // -y
+    DIR_NORTH, // +y
+    DIR_UP,    // +z
+    DIR_DOWN,  // -z
+} world_direction;
 
 typedef struct trace_result
 {
@@ -58,58 +69,91 @@ void World_Create(world *World)
 void World_Update(world *World, const camera Camera)
 {
     i32 xMin = F32_FloorToI32(Camera.Position.x / CHUNK_WIDTH) - LOADED_CHUNKS / 2;
-    i32 zMin = F32_FloorToI32(Camera.Position.z / CHUNK_WIDTH) - LOADED_CHUNKS / 2;
+    i32 yMin = F32_FloorToI32(Camera.Position.y / CHUNK_WIDTH) - LOADED_CHUNKS / 2;
 
     for (i32 x = 0; x < LOADED_CHUNKS; x++)
     {
-        for (i32 z = 0; z < LOADED_CHUNKS; z++)
+        for (i32 y = 0; y < LOADED_CHUNKS; y++)
         {
-            chunk *Chunk = ChunkMap_GetChunk(&World->ChunkMap, x + xMin, z + zMin);
+            chunk *Chunk = ChunkMap_GetChunk(&World->ChunkMap, x + xMin, y + yMin);
             if (Chunk) continue;
-            ChunkMap_AllocateChunk(&World->ChunkMap, x + xMin, z + zMin);
+            ChunkMap_AllocateChunk(&World->ChunkMap, x + xMin, y + yMin);
         }
     }
 }
 
-void World_DrawChunk(chunk *Chunk, const bitmap Target, bitmap TerrainTexture, const camera Camera)
+bool World_GetChunkGroup(const world *World, const chunk *Chunk, chunk_group *Result)
 {
+    Result->Chunks[0][0] = ChunkMap_GetChunk(&World->ChunkMap, Chunk->x - 1, Chunk->y - 1);
+    if (!Result->Chunks[0][0]) return false;
+    Result->Chunks[0][1] = ChunkMap_GetChunk(&World->ChunkMap, Chunk->x - 1, Chunk->y);
+    if (!Result->Chunks[0][1]) return false;
+    Result->Chunks[0][2] = ChunkMap_GetChunk(&World->ChunkMap, Chunk->x - 1, Chunk->y + 1);
+    if (!Result->Chunks[0][2]) return false;
+    Result->Chunks[1][0] = ChunkMap_GetChunk(&World->ChunkMap, Chunk->x, Chunk->y - 1);
+    if (!Result->Chunks[1][0]) return false;
+    Result->Chunks[1][1] = ChunkMap_GetChunk(&World->ChunkMap, Chunk->x, Chunk->y);
+    if (!Result->Chunks[1][1]) return false;
+    Result->Chunks[1][2] = ChunkMap_GetChunk(&World->ChunkMap, Chunk->x, Chunk->y + 1);
+    if (!Result->Chunks[1][2]) return false;
+    Result->Chunks[2][0] = ChunkMap_GetChunk(&World->ChunkMap, Chunk->x + 1, Chunk->y - 1);
+    if (!Result->Chunks[2][0]) return false;
+    Result->Chunks[2][1] = ChunkMap_GetChunk(&World->ChunkMap, Chunk->x + 1, Chunk->y);
+    if (!Result->Chunks[2][1]) return false;
+    Result->Chunks[2][2] = ChunkMap_GetChunk(&World->ChunkMap, Chunk->x + 1, Chunk->y + 1);
+    if (!Result->Chunks[2][2]) return false;
+
+    return true;
+}
+
+void World_DrawChunk(world *World, i32 x, i32 y, const bitmap Target, bitmap TerrainTexture, const camera Camera)
+{
+    chunk *Chunk = ChunkMap_GetChunk(&World->ChunkMap, x, y);
     if (!Chunk) return;
+
+    if (Chunk->MeshDirty)
+    {
+        chunk_group ChunkGroup;
+        if (!World_GetChunkGroup(World, Chunk, &ChunkGroup))
+            return;
+        Chunk_GenerateMesh(ChunkGroup);
+    }
     Chunk_Draw(Camera, Target, TerrainTexture, Chunk);
 }
 
 void World_Draw(world *World, const bitmap Target, bitmap TerrainTexture, const camera Camera)
 {
     i32 xMid = F32_FloorToI32(Camera.Position.x / CHUNK_WIDTH);
-    i32 zMid = F32_FloorToI32(Camera.Position.z / CHUNK_WIDTH);
+    i32 yMid = F32_FloorToI32(Camera.Position.y / CHUNK_WIDTH);
     i32 xMin = xMid - VIEW_DISTANCE;
-    i32 zMin = zMid - VIEW_DISTANCE;
+    i32 yMin = yMid - VIEW_DISTANCE;
     i32 xMax = xMid + VIEW_DISTANCE;
-    i32 zMax = zMid + VIEW_DISTANCE;
+    i32 yMax = yMid + VIEW_DISTANCE;
 
     vec3 Forward = Camera_Forward(Camera);
 
-    if (Abs(Forward.x) < Abs(Forward.z))
+    if (Abs(Forward.x) < Abs(Forward.y))
     {
-        for (i32 z = zMin; z < zMid; ++z)
+        for (i32 y = yMin; y < yMid; ++y)
         {
             for (i32 x = xMin; x < xMid; ++x)
             {
-                World_DrawChunk(ChunkMap_GetChunk(&World->ChunkMap, x, z), Target, TerrainTexture, Camera);
+                World_DrawChunk(World, x, y, Target, TerrainTexture, Camera);
             }
             for (i32 x = xMax; x >= xMid; --x)
             {
-                World_DrawChunk(ChunkMap_GetChunk(&World->ChunkMap, x, z), Target, TerrainTexture, Camera);
+                World_DrawChunk(World, x, y, Target, TerrainTexture, Camera);
             }
         }
-        for (i32 z = zMax; z >= zMid; --z)
+        for (i32 y = yMax; y >= yMid; --y)
         {
             for (i32 x = xMin; x < xMid; ++x)
             {
-                World_DrawChunk(ChunkMap_GetChunk(&World->ChunkMap, x, z), Target, TerrainTexture, Camera);
+                World_DrawChunk(World, x, y, Target, TerrainTexture, Camera);
             }
             for (i32 x = xMax; x >= xMid; --x)
             {
-                World_DrawChunk(ChunkMap_GetChunk(&World->ChunkMap, x, z), Target, TerrainTexture, Camera);
+                World_DrawChunk(World, x, y, Target, TerrainTexture, Camera);
             }
         }
     }
@@ -117,24 +161,24 @@ void World_Draw(world *World, const bitmap Target, bitmap TerrainTexture, const 
     {
         for (i32 x = xMin; x < xMid; ++x)
         {
-            for (i32 z = zMin; z < zMid; ++z)
+            for (i32 y = yMin; y < yMid; ++y)
             {
-                World_DrawChunk(ChunkMap_GetChunk(&World->ChunkMap, x, z), Target, TerrainTexture, Camera);
+                World_DrawChunk(World, x, y, Target, TerrainTexture, Camera);
             }
-            for (i32 z = zMax; z >= zMid; --z)
+            for (i32 y = yMax; y >= yMid; --y)
             {
-                World_DrawChunk(ChunkMap_GetChunk(&World->ChunkMap, x, z), Target, TerrainTexture, Camera);
+                World_DrawChunk(World, x, y, Target, TerrainTexture, Camera);
             }
         }
         for (i32 x = xMax; x >= xMid; --x)
         {
-            for (i32 z = zMin; z < zMid; ++z)
+            for (i32 y = yMin; y < yMid; ++y)
             {
-                World_DrawChunk(ChunkMap_GetChunk(&World->ChunkMap, x, z), Target, TerrainTexture, Camera);
+                World_DrawChunk(World, x, y, Target, TerrainTexture, Camera);
             }
-            for (i32 z = zMax; z >= zMid; --z)
+            for (i32 y = yMax; y >= yMid; --y)
             {
-                World_DrawChunk(ChunkMap_GetChunk(&World->ChunkMap, x, z), Target, TerrainTexture, Camera);
+                World_DrawChunk(World, x, y, Target, TerrainTexture, Camera);
             }
         }
     }
@@ -163,46 +207,36 @@ void Chunk_BlockUnderPlayer(world *World, camera Camera)
     }
 }*/
 
-block World_GetBlock(world *World, vec3 Position)
+block World_GetBlock(const world *World, vec3 Position)
 {
-    if ((Position.y < 0) || (Position.y > CHUNK_HEIGHT - 1))
+    if ((Position.z < 0) || (Position.z > CHUNK_HEIGHT - 1))
         return (block){ 0 };
 
     ivec3 iPosition = Vec3_FloorToIVec3(Position);
 
     i32 ChunkX = iPosition.x >> CHUNK_WIDTH_SHIFT;
-    i32 ChunkZ = iPosition.z >> CHUNK_WIDTH_SHIFT;
+    i32 ChunkY = iPosition.y >> CHUNK_WIDTH_SHIFT;
 
-    chunk *Chunk = ChunkMap_GetChunk(&World->ChunkMap, ChunkX, ChunkZ);
+    const chunk *Chunk = ChunkMap_GetChunk(&World->ChunkMap, ChunkX, ChunkY);
     if (!Chunk) return (block){ 0 }; // maybe generate chunk instead?
 
-    i32 BlockX = iPosition.x & CHUNK_WIDTH_MASK;
-    i32 BlockY = iPosition.y & CHUNK_HEIGHT_MASK;
-    i32 BlockZ = iPosition.z & CHUNK_WIDTH_MASK;
-
-    return Chunk->Blocks[BlockX][BlockZ][BlockY];
+    return Chunk_GetBlock(Chunk, iPosition);
 }
 
 void World_SetBlock(world *World, vec3 Position, block Block)
 {
-    if ((Position.y < 0) || (Position.y > CHUNK_HEIGHT - 1))
+    if ((Position.z < 0) || (Position.z > CHUNK_HEIGHT - 1))
         return;
 
     ivec3 iPosition = Vec3_FloorToIVec3(Position);
 
     i32 ChunkX = iPosition.x >> CHUNK_WIDTH_SHIFT;
-    i32 ChunkZ = iPosition.z >> CHUNK_WIDTH_SHIFT;
+    i32 ChunkY = iPosition.y >> CHUNK_WIDTH_SHIFT;
 
-    chunk *Chunk = ChunkMap_GetChunk(&World->ChunkMap, ChunkX, ChunkZ);
+    chunk *Chunk = ChunkMap_GetChunk(&World->ChunkMap, ChunkX, ChunkY);
     if (!Chunk) return; // maybe generate chunk instead?
 
-    i32 BlockX = iPosition.x & CHUNK_WIDTH_MASK;
-    i32 BlockY = iPosition.y & CHUNK_HEIGHT_MASK;
-    i32 BlockZ = iPosition.z & CHUNK_WIDTH_MASK;
-
-    Chunk->Blocks[BlockX][BlockZ][BlockY] = Block;
-
-    Chunk_GenerateMesh(Chunk);
+    Chunk_SetBlock(Chunk, iPosition, Block);
 }
 
 bool World_TraceRay(world *World, vec3 Origin, vec3 Direction, f32 Length, trace_result *Result)
@@ -226,19 +260,22 @@ bool World_TraceRay(world *World, vec3 Origin, vec3 Direction, f32 Length, trace
     {
         if (t > RayLength)
             return false;
-        if ((RaySign.y < 0) && (RayPosition.y < 0))
+        if ((RaySign.z < 0) && (RayPosition.z < 0))
             return false;
-        if ((RaySign.y > 0) && (RayPosition.y > CHUNK_HEIGHT - 1))
+        if ((RaySign.z > 0) && (RayPosition.z > CHUNK_HEIGHT - 1))
             return false;
 
         block Block = World_GetBlock(World, RayPosition);
         if (Block.Id != BLOCK_ID_AIR)
         {
+            vec3 t3 = (vec3){ t, t, t };
+            vec3 HitPosition = Add(Origin, Mul(Direction, t3));
+            vec3 BlockPosition = Floor(RayPosition);
             *Result = (trace_result) {
-                .HitPosition = Add(Origin, Mul(Direction, Vec3_Set1(t))),
+                .HitPosition = HitPosition,
                 .Block = Block,
                 .BlockFace = LastFace,
-                .BlockPosition = RayPosition,
+                .BlockPosition = BlockPosition,
             };
             return true;
         }
@@ -257,12 +294,12 @@ bool World_TraceRay(world *World, vec3 Origin, vec3 Direction, f32 Length, trace
                 LastFace = BLOCK_FACE_RIGHT;
             }
         }
-        else if ((tMax.z <= tMax.x) && (tMax.z <= tMax.y))
+        else if ((tMax.y <= tMax.x) && (tMax.y <= tMax.z))
         {
-            t = tMax.z;
-            tMax.z += tDelta.z;
-            RayPosition.z += RaySign.z;
-            if (RaySign.z > 0)
+            t = tMax.y;
+            tMax.y += tDelta.y;
+            RayPosition.y += RaySign.y;
+            if (RaySign.y > 0)
             {
                 LastFace = BLOCK_FACE_FRONT;
             }
@@ -271,12 +308,12 @@ bool World_TraceRay(world *World, vec3 Origin, vec3 Direction, f32 Length, trace
                 LastFace = BLOCK_FACE_BACK;
             }
         }
-        else if ((tMax.y <= tMax.x) && (tMax.y <= tMax.z))
+        else if ((tMax.z <= tMax.x) && (tMax.z <= tMax.y))
         {
-            t = tMax.y;
-            tMax.y += tDelta.y;
-            RayPosition.y += RaySign.y;
-            if (RaySign.y > 0)
+            t = tMax.z;
+            tMax.z += tDelta.z;
+            RayPosition.z += RaySign.z;
+            if (RaySign.z > 0)
             {
                 LastFace = BLOCK_FACE_BOTTOM;
             }
@@ -299,10 +336,10 @@ void Block_PlaceOnSide(world *World, trace_result TraceResult)
     {
         case BLOCK_FACE_LEFT:   TraceResult.BlockPosition.x -= 1; break;
         case BLOCK_FACE_RIGHT:  TraceResult.BlockPosition.x += 1; break;
-        case BLOCK_FACE_FRONT:  TraceResult.BlockPosition.z -= 1; break;
-        case BLOCK_FACE_BACK:   TraceResult.BlockPosition.z += 1; break;
-        case BLOCK_FACE_BOTTOM: TraceResult.BlockPosition.y -= 1; break;
-        case BLOCK_FACE_TOP:    TraceResult.BlockPosition.y += 1; break;
+        case BLOCK_FACE_FRONT:  TraceResult.BlockPosition.y -= 1; break;
+        case BLOCK_FACE_BACK:   TraceResult.BlockPosition.y += 1; break;
+        case BLOCK_FACE_BOTTOM: TraceResult.BlockPosition.z -= 1; break;
+        case BLOCK_FACE_TOP:    TraceResult.BlockPosition.z += 1; break;
         default: break;
     }
     block Block = { .Id = BLOCK_ID_GRAS };

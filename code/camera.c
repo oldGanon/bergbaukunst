@@ -26,8 +26,8 @@ vec3 Camera_Direction(const camera Camera)
 {
     return (vec3) {
         .x = Camera.SinYaw * Camera.CosPitch,
-        .y = Camera.SinPitch,
-        .z = Camera.CosPitch * Camera.CosYaw,
+        .y = Camera.CosPitch * Camera.CosYaw,
+        .z = Camera.SinPitch,
     };
 }
 
@@ -35,7 +35,7 @@ vec3 Camera_Forward(const camera Camera)
 {
     return (vec3) {
         .x = Camera.SinYaw,
-        .z = Camera.CosYaw,
+        .y = Camera.CosYaw,
     };
 }
 
@@ -43,7 +43,7 @@ vec3 Camera_Right(const camera Camera)
 {
     return (vec3) {
         .x = Camera.CosYaw,
-        .z = -Camera.SinYaw,
+        .y = -Camera.SinYaw,
     };
 }
 
@@ -52,10 +52,11 @@ vec3 Camera_ToScreen(const bitmap Screen, vec3 Position)
     f32 HalfWidth = Screen.Width * 0.5f;
     f32 HalfHeight = Screen.Height * 0.5f;
     f32 MinDim = Min(HalfWidth, HalfHeight);
-    Position.x = Position.x * MinDim + HalfWidth;
-    Position.y = Position.y * MinDim + HalfHeight;
-
-    return Position;
+    return (vec3) {
+        .x = Position.x * MinDim + HalfWidth,
+        .y = Position.z * MinDim + HalfHeight,
+        .z = Position.y,
+    };
 }
 
 vec3 Camera_FromScreen(const bitmap Screen, vec3 Position)
@@ -63,25 +64,26 @@ vec3 Camera_FromScreen(const bitmap Screen, vec3 Position)
     f32 HalfWidth = Screen.Width * 0.5f;
     f32 HalfHeight = Screen.Height * 0.5f;
     f32 MinDim = Min(HalfWidth, HalfHeight);
-    Position.x = Position.x - HalfWidth / MinDim;
-    Position.y = Position.y - HalfHeight / MinDim;
-
-    return Position;
+    return (vec3) {
+        .x = Position.x - HalfWidth / MinDim,
+        .y = Position.z,
+        .z = Position.y - HalfHeight / MinDim,
+    };
 }
 
 vec3 Camera_FromWorldDir(const camera Camera, vec3 Direction)
 {
     {
-        f32 Newx = Camera.CosYaw * Direction.x - Camera.SinYaw * Direction.z;
-        f32 Newz = Camera.CosYaw * Direction.z + Camera.SinYaw * Direction.x;
+        f32 Newx = Camera.CosYaw * Direction.x - Camera.SinYaw * Direction.y;
+        f32 Newy = Camera.CosYaw * Direction.y + Camera.SinYaw * Direction.x;
         Direction.x = Newx;
-        Direction.z = Newz;
+        Direction.y = Newy;
     }
     {
-        f32 Newy = Camera.CosPitch * Direction.y - Camera.SinPitch * Direction.z;
-        f32 Newz = Camera.CosPitch * Direction.z + Camera.SinPitch * Direction.y;
-        Direction.y = Newy;
+        f32 Newz = Camera.CosPitch * Direction.z - Camera.SinPitch * Direction.y;
+        f32 Newy = Camera.CosPitch * Direction.y + Camera.SinPitch * Direction.z;
         Direction.z = Newz;
+        Direction.y = Newy;
     }
 
     return Direction;
@@ -90,16 +92,16 @@ vec3 Camera_FromWorldDir(const camera Camera, vec3 Direction)
 vec3 Camera_ToWorldDir(const camera Camera, vec3 Direction)
 {
     {
-        f32 Newy = Camera.CosPitch * Direction.y + Camera.SinPitch * Direction.z;
-        f32 Newz = Camera.CosPitch * Direction.z - Camera.SinPitch * Direction.y;
-        Direction.y = Newy;
+        f32 Newz = Camera.CosPitch * Direction.z + Camera.SinPitch * Direction.y;
+        f32 Newy = Camera.CosPitch * Direction.y - Camera.SinPitch * Direction.z;
         Direction.z = Newz;
+        Direction.y = Newy;
     }
     {
-        f32 Newx = Camera.CosYaw * Direction.x + Camera.SinYaw * Direction.z;
-        f32 Newz = Camera.CosYaw * Direction.z - Camera.SinYaw * Direction.x;
+        f32 Newx = Camera.CosYaw * Direction.x + Camera.SinYaw * Direction.y;
+        f32 Newy = Camera.CosYaw * Direction.y - Camera.SinYaw * Direction.x;
         Direction.x = Newx;
-        Direction.z = Newz;
+        Direction.y = Newy;
     }
 
     return Direction;
@@ -149,10 +151,10 @@ bool Camera_PointVisible(const camera Camera, const bitmap Screen, vec3 Position
     f32 X = Screen.Width * MinDim;
     f32 Y = Screen.Height * MinDim;
 
-    vec3 A = {-X,-Y, 1 };
-    vec3 B = { X,-Y, 1 };
-    vec3 C = { X, Y, 1 };
-    vec3 D = {-X, Y, 1 };
+    vec3 A = { -X, 1, Y, };
+    vec3 B = {  X, 1, Y, };
+    vec3 C = {  X, 1,-Y, };
+    vec3 D = { -X, 1,-Y, };
 
     if (Vec3_Dot(Position, Vec3_Cross(A, B)) < 0) return false;
     if (Vec3_Dot(Position, Vec3_Cross(B, C)) < 0) return false;
@@ -174,10 +176,10 @@ bool Camera_BoxVisible(const camera Camera, const bitmap Screen, vec3 P0, vec3 P
     f32 X = Screen.Width * MinDim;
     f32 Y = Screen.Height * MinDim;
 
-    vec3 A = {-X,-Y, 1 };
-    vec3 B = { X,-Y, 1 };
-    vec3 C = { X, Y, 1 };
-    vec3 D = {-X, Y, 1 };
+    vec3 A = { -X, 1, Y };
+    vec3 B = {  X, 1, Y };
+    vec3 C = {  X, 1,-Y };
+    vec3 D = { -X, 1,-Y };
 
     vec3 AB = Camera_ToWorldDir(Camera, Vec3_Cross(A, B));
     vec3 BC = Camera_ToWorldDir(Camera, Vec3_Cross(B, C));
