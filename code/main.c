@@ -313,7 +313,7 @@ palette Win32_LoadPalette(const char* Name)
     BITMAP Image;
     GetObject(hImage, sizeof(BITMAP), &Image);
 
-    if (Image.bmWidth == 16 && Image.bmWidth == 16)
+    if (Image.bmWidth == 16 && Image.bmHeight == 16)
     {
         BITMAPINFO_AND_PALETTE BitmapInfo = {
             .bmiHeader = {
