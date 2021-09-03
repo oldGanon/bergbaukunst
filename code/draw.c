@@ -547,7 +547,7 @@ void Draw_String(bitmap Target, const bitmap Font, color Color, ivec2 Position, 
 /**/
 /**/
 /**/
-
+#if 0
 void Draw__TriangleTexturedShadedVerts3D(bitmap Target, const bitmap Texture, vertex A, vertex B, vertex C)
 {
     _mm_setcsr(_mm_getcsr() | 0x8040);
@@ -560,6 +560,7 @@ void Draw__TriangleTexturedShadedVerts3D(bitmap Target, const bitmap Texture, ve
     __m128 RowOffset = _mm_setr_ps(0, 0, 0, 0);
     __m128 One = _mm_set1_ps(1);
 
+    __m128i vmul = _mm_set1_epi32(Texture.Pitch);
     __m128i umask = _mm_set1_epi32(Texture.Width - 1);
     __m128i vmask = _mm_set1_epi32(Texture.Height - 1);
     __m128i smask = _mm_set1_epi32(7);
@@ -678,6 +679,8 @@ void Draw__TriangleTexturedShadedVerts3D(bitmap Target, const bitmap Texture, ve
                 __m128 aa = _mm_add_ps(_mm_add_ps(a4[0], _mm_mul_ps(Beta, a4[1])), _mm_mul_ps(Gamma, a4[2]));
                 __m128 bb = _mm_add_ps(_mm_add_ps(b4[0], _mm_mul_ps(Beta, b4[1])), _mm_mul_ps(Gamma, b4[2]));
 
+                __m128 dither = Bayer[y&3];
+
                 for(i32 x = iMinX; x < iMaxX; x += PACK_WIDTH)
                 {
                     __m128i Mask4 = _mm_srai_epi32(_mm_castps_si128(_mm_or_ps(_mm_or_ps(Alpha, Beta), Gamma)), 32);
@@ -693,12 +696,17 @@ void Draw__TriangleTexturedShadedVerts3D(bitmap Target, const bitmap Texture, ve
                         __m128 vvv = _mm_add_ps(_mm_add_ps(_mm_mul_ps(v4[0], aaa), _mm_mul_ps(v4[1], bbb)), _mm_mul_ps(v4[2], ccc));
                         __m128 sss = _mm_add_ps(_mm_add_ps(_mm_mul_ps(s4[0], aaa), _mm_mul_ps(s4[1], bbb)), _mm_mul_ps(s4[2], ccc));
 
-                        sss = _mm_add_ps(_mm_mul_ps(sss, ssize), Bayer[y&3]);
+                        sss = _mm_add_ps(_mm_mul_ps(sss, ssize), dither);
 
-                        i32 iu[4], iv[4], is[4];
-                        _mm_storeu_epi32(iu, _mm_and_si128(_mm_cvttps_epi32(uuu), umask));
-                        _mm_storeu_epi32(iv, _mm_and_si128(_mm_cvttps_epi32(vvv), vmask));
-                        _mm_storeu_epi32(is, _mm_and_si128(_mm_cvttps_epi32(sss), smask));
+                        __m128i iuuu = _mm_and_si128(_mm_cvttps_epi32(uuu), umask);
+                        __m128i ivvv = _mm_and_si128(_mm_cvttps_epi32(vvv), vmask);
+                        __m128i isss = _mm_and_si128(_mm_cvttps_epi32(sss), smask);
+
+                        __m128i iuv8 = _mm_add_epi32(iuuu, _mm_mullo_epi32(ivvv, vmul));
+
+                        i32 iuv[4], is[4];
+                        _mm_storeu_epi32(iuv, iuv8);
+                        _mm_storeu_epi32(is, isss);
 
                         u32 M[4];
                         _mm_storeu_epi32(M, Mask4);
@@ -706,7 +714,7 @@ void Draw__TriangleTexturedShadedVerts3D(bitmap Target, const bitmap Texture, ve
                         for (i32 p = 0; p < 4; ++p)
                         {
                             color *Dst = Target.Pixels + Index;
-                            color Texel = *(Texture.Pixels + Texture.Pitch * iv[p] + iu[p]);
+                            color Texel = *(Texture.Pixels + iuv[p]);
                             Texel.Value &= 0xF8;
                             Texel.Value &= M[p];
                             if (Texel.Value) Dst[p].Value = Texel.Value | (is[p] & 0xFF);
@@ -730,6 +738,200 @@ void Draw__TriangleTexturedShadedVerts3D(bitmap Target, const bitmap Texture, ve
         }
     }
 }
+#else
+void Draw__TriangleTexturedShadedVerts3D(bitmap Target, const bitmap Texture, vertex A, vertex B, vertex C)
+{
+    _mm_setcsr(_mm_getcsr() | 0x8040);
+#define PACK_WIDTH_SHIFT 2
+#define PACK_HEIGHT_SHIFT 1
+#define PACK_WIDTH (1 << PACK_WIDTH_SHIFT)
+#define PACK_HEIGHT (1 << PACK_HEIGHT_SHIFT)
+
+    __m256 ColOffset = _mm256_setr_ps(0, 1, 2, 3, 0, 1, 2, 3);
+    __m256 RowOffset = _mm256_setr_ps(0, 0, 0, 0, 1, 1, 1, 1);
+    __m256 One = _mm256_set1_ps(1);
+
+    __m256i vmul = _mm256_set1_epi32(Texture.Pitch);
+    __m256i umask = _mm256_set1_epi32(Texture.Width - 1);
+    __m256i vmask = _mm256_set1_epi32(Texture.Height - 1);
+    __m256i smask = _mm256_set1_epi32(7);
+    __m256 ssize  = _mm256_set1_ps(7);
+
+    __m256 Bayer[4] = {
+        _mm256_set_ps( 0.0f/16.0f, 8.0f/16.0f, 2.0f/16.0f,10.0f/16.0f,
+                      12.0f/16.0f, 4.0f/16.0f,14.0f/16.0f, 6.0f/16.0f),
+        _mm256_set_ps( 3.0f/16.0f,11.0f/16.0f, 1.0f/16.0f, 9.0f/16.0f,
+                      15.0f/16.0f, 7.0f/16.0f,13.0f/16.0f, 5.0f/16.0f),
+    };
+
+    f32 MinX = 0;
+    f32 MinY = 0;
+    f32 MaxX = (f32)Target.Width;
+    f32 MaxY = (f32)Target.Height;
+
+    {
+        f32 X[3] = { A.Position.x, B.Position.x, C.Position.x };
+        f32 Y[3] = { A.Position.y, B.Position.y, C.Position.y };
+        
+        f32 z[3] = { 1.0f / A.Position.z, 1.0f / B.Position.z, 1.0f / C.Position.z };
+        f32 a[3] = { z[0], 0, 0 };
+        f32 b[3] = { 0, z[1], 0 };
+        f32 s[3] = { A.Shadow, B.Shadow, C.Shadow };
+        f32 u[3] = { A.TexCoord.u, B.TexCoord.u, C.TexCoord.u };
+        f32 v[3] = { A.TexCoord.v, B.TexCoord.v, C.TexCoord.v };
+        
+        // barycentric edge functions
+        // FAB(x, y) = (A.y - B.y)x + (B.x - A.x)y + (A.x * B.yy - B.x * A.y) = 0
+        // FBC(x, y) = (B.y - C.y)x + (C.x - B.x)y + (B.x * C.yy - C.x * B.y) = 0
+        // FCA(x, y) = (C.y - A.y)x + (A.x - C.x)y + (C.x * A.yy - A.x * C.y) = 0
+
+        f32 F12_dx = Y[1] - Y[2];
+        f32 F20_dx = Y[2] - Y[0];
+        f32 F01_dx = Y[0] - Y[1];
+
+        f32 F12_dy = X[2] - X[1];
+        f32 F20_dy = X[0] - X[2];
+        f32 F01_dy = X[1] - X[0];
+
+        f32 F12_0 = X[1] * Y[2] - X[2] * Y[1];
+        f32 F20_0 = X[2] * Y[0] - X[0] * Y[2];
+        f32 F01_0 = X[0] * Y[1] - X[1] * Y[0];
+
+        f32 invTriArea = 1.0f / (F01_dy * F20_dx - F20_dy * F01_dx);
+        z[1] = (z[1] - z[0]) * invTriArea;
+        z[2] = (z[2] - z[0]) * invTriArea;
+        a[1] = (a[1] - a[0]) * invTriArea;
+        a[2] = (a[2] - a[0]) * invTriArea;
+        b[1] = (b[1] - b[0]) * invTriArea;
+        b[2] = (b[2] - b[0]) * invTriArea;
+
+        MinX = Max(Floor(Min(Min(X[0], X[1]), X[2]) / PACK_WIDTH) * PACK_WIDTH, MinX);
+        MinY = Max(Floor(Min(Min(Y[0], Y[1]), Y[2]) / PACK_HEIGHT) * PACK_HEIGHT, MinY);
+        MaxX = Min(Ceil(Max(Max(X[0], X[1]), X[2])), MaxX);
+        MaxY = Min(Ceil(Max(Max(Y[0], Y[1]), Y[2])), MaxY);
+
+        {
+            __m256 z8[3] = { _mm256_set1_ps(z[0]), _mm256_set1_ps(z[1]), _mm256_set1_ps(z[2]) };
+            __m256 a8[3] = { _mm256_set1_ps(a[0]), _mm256_set1_ps(a[1]), _mm256_set1_ps(a[2]) };
+            __m256 b8[3] = { _mm256_set1_ps(b[0]), _mm256_set1_ps(b[1]), _mm256_set1_ps(b[2]) };
+            __m256 s8[3] = { _mm256_set1_ps(s[0]), _mm256_set1_ps(s[1]), _mm256_set1_ps(s[2]) };
+            __m256 u8[3] = { _mm256_set1_ps(u[0]), _mm256_set1_ps(u[1]), _mm256_set1_ps(u[2]) };
+            __m256 v8[3] = { _mm256_set1_ps(v[0]), _mm256_set1_ps(v[1]), _mm256_set1_ps(v[2]) };
+        
+            __m256 F12_dx8 = _mm256_set1_ps(F12_dx);
+            __m256 F20_dx8 = _mm256_set1_ps(F20_dx);
+            __m256 F01_dx8 = _mm256_set1_ps(F01_dx);
+
+            __m256 F12_dy8 = _mm256_set1_ps(F12_dy);
+            __m256 F20_dy8 = _mm256_set1_ps(F20_dy);
+            __m256 F01_dy8 = _mm256_set1_ps(F01_dy);
+
+            __m256 Col = _mm256_add_ps(ColOffset, _mm256_set1_ps(MinX));
+            __m256 A12_0 = _mm256_mul_ps(F12_dx8, Col);
+            __m256 A20_0 = _mm256_mul_ps(F20_dx8, Col);
+            __m256 A01_0 = _mm256_mul_ps(F01_dx8, Col);
+
+            __m256 Row = _mm256_add_ps(RowOffset, _mm256_set1_ps(MinY));
+            __m256 B12_0 = _mm256_mul_ps(F12_dy8, Row);
+            __m256 B20_0 = _mm256_mul_ps(F20_dy8, Row);
+            __m256 B01_0 = _mm256_mul_ps(F01_dy8, Row);
+
+            __m256 F12_Row = _mm256_add_ps(_mm256_add_ps(A12_0, B12_0), _mm256_set1_ps(F12_0));
+            __m256 F20_Row = _mm256_add_ps(_mm256_add_ps(A20_0, B20_0), _mm256_set1_ps(F20_0));
+            __m256 F01_Row = _mm256_add_ps(_mm256_add_ps(A01_0, B01_0), _mm256_set1_ps(F01_0));
+
+            F12_dx8 = _mm256_mul_ps(F12_dx8, _mm256_set1_ps(PACK_WIDTH));
+            F20_dx8 = _mm256_mul_ps(F20_dx8, _mm256_set1_ps(PACK_WIDTH));
+            F01_dx8 = _mm256_mul_ps(F01_dx8, _mm256_set1_ps(PACK_WIDTH));
+
+            F12_dy8 = _mm256_mul_ps(F12_dy8, _mm256_set1_ps(PACK_HEIGHT));
+            F20_dy8 = _mm256_mul_ps(F20_dy8, _mm256_set1_ps(PACK_HEIGHT));
+            F01_dy8 = _mm256_mul_ps(F01_dy8, _mm256_set1_ps(PACK_HEIGHT));
+
+            __m256 zz_dx = _mm256_add_ps(_mm256_mul_ps(F20_dx8, z8[1]), _mm256_mul_ps(F01_dx8, z8[2]));
+            __m256 aa_dx = _mm256_add_ps(_mm256_mul_ps(F20_dx8, a8[1]), _mm256_mul_ps(F01_dx8, a8[2]));
+            __m256 bb_dx = _mm256_add_ps(_mm256_mul_ps(F20_dx8, b8[1]), _mm256_mul_ps(F01_dx8, b8[2]));
+
+            i32 iMinX = F32_FloatToI32(MinX);
+            i32 iMinY = F32_FloatToI32(MinY);
+            i32 iMaxX = F32_FloatToI32(MaxX);
+            i32 iMaxY = F32_FloatToI32(MaxY);
+
+            i32 RowIndex = iMinY * Target.Pitch + iMinX;
+
+            for(i32 y = iMinY; y < iMaxY; y += PACK_HEIGHT)
+            {
+                i32 Index = RowIndex;
+                __m256 Alpha = F12_Row;
+                __m256 Beta  = F20_Row;
+                __m256 Gamma = F01_Row;
+
+                __m256 zz = _mm256_add_ps(_mm256_add_ps(z8[0], _mm256_mul_ps(Beta, z8[1])), _mm256_mul_ps(Gamma, z8[2]));
+                __m256 aa = _mm256_add_ps(_mm256_add_ps(a8[0], _mm256_mul_ps(Beta, a8[1])), _mm256_mul_ps(Gamma, a8[2]));
+                __m256 bb = _mm256_add_ps(_mm256_add_ps(b8[0], _mm256_mul_ps(Beta, b8[1])), _mm256_mul_ps(Gamma, b8[2]));
+
+                __m256 dither = Bayer[(y>>1)&1];
+
+                for(i32 x = iMinX; x < iMaxX; x += PACK_WIDTH)
+                {
+                    __m256i mask = _mm256_srai_epi32(_mm256_castps_si256(_mm256_or_ps(_mm256_or_ps(Alpha, Beta), Gamma)), 32);
+                    if (!_mm256_test_all_ones(mask))
+                    {
+                        __m256 zzz = _mm256_div_ps(One, zz);
+                        __m256 aaa = _mm256_mul_ps(aa, zzz);
+                        __m256 bbb = _mm256_mul_ps(bb, zzz);
+                        __m256 ccc = _mm256_sub_ps(One, _mm256_add_ps(aaa, bbb));
+
+                        // interpolate
+                        __m256 uuu = _mm256_add_ps(_mm256_add_ps(_mm256_mul_ps(u8[0], aaa), _mm256_mul_ps(u8[1], bbb)), _mm256_mul_ps(u8[2], ccc));
+                        __m256 vvv = _mm256_add_ps(_mm256_add_ps(_mm256_mul_ps(v8[0], aaa), _mm256_mul_ps(v8[1], bbb)), _mm256_mul_ps(v8[2], ccc));
+                        __m256 sss = _mm256_add_ps(_mm256_add_ps(_mm256_mul_ps(s8[0], aaa), _mm256_mul_ps(s8[1], bbb)), _mm256_mul_ps(s8[2], ccc));
+
+                        sss = _mm256_add_ps(_mm256_mul_ps(sss, ssize), dither);
+
+                        __m256i iuuu = _mm256_and_si256(_mm256_cvttps_epi32(uuu), umask);
+                        __m256i ivvv = _mm256_and_si256(_mm256_cvttps_epi32(vvv), vmask);
+                        __m256i isss = _mm256_and_si256(_mm256_cvttps_epi32(sss), smask);
+
+                        __m256i iuv8 = _mm256_add_epi32(iuuu, _mm256_mullo_epi32(vmul, ivvv));
+
+                        // gather
+                        color *Dst0 = Target.Pixels + Index;
+                        color *Dst1 = Dst0 + Target.Pitch;
+                        __m256i dst = _mm256_set_m128i(_mm_loadu_si32(Dst1), _mm_loadu_si32(Dst0));
+                        dst = _mm256_shuffle_epi8(dst, _mm256_set_epi8(3,3,3,3,2,2,2,2,1,1,1,1,0,0,0,0,3,3,3,3,2,2,2,2,1,1,1,1,0,0,0,0));
+
+                        // shade
+                        __m256i tex = _mm256_i32gather_epi32((const int *)Texture.Pixels, iuv8, 1);
+                        tex = _mm256_and_si256(tex, _mm256_set1_epi32(0xF8));
+                        mask = _mm256_or_si256(mask, _mm256_cmpeq_epi32(tex, _mm256_setzero_si256()));
+                        tex = _mm256_or_si256(tex, isss);
+                        dst = _mm256_blendv_epi8(tex, dst, mask);
+
+                        // scatter
+                        dst = _mm256_shuffle_epi8(dst, _mm256_set_epi8(0,0,0,0,0,0,0,0,0,0,0,0,12,8,4,0,0,0,0,0,0,0,0,0,0,0,0,0,12,8,4,0));
+                        _mm_storeu_si32(Dst0, _mm256_castsi256_si128(dst));
+                        _mm_storeu_si32(Dst1, _mm256_extracti128_si256(dst, 1));
+                    }
+
+                    Index += PACK_WIDTH;
+                    Alpha = _mm256_add_ps(Alpha, F12_dx8);
+                    Beta  = _mm256_add_ps(Beta,  F20_dx8);
+                    Gamma = _mm256_add_ps(Gamma, F01_dx8);
+                    zz = _mm256_add_ps(zz, zz_dx);
+                    aa = _mm256_add_ps(aa, aa_dx);
+                    bb = _mm256_add_ps(bb, bb_dx);
+                }
+
+                RowIndex += PACK_HEIGHT * Target.Pitch;
+                F12_Row = _mm256_add_ps(F12_Row, F12_dy8);
+                F20_Row = _mm256_add_ps(F20_Row, F20_dy8);
+                F01_Row = _mm256_add_ps(F01_Row, F01_dy8);
+            }
+        }
+    }
+}
+#endif
 
 inline vertex Vertex_Lerp(vertex A, vertex B, f32 t)
 {
