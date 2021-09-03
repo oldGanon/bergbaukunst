@@ -12,6 +12,13 @@ typedef struct quad_mesh
     u32 Count;
 } quad_mesh;
 
+quad_mesh Mesh_Create(void);
+void Mesh_Delete(quad_mesh *);
+void Mesh_Clear(quad_mesh *);
+void Mesh_AddQuad(quad_mesh *, quad);
+void Mesh_Sort(quad_mesh *, const camera, vec3);
+void Mesh_Draw(bitmap, const camera, bitmap, vec3, quad_mesh *);
+
 typedef struct quad_reorder_buffer
 {
     quad *Quads;
@@ -20,16 +27,26 @@ typedef struct quad_reorder_buffer
     u32 Count;
 } quad_reorder_buffer;
 
-global quad_reorder_buffer GlobalQuadReorderBuffer = { 0 };
-
 void QuadReorderBuffer_Load(quad_reorder_buffer *ReorderBuffer, const quad_mesh *Mesh);
 void QuadReorderBuffer_Store(const quad_reorder_buffer *ReorderBuffer, quad_mesh *Mesh);
 void QuadReorderBuffer_CalcDistances(quad_reorder_buffer *ReorderBuffer, vec3 Position);
 void QuadReorderBuffer_InsertionSort(quad_reorder_buffer *ReorderBuffer);
 
+global quad_reorder_buffer GlobalQuadReorderBuffer = { 0 };
+
 /*******************/
 /*    Quad Mesh    */
 /*******************/
+
+inline quad Quad_RotateVerts(quad Quad)
+{
+    vertex T = Quad.Verts[0];
+    Quad.Verts[0] = Quad.Verts[1];
+    Quad.Verts[1] = Quad.Verts[2];
+    Quad.Verts[2] = Quad.Verts[3];
+    Quad.Verts[3] = T;
+    return Quad;
+}
 
 quad_mesh Mesh_Create(void)
 {

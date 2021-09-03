@@ -21,16 +21,6 @@ typedef struct world
     chunk_map ChunkMap;
 } world;
 
-typedef enum block_face
-{
-    BLOCK_FACE_LEFT,   // -x WEST
-    BLOCK_FACE_RIGHT,  // +x EAST
-    BLOCK_FACE_FRONT,  // -y SOUTH
-    BLOCK_FACE_BACK,   // +y NORTH
-    BLOCK_FACE_BOTTOM, // +z UP
-    BLOCK_FACE_TOP,    // -z DOWN
-} block_face;
-
 // typedef enum world_direction
 // {
 //     WEST,  // -x
@@ -45,8 +35,9 @@ typedef struct trace_result
 {
     block Block;
     block_face BlockFace;
+
     vec3 BlockPosition;
-    vec3 HitPosition;
+    vec3 FreePosition;
 } trace_result;
 
 
@@ -77,8 +68,6 @@ void World_DrawChunk(world *World, i32 x, i32 y, const bitmap Target, bitmap Ter
 {
     chunk *Chunk = ChunkMap_GetChunk(&World->ChunkMap, x, y);
     if (!Chunk) return;
-
-    if (Chunk->MeshDirty) Chunk_GenerateMesh(Chunk);
     Chunk_Draw(Camera, Target, TerrainTexture, Chunk);
 }
 
@@ -142,29 +131,6 @@ void World_Draw(world *World, const bitmap Target, bitmap TerrainTexture, const 
         }
     }
 }
-/*
-void Chunk_BlockUnderPlayer(world *World, camera Camera)
-{
-    i32 xMid = F32_FloorToI32(Camera.Position.x / CHUNK_WIDTH);
-    i32 zMid = F32_FloorToI32(Camera.Position.z / CHUNK_WIDTH);
-    chunk* Chunk = ChunkMap_GetChunk(&World->ChunkMap, xMid, zMid);
-    i32 XP = (i32)Camera.Position.x % CHUNK_WIDTH;
-    if(XP < 0)
-    {
-        XP += CHUNK_WIDTH;
-    }
-    i32 ZP = (i32)Camera.Position.z % 16;
-    if (ZP < 0) 
-    {
-        ZP += CHUNK_WIDTH;
-    }
-    i32 YP = Camera.Position.y;
-    if (YP > 0 && YP < 256 && Chunk->Blocks[XP][ZP][YP-2].Id == 0) 
-    {
-        Chunk->Blocks[XP][ZP][YP-2].Id = 1;
-        Chunk_GatherQuads(Chunk);
-    }
-}*/
 
 inline ivec3 World_ToBlockPosition(ivec3 WorldPosition)
 {
@@ -201,11 +167,9 @@ void World_SetBlock(world *World, vec3 WorldPosition, block Block)
     Chunk_SetBlock(Chunk, iWorldPosition, Block);
 }
 
-bool World_TraceRay(world *World, vec3 Origin, vec3 Direction, f32 Length, trace_result *Result)
+f32 World_TraceRay(world *World, vec3 RayOrigin, vec3 RayDirection, f32 RayLength, trace_result *Result)
 {
-    f32 RayLength = Length;
-    vec3 RayDirection = Direction;
-    vec3 RayPosition = Origin;
+    vec3 RayPosition = RayOrigin;
     vec3 RaySign = Sign(RayDirection);
 
     f32 t = 0;
@@ -221,25 +185,24 @@ bool World_TraceRay(world *World, vec3 Origin, vec3 Direction, f32 Length, trace
     for (;;)
     {
         if (t > RayLength)
-            return false;
+            return RayLength;
         if ((RaySign.z < 0) && (RayPosition.z < 0))
-            return false;
+            return INFINITY;
         if ((RaySign.z > 0) && (RayPosition.z > CHUNK_HEIGHT - 1))
-            return false;
+            return INFINITY;
 
-        block Block = World_GetBlock(World, RayPosition);
-        if (Block.Id != BLOCK_ID_AIR)
+        vec3 BlockPosition = Floor(RayPosition);
+        block Block = World_GetBlock(World, BlockPosition);
+        if (Block_TraceRay(Block, BlockPosition, RayOrigin, RayDirection) < RayLength)
         {
-            vec3 t3 = (vec3){ t, t, t };
-            vec3 HitPosition = Add(Origin, Mul(Direction, t3));
-            vec3 BlockPosition = Floor(RayPosition);
+            vec3 FreePosition = Add(BlockPosition, BlockFace_Normal[LastFace]);
             *Result = (trace_result) {
-                .HitPosition = HitPosition,
                 .Block = Block,
                 .BlockFace = LastFace,
                 .BlockPosition = BlockPosition,
+                .FreePosition = FreePosition,
             };
-            return true;
+            return t;
         }
 
         if ((tMax.x <= tMax.y) && (tMax.x <= tMax.z))
@@ -267,26 +230,6 @@ bool World_TraceRay(world *World, vec3 Origin, vec3 Direction, f32 Length, trace
             else               LastFace = BLOCK_FACE_TOP;
         }
     }
-}
-
-bool World_TraceCameraRay(world *World, camera Camera, f32 Length, trace_result *Result)
-{
-    return World_TraceRay(World, Camera.Position, Camera_Direction(Camera), Length, Result);
-}
-
-vec3 World_GetTraceBlockFacePosition(trace_result TraceResult)
-{
-    switch (TraceResult.BlockFace)
-    {
-        case BLOCK_FACE_LEFT:   TraceResult.BlockPosition.x -= 1; break;
-        case BLOCK_FACE_RIGHT:  TraceResult.BlockPosition.x += 1; break;
-        case BLOCK_FACE_FRONT:  TraceResult.BlockPosition.y -= 1; break;
-        case BLOCK_FACE_BACK:   TraceResult.BlockPosition.y += 1; break;
-        case BLOCK_FACE_BOTTOM: TraceResult.BlockPosition.z -= 1; break;
-        case BLOCK_FACE_TOP:    TraceResult.BlockPosition.z += 1; break;
-        default: break;
-    }
-    return TraceResult.BlockPosition;
 }
 
 void Block_Highlight(bitmap Buffer, camera Camera, trace_result TraceResult)

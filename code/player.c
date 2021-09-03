@@ -147,7 +147,7 @@ void Player_Update(player *Player, input Input, world *World,  f32 DeltaTime)
     if (Input.Punch)
     {
         trace_result TraceResult;
-        if (World_TraceRay(World, Player->Position, Player_ViewDirection(Player), 5.0f, &TraceResult))
+        if (World_TraceRay(World, Player->Position, Player_ViewDirection(Player), 5.0f, &TraceResult) < 5.0f)
         {
             World_SetBlock(World, TraceResult.BlockPosition, (block) { 0 });
         }
@@ -155,11 +155,11 @@ void Player_Update(player *Player, input Input, world *World,  f32 DeltaTime)
     else if (Input.Place)
     {
         trace_result TraceResult;
-        if (World_TraceRay(World, Player->Position, Player_ViewDirection(Player), 5.0f, &TraceResult))
+        if (World_TraceRay(World, Player->Position, Player_ViewDirection(Player), 5.0f, &TraceResult) < 5.0f)
         {
-            vec3 PlacePosition = World_GetTraceBlockFacePosition(TraceResult);
-            vec3 PlayerBlock = Vec3_Floor(Player->Position);
+            vec3 PlacePosition = TraceResult.FreePosition;
 
+            vec3 PlayerBlock = Vec3_Floor(Player->Position);
             if (!(PlayerBlock.x == PlacePosition.x &&
                 PlayerBlock.y == PlacePosition.y &&
                (PlayerBlock.z == PlacePosition.z ||

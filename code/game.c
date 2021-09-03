@@ -94,7 +94,7 @@ void Game_Draw(game *Game, bitmap Buffer)
     Draw_Line(Buffer, COLOR_WHITE, D, A);
 
     trace_result TraceResult;
-    if (World_TraceCameraRay(&Game->World, Game->Camera, 5.0f, &TraceResult))
+    if (World_TraceRay(&Game->World, Game->Camera.Position, Camera_Direction(Game->Camera), 5.0f, &TraceResult) < 5.0f)
     {
         Block_Highlight(Buffer, Game->Camera, TraceResult);
     }

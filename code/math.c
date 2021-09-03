@@ -1,5 +1,6 @@
 
 #include <intrin.h>
+#include <math.h>
 
 typedef union
 {
