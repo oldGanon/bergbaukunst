@@ -1,19 +1,3 @@
-
-#include "world.c"
-
-typedef struct game
-{
-    u64 Frame;
-
-    /* RESOURCES */
-    palette Palette;
-    bitmap Terrain;
-    bitmap Font;
-
-    camera Camera;
-    world World;
-} game;
-
 typedef struct input
 {
     vec2 Look;
@@ -29,12 +13,37 @@ typedef struct input
     bool LookLeft;
     bool LookRight;
 
+    bool Survival;
     bool Interact;
     bool Jump;
     bool Crouch;
     bool Punch;
     bool Place;
 } input;
+
+#include "world.c"
+
+typedef struct player
+{
+    vec3 PlayerVelocity;
+    bool Survival;
+
+}player;
+
+typedef struct game
+{
+    u64 Frame;
+
+    /* RESOURCES */
+    palette Palette;
+    bitmap Terrain;
+    bitmap Font;
+
+    camera Camera;
+    player Player;
+    world World;
+} game;
+
 
 void Game_Init(game *Game)
 {
@@ -43,7 +52,7 @@ void Game_Init(game *Game)
     Game->Palette = Win32_LoadPalette("PALETTE");
     Win32_SetPalette(&Game->Palette);
 
-    Camera_SetPosition(&Game->Camera, (vec3) { 3.0f, 2.0f, 2.0f });
+    Camera_SetPosition(&Game->Camera, (vec3) { 3.0f, 10.0f, 10.0f });
     Camera_SetRotation(&Game->Camera, 0.0f, 0.0f);
 
     World_Create(&Game->World);
@@ -63,32 +72,45 @@ void Game_Update(game *Game, const input Input)
     f32 TurnSpeed = 0.05f;
     f32 Sensitivity = 1.0f / 3500.0f;
 
-    if (Input.MoveForward) {
-        NewCameraPosition.x += Forward.x * Speed;
-        NewCameraPosition.y += Forward.y * Speed;
-        NewCameraPosition.z += Forward.z * Speed;
-    }
-    if (Input.MoveBack) {
-        NewCameraPosition.x -= Forward.x * Speed;
-        NewCameraPosition.y -= Forward.y * Speed;
-        NewCameraPosition.z -= Forward.z * Speed;
-    }
-    if (Input.MoveRight) {
-        NewCameraPosition.x += Right.x * Speed;
-        NewCameraPosition.y += Right.y * Speed;
-    }
-    if (Input.MoveLeft) {
-        NewCameraPosition.x -= Right.x * Speed;
-        NewCameraPosition.y -= Right.y * Speed;
-    }
-    if (Input.Jump)
+    if (Input.Survival) 
     {
-        NewCameraPosition.z += Speed;
+        Game->Player.Survival = !Game->Player.Survival;
     }
-    if (Input.Crouch)
+
+    if(Game->Player.Survival)
     {
-        NewCameraPosition.z -= Speed;
+        NewCameraPosition = Player_HandleMovement(Input, &Game->Player.PlayerVelocity, Camera, &Game->World);
     }
+    else
+    {
+        if (Input.MoveForward) {
+            NewCameraPosition.x += Forward.x * Speed;
+            NewCameraPosition.y += Forward.y * Speed;
+            NewCameraPosition.z += Forward.z * Speed;
+        }
+        if (Input.MoveBack) {
+            NewCameraPosition.x -= Forward.x * Speed;
+            NewCameraPosition.y -= Forward.y * Speed;
+            NewCameraPosition.z -= Forward.z * Speed;
+        }
+        if (Input.MoveRight) {
+            NewCameraPosition.x += Right.x * Speed;
+            NewCameraPosition.y += Right.y * Speed;
+        }
+        if (Input.MoveLeft) {
+            NewCameraPosition.x -= Right.x * Speed;
+            NewCameraPosition.y -= Right.y * Speed;
+        }
+        if (Input.Jump)
+        {
+            NewCameraPosition.z += Speed;
+        }
+        if (Input.Crouch)
+        {
+            NewCameraPosition.z -= Speed;
+        }
+    }
+
     if (Input.LookUp) {
         NewPitch += TurnSpeed;
     }
@@ -105,6 +127,9 @@ void Game_Update(game *Game, const input Input)
     NewYaw += Input.Look.x * Sensitivity;
     NewPitch += Input.Look.y * Sensitivity;
     
+    Camera_SetPosition(Camera, NewCameraPosition);
+    Camera_SetRotation(Camera, NewYaw, NewPitch);
+
     if (Input.Punch)
     {
         trace_result TraceResult;
@@ -118,12 +143,10 @@ void Game_Update(game *Game, const input Input)
         trace_result TraceResult;
         if (World_TraceCameraRay(&Game->World, Game->Camera, 5.0f, &TraceResult))
         {
-            Block_PlaceOnSide(&Game->World, TraceResult);
+            Block_PlaceOnSide(&Game->World, Game->Camera,TraceResult);
         }
     }
-    
-    Camera_SetPosition(Camera, NewCameraPosition);
-    Camera_SetRotation(Camera, NewYaw, NewPitch);
+
 
     World_Update(&Game->World, Game->Camera);
 }

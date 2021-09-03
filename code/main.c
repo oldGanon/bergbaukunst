@@ -549,6 +549,7 @@ int WINAPI CALLBACK WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR 
                             case VK_RIGHT: Input.LookRight = IsDown; break;
 
                             case 'E': Input.Interact = IsDown; break;
+                            case 'R': Input.Survival = IsDown; break;
                             case VK_SPACE: Input.Jump = IsDown; break;
                             case VK_SHIFT: Input.Crouch = IsDown; break;
                         }
