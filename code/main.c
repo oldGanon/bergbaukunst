@@ -549,7 +549,7 @@ int WINAPI CALLBACK WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR 
                             case VK_RIGHT: Input.LookRight = IsDown; break;
 
                             case 'E': Input.Interact = IsDown; break;
-                            case 'R': Input.Survival = IsDown; break;
+                            case 'R': Input.NoClip = IsDown; break;
                             case VK_SPACE: Input.Jump = IsDown; break;
                             case VK_SHIFT: Input.Crouch = IsDown; break;
                         }
@@ -593,7 +593,7 @@ int WINAPI CALLBACK WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR 
         if (GlobalFocus)
         {
             // UPDATE
-            Game_Update(Game, Input);
+            Game_Update(Game, Input, 1.0f/60.0f);
 
             // DRAW
             Game_Draw(Game, GlobalBackbuffer);

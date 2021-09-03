@@ -13,7 +13,7 @@ typedef struct input
     bool LookLeft;
     bool LookRight;
 
-    bool Survival;
+    bool NoClip;
     bool Interact;
     bool Jump;
     bool Crouch;
@@ -22,13 +22,7 @@ typedef struct input
 } input;
 
 #include "world.c"
-
-typedef struct player
-{
-    vec3 PlayerVelocity;
-    bool Survival;
-
-}player;
+#include "player.c"
 
 typedef struct game
 {
@@ -52,101 +46,32 @@ void Game_Init(game *Game)
     Game->Palette = Win32_LoadPalette("PALETTE");
     Win32_SetPalette(&Game->Palette);
 
-    Camera_SetPosition(&Game->Camera, (vec3) { 3.0f, 10.0f, 10.0f });
+    Camera_SetPosition(&Game->Camera, (vec3){ 0 });
     Camera_SetRotation(&Game->Camera, 0.0f, 0.0f);
 
     World_Create(&Game->World);
+
+    Game->Player = (player){
+        .Position = (vec3) { 3.0f, 10.0f, 10.0f },
+        .NoClip = true,
+    };
 }
 
-void Game_Update(game *Game, const input Input)
+void Game_Update(game *Game, const input Input, f32 DeltaTime)
 {
     camera *Camera = &Game->Camera;
 
-    vec3 Forward = Camera_Forward(*Camera);
-    vec3 Right = Camera_Right(*Camera);
-    vec3 NewCameraPosition = Camera->Position;
-    f32 NewYaw = Camera->Yaw;
-    f32 NewPitch = Camera->Pitch;
-
     f32 Speed = 0.25f;
-    f32 TurnSpeed = 0.05f;
-    f32 Sensitivity = 1.0f / 3500.0f;
 
-    if (Input.Survival) 
+    if (Input.NoClip)
     {
-        Game->Player.Survival = !Game->Player.Survival;
+        Game->Player.NoClip = !Game->Player.NoClip;
     }
 
-    if(Game->Player.Survival)
-    {
-        NewCameraPosition = Player_HandleMovement(Input, &Game->Player.PlayerVelocity, Camera, &Game->World);
-    }
-    else
-    {
-        if (Input.MoveForward) {
-            NewCameraPosition.x += Forward.x * Speed;
-            NewCameraPosition.y += Forward.y * Speed;
-            NewCameraPosition.z += Forward.z * Speed;
-        }
-        if (Input.MoveBack) {
-            NewCameraPosition.x -= Forward.x * Speed;
-            NewCameraPosition.y -= Forward.y * Speed;
-            NewCameraPosition.z -= Forward.z * Speed;
-        }
-        if (Input.MoveRight) {
-            NewCameraPosition.x += Right.x * Speed;
-            NewCameraPosition.y += Right.y * Speed;
-        }
-        if (Input.MoveLeft) {
-            NewCameraPosition.x -= Right.x * Speed;
-            NewCameraPosition.y -= Right.y * Speed;
-        }
-        if (Input.Jump)
-        {
-            NewCameraPosition.z += Speed;
-        }
-        if (Input.Crouch)
-        {
-            NewCameraPosition.z -= Speed;
-        }
-    }
+    Player_Update(&Game->Player, Input, &Game->World, DeltaTime);
 
-    if (Input.LookUp) {
-        NewPitch += TurnSpeed;
-    }
-    if (Input.LookDown) {
-        NewPitch -= TurnSpeed;
-    }
-    if (Input.LookRight) {
-        NewYaw += TurnSpeed;
-    }    
-    if (Input.LookLeft) {
-        NewYaw -= TurnSpeed;
-    }
-
-    NewYaw += Input.Look.x * Sensitivity;
-    NewPitch += Input.Look.y * Sensitivity;
-    
-    Camera_SetPosition(Camera, NewCameraPosition);
-    Camera_SetRotation(Camera, NewYaw, NewPitch);
-
-    if (Input.Punch)
-    {
-        trace_result TraceResult;
-        if (World_TraceCameraRay(&Game->World, Game->Camera, 5.0f, &TraceResult))
-        {
-            World_SetBlock(&Game->World, TraceResult.BlockPosition, (block) { 0 });
-        }
-    }
-    else if (Input.Place)
-    {
-        trace_result TraceResult;
-        if (World_TraceCameraRay(&Game->World, Game->Camera, 5.0f, &TraceResult))
-        {
-            Block_PlaceOnSide(&Game->World, Game->Camera,TraceResult);
-        }
-    }
-
+    Camera_SetPosition(Camera, Game->Player.Position);
+    Camera_SetRotation(Camera, Game->Player.Yaw, Game->Player.Pitch);
 
     World_Update(&Game->World, Game->Camera);
 }

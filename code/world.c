@@ -274,9 +274,8 @@ bool World_TraceCameraRay(world *World, camera Camera, f32 Length, trace_result 
     return World_TraceRay(World, Camera.Position, Camera_Direction(Camera), Length, Result);
 }
 
-void Block_PlaceOnSide(world *World, camera Camera, trace_result TraceResult)
+vec3 World_GetTraceBlockFacePosition(trace_result TraceResult)
 {
-
     switch (TraceResult.BlockFace)
     {
         case BLOCK_FACE_LEFT:   TraceResult.BlockPosition.x -= 1; break;
@@ -287,17 +286,7 @@ void Block_PlaceOnSide(world *World, camera Camera, trace_result TraceResult)
         case BLOCK_FACE_TOP:    TraceResult.BlockPosition.z += 1; break;
         default: break;
     }
-    
-    vec3 CameraPosition = Vec3_Floor(Camera.Position);
-    TraceResult.BlockPosition = Vec3_Floor(TraceResult.BlockPosition);
-
-    if (CameraPosition.x == TraceResult.BlockPosition.x &&
-        CameraPosition.y == TraceResult.BlockPosition.y &&
-       (CameraPosition.z == TraceResult.BlockPosition.z ||
-        CameraPosition.z - 1 == TraceResult.BlockPosition.z)) return;
-
-    block Block = { .Id = BLOCK_ID_GRAS };
-    World_SetBlock(World, TraceResult.BlockPosition, Block);
+    return TraceResult.BlockPosition;
 }
 
 void Block_Highlight(bitmap Buffer, camera Camera, trace_result TraceResult)
@@ -315,62 +304,4 @@ void Block_Highlight(bitmap Buffer, camera Camera, trace_result TraceResult)
 
     Draw_Line(Buffer, COLOR_WHITE, Camera_WorldToScreen(Camera, Buffer, (vec3) { BlockCorner.x + 1, BlockCorner.y, BlockCorner.z + 1 }),
                                    Camera_WorldToScreen(Camera, Buffer, (vec3) { BlockCorner.x    , BlockCorner.y, BlockCorner.z + 1 }));
-}
-
-vec3 Player_HandleMovement(input Input, vec3 *PlayerVelocity, camera* Camera, world* World)
-{
-    vec3 Acceleration = { 0 };
-    vec3 Forward = Camera_Forward(*Camera);
-    vec3 Right = Camera_Right(*Camera);
-    f32 Speed = 0.05f;
-    f32 JumpHeight = 0.20f;
-
-    if (Input.MoveForward) {
-        Acceleration.x += Forward.x * Speed;
-        Acceleration.y += Forward.y * Speed;
-        Acceleration.z += Forward.z * Speed;
-    }
-    if (Input.MoveBack) {
-        Acceleration.x -= Forward.x * Speed;
-        Acceleration.y -= Forward.y * Speed;
-        Acceleration.z -= Forward.z * Speed;
-    }
-    if (Input.MoveRight) {
-        Acceleration.x += Right.x * Speed;
-        Acceleration.y += Right.y * Speed;
-    }
-    if (Input.MoveLeft) {
-        Acceleration.x -= Right.x * Speed;
-        Acceleration.y -= Right.y * Speed;
-    }
-    if (Input.Jump && PlayerVelocity->z == 0)
-    {
-        Acceleration.z += JumpHeight;
-    }
-
-    Acceleration.z -= 0.01f;
-
-    Acceleration.x = Acceleration.x - PlayerVelocity->x * 0.5f;
-    Acceleration.y = Acceleration.y - PlayerVelocity->y * 0.5f;
-    Acceleration.z = Acceleration.z - PlayerVelocity->z * 0.01f;
-
-    *PlayerVelocity = Vec3_Add(*PlayerVelocity, Acceleration);
-
-    if (World_GetBlock(World, (vec3) { Camera->Position.x + PlayerVelocity->x, Camera->Position.y, Camera->Position.z     }).Id != 0 ||
-        World_GetBlock(World, (vec3) { Camera->Position.x + PlayerVelocity->x, Camera->Position.y, Camera->Position.z - 1 }).Id != 0)
-    {
-        PlayerVelocity->x = 0;
-    }
-    if (World_GetBlock(World, (vec3) { Camera->Position.x, Camera->Position.y + PlayerVelocity->y, Camera->Position.z     }).Id != 0  ||
-        World_GetBlock(World, (vec3) { Camera->Position.x, Camera->Position.y + PlayerVelocity->y, Camera->Position.z - 1 }).Id != 0)
-    {
-        PlayerVelocity->y = 0;
-    }
-    if (World_GetBlock(World, (vec3) { Camera->Position.x, Camera->Position.y, Camera->Position.z + PlayerVelocity->z     }).Id != 0 ||
-        World_GetBlock(World, (vec3) { Camera->Position.x, Camera->Position.y, Camera->Position.z + PlayerVelocity->z - 1 }).Id != 0)
-    {
-        PlayerVelocity->z = 0;
-    }
-    //Camera_SetPosition(Camera, Vec3_Add(Camera->Position, *PlayerVelocity));
-    return(Vec3_Add(Camera->Position, *PlayerVelocity));
 }
