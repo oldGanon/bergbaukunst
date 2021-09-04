@@ -81,11 +81,6 @@ inline void Mesh__MakeSpace(quad_mesh *Mesh, u32 Count)
 void Mesh_AddQuad(quad_mesh *Mesh, quad Quad)
 {
     Mesh__MakeSpace(Mesh, Mesh->Count + 1);
-
-    Quad.Center = Vec3_Add(Vec3_Add(Quad.Verts[0].Position, Quad.Verts[1].Position),
-                           Vec3_Add(Quad.Verts[2].Position, Quad.Verts[3].Position));
-    Quad.Center = Vec3_Mul(Quad.Center, (vec3){ 0.25f, 0.25f, 0.25f });
-
     Mesh->Quads[Mesh->Count++] = Quad;
 }
 
@@ -153,7 +148,12 @@ void QuadReorderBuffer_CalcDistances(quad_reorder_buffer *ReorderBuffer, vec3 Po
 {
     for (u32 i = 0; i < ReorderBuffer->Count; i++)
     {
-        ReorderBuffer->Distances[i] = Vec3_LengthSq(Vec3_Sub(ReorderBuffer->Quads[i].Center, Position));
+        vec3 Center = Vec3_Add(Vec3_Add(ReorderBuffer->Quads[i].Verts[0].Position, 
+                                        ReorderBuffer->Quads[i].Verts[1].Position),
+                               Vec3_Add(ReorderBuffer->Quads[i].Verts[2].Position, 
+                                        ReorderBuffer->Quads[i].Verts[3].Position));
+        Center = Vec3_Mul(Center, Vec3_Set1(0.25f));
+        ReorderBuffer->Distances[i] = Vec3_LengthSq(Vec3_Sub(Center, Position));
     }
 }
 

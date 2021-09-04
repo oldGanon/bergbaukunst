@@ -9,12 +9,18 @@ typedef struct player
 
 vec3 Player_Forward(player *Player)
 {
-    return (vec3) { .x = Sin(Player->Yaw),  .y = Cos(Player->Yaw) };
+    return (vec3) {
+        .x = Sin(Player->Yaw),
+        .y = Cos(Player->Yaw)
+    };
 }
 
 vec3 Player_Right(player *Player)
 {
-    return (vec3){ .x = Cos(Player->Yaw), .y = -Sin(Player->Yaw) };
+    return (vec3){
+        .x = Cos(Player->Yaw),
+        .y = -Sin(Player->Yaw)
+    };
 }
 
 vec3 Player_ViewDirection(player *Player)
@@ -141,6 +147,9 @@ void Player_Update(player *Player, input Input, world *World,  f32 DeltaTime)
     }
     Player->Yaw += Input.Look.x * Sensitivity;
     Player->Pitch += Input.Look.y * Sensitivity;
+
+    Player->Yaw = Modulo(Player->Yaw, 2*MATH_PI);
+    Player->Pitch = Clamp(Player->Pitch, -0.5f*MATH_PI, 0.5f*MATH_PI);
 
 
 
