@@ -100,6 +100,7 @@ void Mesh_Draw(bitmap Target, const camera Camera, bitmap Texture, vec3 Position
 {
     Mesh_Sort(Mesh, Camera, Position);
 
+    Draw_BatchInit(Target, Texture);
     for (u32 i = 0; i < Mesh->Count; i++) 
     {
         vertex V0 = Mesh->Quads[i].Verts[0];
@@ -112,8 +113,9 @@ void Mesh_Draw(bitmap Target, const camera Camera, bitmap Texture, vec3 Position
         V2.Position = Camera_WorldToScreen(Camera, Target, Vec3_Add(V2.Position, Position));
         V3.Position = Camera_WorldToScreen(Camera, Target, Vec3_Add(V3.Position, Position));
 
-        Draw_Quad(Target, Texture, V0, V1, V2, V3);
+        Draw_QuadBatched(V0, V1, V2, V3);
     }
+    Draw_BatchFlush();
 }
 
 /***********************/
