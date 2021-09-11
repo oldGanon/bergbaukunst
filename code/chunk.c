@@ -66,6 +66,7 @@ void Chunk_SetBlock(chunk *Chunk, ivec3 WorldPosition, block Block)
 
 void Chunk_GenerateBlocks(chunk *Chunk)
 {
+#if 0
     for (i32 zz = 0; zz < CHUNK_HEIGHT; zz++)
     for (i32 yy = 0; yy < CHUNK_WIDTH; yy++)
     for (i32 xx = 0; xx < CHUNK_WIDTH; xx++)
@@ -97,7 +98,8 @@ void Chunk_GenerateBlocks(chunk *Chunk)
             CurrentBlock->Id = BLOCK_ID_AIR;
         }
     }
-
+#endif
+    WorldGen_GenerateChunk(Chunk);
     Chunk_CalcSkyLight(Chunk);
 }
 

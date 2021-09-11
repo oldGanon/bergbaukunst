@@ -2,13 +2,17 @@
 inline ivec3 World_ToBlockPosition(ivec3 WorldPosition);
 inline ivec2 World_ToChunkPosition(ivec3 WorldPosition);
 
+typedef struct chunk chunk;
+void WorldGen_GenerateChunk(chunk *Chunk);
+
 #include "mesh.c"
 #include "block.c"
 #include "chunk.c"
 #include "chunkmap.c"
+#include "worldgen.c"
 
-#define LOADED_CHUNKS 16
-#define VIEW_DISTANCE 4
+#define LOADED_CHUNKS 32
+#define VIEW_DISTANCE 8
 
 typedef struct entity
 {
@@ -19,6 +23,8 @@ typedef struct world
 {
     entity Entities[256];
     chunk_map ChunkMap;
+
+    u32 MeshGenerationBudget;
 } world;
 
 // typedef enum world_direction
@@ -42,13 +48,16 @@ typedef struct trace_result
 
 
 
-void World_Create(world *World)
+void World_Init(world *World)
 {
     World->ChunkMap = ChunkMap_Create();
+    WorldGen_Init();
 }
 
 void World_Update(world *World, const camera Camera)
 {
+    World->MeshGenerationBudget = 1;
+
     ivec2 HalfLoadedDim = iVec2_Set1(LOADED_CHUNKS >> 1);
     ivec2 CenterChunk = World_ToChunkPosition(Vec3_FloorToIVec3(Camera.Position));
     ivec2 MinPos = iVec2_Sub(CenterChunk, HalfLoadedDim);
@@ -106,9 +115,24 @@ void World_GenerateChunkMesh(world *World, chunk *Chunk)
         vec3 BlockPosition = iVec3_ToVec3(iBlockPosition);
         switch (Block.Id)
         {
+            case BLOCK_ID_DIRT:
+            {
+                Block_AddQuadsToMesh(&Chunk->Mesh, BlockPosition, &BlockGroup, 2, 2, 2, 2, 2, 2);
+            } break;
+
             case BLOCK_ID_GRAS:
             {
                 Block_AddQuadsToMesh(&Chunk->Mesh, BlockPosition, &BlockGroup, 1, 1, 1, 1, 2, 0);
+            } break;
+
+            case BLOCK_ID_STONE:
+            {
+                Block_AddQuadsToMesh(&Chunk->Mesh, BlockPosition, &BlockGroup, 5, 5, 5, 5, 5, 5);
+            } break;
+
+            case BLOCK_ID_COBBLE:
+            {
+                Block_AddQuadsToMesh(&Chunk->Mesh, BlockPosition, &BlockGroup, 4, 4, 4, 4, 4, 4);
             } break;
 
             case BLOCK_ID_WOOD:
@@ -120,6 +144,11 @@ void World_GenerateChunkMesh(world *World, chunk *Chunk)
             {
                 Block_AddQuadsToMesh(&Chunk->Mesh, BlockPosition, &BlockGroup, 3, 3, 3, 3, 3, 3);
             } break;
+
+            case BLOCK_ID_SAND:
+            {
+                Block_AddQuadsToMesh(&Chunk->Mesh, BlockPosition, &BlockGroup, 6, 6, 6, 6, 6, 6);
+            } break;
         }
     }
 
@@ -130,7 +159,11 @@ void World_DrawChunk(world *World, i32 x, i32 y, const bitmap Target, bitmap Ter
 {
     chunk *Chunk = ChunkMap_GetChunk(&World->ChunkMap, x, y);
     if (!Chunk) return;
-    if (Chunk->MeshDirty) World_GenerateChunkMesh(World, Chunk);
+    if (Chunk->MeshDirty && World->MeshGenerationBudget)
+    {
+        --World->MeshGenerationBudget;
+        World_GenerateChunkMesh(World, Chunk);
+    }
     Chunk_Draw(Camera, Target, TerrainTexture, Chunk);
 }
 

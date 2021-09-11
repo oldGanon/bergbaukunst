@@ -2,9 +2,13 @@
 enum
 {
     BLOCK_ID_AIR = 0,
-    BLOCK_ID_GRAS = 1,
-    BLOCK_ID_WOOD = 2,
-    BLOCK_ID_LEAVES = 3,
+    BLOCK_ID_DIRT = 1,
+    BLOCK_ID_GRAS = 2,
+    BLOCK_ID_STONE = 3,
+    BLOCK_ID_COBBLE = 4,
+    BLOCK_ID_WOOD = 5,
+    BLOCK_ID_LEAVES = 6,
+    BLOCK_ID_SAND = 7,
 } block_id;
 
 typedef struct block
@@ -19,14 +23,22 @@ typedef struct block_group
 } block_group;
 
 const u8 Block_Solid[256] = {
+    [BLOCK_ID_DIRT] = true,
     [BLOCK_ID_GRAS] = true,
+    [BLOCK_ID_STONE] = true,
+    [BLOCK_ID_COBBLE] = true,
     [BLOCK_ID_WOOD] = true,
     [BLOCK_ID_LEAVES] = true,
+    [BLOCK_ID_SAND] = true,
 };
 
 const u8 Block_Opaque[256] = {
+    [BLOCK_ID_DIRT] = true,
     [BLOCK_ID_GRAS] = true,
+    [BLOCK_ID_STONE] = true,
+    [BLOCK_ID_COBBLE] = true,
     [BLOCK_ID_WOOD] = true,
+    [BLOCK_ID_SAND] = true,
 };
 
 typedef enum block_face
@@ -57,7 +69,7 @@ f32 Box_TraceRay(vec3 RayOrigin, vec3 RayDirection, vec3 BoxMin, vec3 BoxMax)
     vec3 tmax3 = Max(t0, t1);
     f32 tmin = Max(Max(tmin3.x, tmin3.y), tmin3.z);
     f32 tmax = Min(Min(tmax3.x, tmax3.y), tmax3.z);
-    if (tmin < 0.0f || tmax < tmin) return INFINITY;
+    if (tmax < 0.0f || tmax < tmin) return INFINITY;
     if (tmin < 0.0f && tmax > 0.0f) return 0.0;
     return tmin;
 }

@@ -49,10 +49,10 @@ void Game_Init(game *Game)
     Camera_SetPosition(&Game->Camera, (vec3){ 0 });
     Camera_SetRotation(&Game->Camera, 0.0f, 0.0f);
 
-    World_Create(&Game->World);
+    World_Init(&Game->World);
 
     Game->Player = (player){
-        .Position = (vec3) { 3.0f, 10.0f, 10.0f },
+        .Position = (vec3) { 3.0f, 10.0f, 70.0f },
         .NoClip = true,
     };
 }

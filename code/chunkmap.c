@@ -29,22 +29,15 @@ typedef struct chunk_map_value
 
 #define CHUNK_MAP_MAXLOAD_PERCENT 90
 
-inline u64 ChunkMap_FNV1a(const void *Data, size Length)
-{
-    u64 Hash = 14695981039346656037ULL;
-    const u8 *Bytes = Data;
-    while (Length--) Hash = (Hash ^ *Bytes++) * 1099511628211ULL;
-    return Hash;
-}
-
 inline u64 ChunkMap_Coord(i32 x, i32 y)
 {
-    return ((u64)x & 0xFFFFFFFF)  | ((u64)y << 32);
+    return ((u64)x & 0xFFFFFFFFULL)  | ((u64)y << 32);
 }
 
 inline u64 ChunkMap_Hash(u64 Coord)
 {
-    return ChunkMap_FNV1a(&Coord, 8);
+    u64 Hash = Hash_U64(Coord);
+    return Hash;
 }
 
 inline index ChunkMap_HashIndex(const chunk_map *Map, u64 Hash)
@@ -62,12 +55,11 @@ inline u64 ChunkMap_GetIndex(const chunk_map *Map, i32 x, i32 y)
     u64 Coord = ChunkMap_Coord(x, y);
     u64 Hash = ChunkMap_Hash(Coord);
 
-    if (!Hash) Hash = 1;
     u64 Pos = ChunkMap_HashIndex(Map, Hash);
     u64 Dist = 0;
     for (;;)
     {
-        if (Map->Values[Pos].Hash == 0)
+        if (Map->Values[Pos].ChunkId == 0)
             return SIZE_MAX;
         if (Dist > ChunkMap_ProbeDist(Map, Pos))
             return SIZE_MAX;
@@ -85,7 +77,7 @@ inline void ChunkMap_RemoveIndexMasked(chunk_map *Map, u64 Index, u64 Mask)
     for (;;)
     {
         u64 Next = (Index + 1) & Mask;
-        if (Map->Values[Next].Hash == 0)
+        if (Map->Values[Next].ChunkId == 0)
             break;
         if (ChunkMap_ProbeDist(Map, Next) == 0)
             break;
@@ -109,7 +101,7 @@ inline void ChunkMap_InsertValue(chunk_map *Map, chunk_map_value Value)
     u64 Dist = 0;
     for (;;)
     {
-        if (Map->Values[Pos].Hash == 0)
+        if (Map->Values[Pos].ChunkId == 0)
         {
             Map->Count++;
             Map->Values[Pos] = Value;
@@ -143,20 +135,21 @@ inline void ChunkMap_Grow(chunk_map *Map)
     if ((((Map->Count * 100) / CHUNK_MAP_MAXLOAD_PERCENT) < Map->Capacity))
         return;
 
-    u64 OldMask = Map->Mask;
     u64 OldCapacity = Map->Capacity;
+    u64 OldMask = Map->Mask;
+    chunk_map_value *OldValues = Map->Values;
+
+    Map->Count = 0;
     Map->Capacity <<= 1;
     Map->Mask = Map->Capacity - 1;
     Map->Chunks = realloc(Map->Chunks, sizeof(chunk) * Map->Capacity);
-    Map->Values = realloc(Map->Values, sizeof(chunk_map_value) * Map->Capacity);
-    // for (ez_index i = OldCapacity; i < Map->Capacity; ++i)
-    //     Map->Values[i] = { 0 };
+    Map->Values = malloc(sizeof(chunk_map_value) * Map->Capacity);
+
     for (index i = 0; i < OldCapacity; ++i)
-    if (Map->Values[i].Hash & OldCapacity)
-    {
-        ChunkMap_InsertValue(Map, Map->Values[i]);
-        ChunkMap_RemoveIndexMasked(Map, i--, OldMask);
-    }
+        if (OldValues[i].ChunkId)
+            ChunkMap_InsertValue(Map, OldValues[i]);
+
+    free(OldValues);
 }
 
 inline void ChunkMap__ConnectChunk(chunk_map *Map, chunk *Chunk, u64 ChunkId)

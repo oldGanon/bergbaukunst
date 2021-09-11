@@ -86,6 +86,9 @@ struct palette Win32_LoadPalette(const char *);
 void Win32_SetPalette(const struct palette *);
 
 #include "math.c"
+#include "hash.c"
+#include "rng.c"
+#include "noise.c"
 #include "geom.c"
 #include "audio.c"
 #include "draw.c"
