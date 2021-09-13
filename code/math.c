@@ -214,7 +214,7 @@ inline f32 Vec2_Length(vec2 A)
 
     __m128 Shf = _mm_movehdup_ps(V);
     __m128 Sum = _mm_add_ps(V, Shf);
-    return _mm_cvtss_f32(Sum);
+    return _mm_cvtss_f32(_mm_sqrt_ss(Sum));
 }
 
 inline vec2 Vec2_Normalize(vec2 A)

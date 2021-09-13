@@ -2,10 +2,22 @@
 enum
 {
 	BIOME_OCEAN,
-	BIOME_GRAS,
-	BIOME_STONE,
-	BIOME_SAND,
+	BIOME_PLAIN,
+	BIOME_FOREST,
+	BIOME_DESERT,
+	BIOME_MOUNTAIN,
 } biome;
+
+global const u8 WorldGen_BiomeList[] = {
+	BIOME_OCEAN,
+	BIOME_OCEAN,
+	BIOME_OCEAN,
+	BIOME_OCEAN,
+	BIOME_PLAIN,
+	BIOME_FOREST,
+	BIOME_DESERT,
+	BIOME_MOUNTAIN,
+};
 
 typedef struct world_gen
 {
@@ -18,30 +30,25 @@ global world_gen GlobalWorldGen;
 
 u32 WorldGen_GetBiome(vec2 Position)
 {
-	u32 ContinentSize = 64;
-	vec2 ContinentSize2 = Vec2_Set1((f32)ContinentSize);
+	u32 BiomeSize = 64;
+	vec2 BiomeSize2 = Vec2_Set1((f32)BiomeSize);
+	vec2 BiomePosition = Vec2_Div(Position, BiomeSize2);
 
-#if 0
-	u32 Octaves = Log2(ContinentSize);
-	vec2 ContourPosition = Vec2_Div(Position, ContinentSize2);
+	u32 ContourSize = 16;
+	vec2 ContourSize2 = Vec2_Set1((f32)ContourSize);
+	vec2 ContourPosition = Vec2_Div(Position, ContourSize2);
+	u32 Octaves = Log2(ContourSize);
 	f32 ContourX = Noise_FBM2D(&GlobalWorldGen.ContourNoiseX, ContourPosition, Octaves);
 	f32 ContourY = Noise_FBM2D(&GlobalWorldGen.ContourNoiseY, ContourPosition, Octaves);
 	vec2 ContourOffset = (vec2){ ContourX, ContourY };
-	Position = Vec2_Add(Position, Vec2_Mul(ContourOffset, ContinentSize2));
+	BiomePosition = Vec2_Add(BiomePosition, Vec2_Mul(ContourOffset, Vec2_Div(ContourSize2, BiomeSize2)));
 
-	Position = Vec2_Div(Position, ContinentSize2);
-	Position = Vec2_Floor(Position);
+	voronoi_result Voronoi;
+	Noise_Voronoi(BiomePosition, &Voronoi);
 
-	vec2 Grad;
-	f32 Continent = Noise_Simplex2D(&GlobalWorldGen.ContinentNoise, Position, &Grad);
-#endif
-	u32 Octaves = Log2(ContinentSize);
-	vec2 ContourPosition = Vec2_Div(Position, ContinentSize2);
-	f32 Continent = Noise_FBM2D(&GlobalWorldGen.ContourNoiseX, ContourPosition, Octaves);
-	
-
-	if (Continent > 0.0f) return BIOME_GRAS;
-	return BIOME_OCEAN;
+	u64 BiomeIndex = Hash_IVec2(Voronoi.PointCell);
+	u32 Biome = WorldGen_BiomeList[BiomeIndex % sizeof(WorldGen_BiomeList)];
+	return Biome;
 }
 
 void WorldGen_GenerateChunk(chunk *Chunk)
@@ -51,12 +58,14 @@ void WorldGen_GenerateChunk(chunk *Chunk)
     {
         vec2 p = (vec2){ (f32)(Chunk->x * CHUNK_WIDTH + xx),
                          (f32)(Chunk->y * CHUNK_WIDTH + yy) };
-#if 0
+#if 1
         switch (WorldGen_GetBiome(p))
         {
-        	case BIOME_GRAS:  Chunk->Blocks[0][yy][xx] = (block){ .Id = BLOCK_ID_GRAS }; break;
-			case BIOME_STONE: Chunk->Blocks[0][yy][xx] = (block){ .Id = BLOCK_ID_STONE }; break;
-			case BIOME_SAND:  Chunk->Blocks[0][yy][xx] = (block){ .Id = BLOCK_ID_SAND }; break;
+			case BIOME_OCEAN: break;
+			case BIOME_PLAIN: Chunk->Blocks[0][yy][xx] = (block){ .Id = BLOCK_ID_GRAS }; break;
+			case BIOME_FOREST: Chunk->Blocks[0][yy][xx] = (block){ .Id = BLOCK_ID_GRAS }; break;
+			case BIOME_DESERT: Chunk->Blocks[0][yy][xx] = (block){ .Id = BLOCK_ID_SAND }; break;
+			case BIOME_MOUNTAIN: Chunk->Blocks[0][yy][xx] = (block){ .Id = BLOCK_ID_STONE }; break;
         }
 #else
         f32 DistanceBetweenPeaks = 128.0f;

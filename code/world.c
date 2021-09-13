@@ -73,27 +73,117 @@ void World_Update(world *World, const camera Camera)
     }
 }
 
-block World_GetBlockFromNeighborhood(world *World, const chunk *Chunk, ivec3 WorldPosition)
+
+
+typedef struct padded_chunk
 {
-    ivec2 ChunkPosition = World_ToChunkPosition(WorldPosition);
-    u64 ChunkId = Chunk->Neighbors[ChunkPosition.y + 1][ChunkPosition.x + 1];
-    if (!ChunkId) return DEFAULT_BLOCK;
-    const chunk *BlockChunk = ChunkMap_GetChunkById(&World->ChunkMap, ChunkId);
-    if (!BlockChunk) return DEFAULT_BLOCK;
-    return Chunk_GetBlock(BlockChunk, WorldPosition);
+    block Blocks[CHUNK_HEIGHT+2][CHUNK_WIDTH+2][CHUNK_WIDTH+2];
+} padded_chunk;
+
+void World_PaddedChunk(world *World, chunk *Chunk, padded_chunk *PaddedChunk)
+{
+    for (i32 y = 0; y < CHUNK_WIDTH+2; ++y)
+    for (i32 x = 0; x < CHUNK_WIDTH+2; ++x)
+    {
+        PaddedChunk->Blocks[0][y][x] = DEFAULT_HELL_BLOCK;
+        PaddedChunk->Blocks[CHUNK_HEIGHT+1][y][x] = DEFAULT_SKY_BLOCK;
+    }
+
+    for (i32 z = 0; z < CHUNK_HEIGHT; ++z)
+    for (i32 y = 0; y < CHUNK_WIDTH; ++y)
+    for (i32 x = 0; x < CHUNK_WIDTH; ++x)
+    {
+        PaddedChunk->Blocks[z+1][y+1][x+1] = Chunk->Blocks[z][y][x];
+    }
+
+    if (Chunk->Neighbors[0][0])
+    {
+        chunk *Chunk2 = ChunkMap_GetChunkById(&World->ChunkMap, Chunk->Neighbors[0][0]);
+        for (i32 z = 0; z < CHUNK_HEIGHT; ++z)
+        {
+            PaddedChunk->Blocks[z+1][0][0] = Chunk2->Blocks[z][CHUNK_WIDTH-1][CHUNK_WIDTH-1];
+        }
+    }
+
+    if (Chunk->Neighbors[0][2])
+    {
+        chunk *Chunk2 = ChunkMap_GetChunkById(&World->ChunkMap, Chunk->Neighbors[0][2]);
+        for (i32 z = 0; z < CHUNK_HEIGHT; ++z)
+        {
+            PaddedChunk->Blocks[z+1][0][CHUNK_WIDTH+1] = Chunk2->Blocks[z][CHUNK_WIDTH-1][0];
+        }
+    }
+
+    if (Chunk->Neighbors[2][0])
+    {
+        chunk *Chunk2 = ChunkMap_GetChunkById(&World->ChunkMap, Chunk->Neighbors[2][0]);
+        for (i32 z = 0; z < CHUNK_HEIGHT; ++z)
+        {
+            PaddedChunk->Blocks[z+1][CHUNK_WIDTH+1][0] = Chunk2->Blocks[z][0][CHUNK_WIDTH-1];
+        }
+    }
+
+    if (Chunk->Neighbors[2][2])
+    {
+        chunk *Chunk2 = ChunkMap_GetChunkById(&World->ChunkMap, Chunk->Neighbors[2][2]);
+        for (i32 z = 0; z < CHUNK_HEIGHT; ++z)
+        {
+            PaddedChunk->Blocks[z+1][CHUNK_WIDTH+1][CHUNK_WIDTH+1] = Chunk2->Blocks[z][0][0];
+        }
+    }
+
+    if (Chunk->Neighbors[0][1])
+    {
+        chunk *Chunk2 = ChunkMap_GetChunkById(&World->ChunkMap, Chunk->Neighbors[0][1]);
+        for (i32 z = 0; z < CHUNK_HEIGHT; ++z)
+        for (i32 x = 0; x < CHUNK_WIDTH; ++x)
+        {
+            PaddedChunk->Blocks[z+1][0][x+1] = Chunk2->Blocks[z][CHUNK_WIDTH-1][x];
+        }
+    }
+
+    if (Chunk->Neighbors[1][0])
+    {
+        chunk *Chunk2 = ChunkMap_GetChunkById(&World->ChunkMap, Chunk->Neighbors[1][0]);
+        for (i32 z = 0; z < CHUNK_HEIGHT; ++z)
+        for (i32 y = 0; y < CHUNK_WIDTH; ++y)
+        {
+            PaddedChunk->Blocks[z+1][y+1][0] = Chunk2->Blocks[z][y][CHUNK_WIDTH-1];
+        }
+    }
+
+    if (Chunk->Neighbors[2][1])
+    {
+        chunk *Chunk2 = ChunkMap_GetChunkById(&World->ChunkMap, Chunk->Neighbors[2][1]);
+        for (i32 z = 0; z < CHUNK_HEIGHT; ++z)
+        for (i32 x = 0; x < CHUNK_WIDTH; ++x)
+        {
+            PaddedChunk->Blocks[z+1][CHUNK_WIDTH+1][x+1] = Chunk2->Blocks[z][0][x];
+        }
+    }
+
+    if (Chunk->Neighbors[1][2])
+    {
+        chunk *Chunk2 = ChunkMap_GetChunkById(&World->ChunkMap, Chunk->Neighbors[1][2]);
+        for (i32 z = 0; z < CHUNK_HEIGHT; ++z)
+        for (i32 y = 0; y < CHUNK_WIDTH; ++y)
+        {
+            PaddedChunk->Blocks[z+1][y+1][CHUNK_WIDTH+1] = Chunk2->Blocks[z][y][0];
+        }
+    }
 }
 
-block_group World_GetBlockGroup(world *World, const chunk *Chunk, ivec3 WorldPosition)
+block_group PaddedChunk_GetBlockGroup(padded_chunk *Chunk, ivec3 WorldPosition)
 {
     block_group BlockGroup;
-    WorldPosition = iVec3_Sub(WorldPosition, iVec3_Set1(1));
+    // WorldPosition = iVec3_Add(WorldPosition, iVec3_Set1(1));
     for (i32 z = 0; z < 3; ++z)
     for (i32 y = 0; y < 3; ++y)
     for (i32 x = 0; x < 3; ++x)
     {
         ivec3 BlockPosition = (ivec3){ x, y, z };
         BlockPosition = iVec3_Add(BlockPosition, WorldPosition);
-        BlockGroup.Blocks[z][y][x] = World_GetBlockFromNeighborhood(World, Chunk, BlockPosition);
+        BlockGroup.Blocks[z][y][x] = Chunk->Blocks[BlockPosition.z][BlockPosition.y][BlockPosition.x];
     }
     return BlockGroup;
 }
@@ -101,6 +191,9 @@ block_group World_GetBlockGroup(world *World, const chunk *Chunk, ivec3 WorldPos
 void World_GenerateChunkMesh(world *World, chunk *Chunk)
 {
     Mesh_Clear(&Chunk->Mesh);
+
+    padded_chunk PaddedChunk = { 0 };
+    World_PaddedChunk(World, Chunk, &PaddedChunk);
 
     for (i32 z = 0; z < CHUNK_HEIGHT; ++z)
     for (i32 y = 0; y < CHUNK_WIDTH; ++y)
@@ -110,7 +203,7 @@ void World_GenerateChunkMesh(world *World, chunk *Chunk)
         block Block = Chunk_GetBlock(Chunk, iBlockPosition);
         if (Block.Id == BLOCK_ID_AIR) continue;
 
-        block_group BlockGroup = World_GetBlockGroup(World, Chunk, iBlockPosition);
+        block_group BlockGroup = PaddedChunk_GetBlockGroup(&PaddedChunk, iBlockPosition);
 
         vec3 BlockPosition = iVec3_toVec3(iBlockPosition);
         switch (Block.Id)

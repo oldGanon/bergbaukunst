@@ -477,15 +477,15 @@ noise Noise_Random(rng *Rng)
     return Noise;
 }
 
-typedef struct voronoi
+typedef struct voronoi_result
 {
     f32 PointDist;
     f32 BorderDist;
     ivec2 PointCell;
     ivec2 BorderCell;
-} voronoi;
+} voronoi_result;
 
-voronoi Noise_Voronoi(vec2 P)
+f32 Noise_Voronoi(vec2 P, voronoi_result *Result)
 {
     ivec2 N = Vec2_FloorToIVec2(P);
     vec2 F = Vec2_Fract(P);
@@ -496,9 +496,10 @@ voronoi Noise_Voronoi(vec2 P)
     for (i32 x = -2; x <= 2; ++x)
     for (i32 y = -2; y <= 2; ++y)
     {
-        ivec2 Cell = (ivec2){ .x = x, .y = y };
-        vec2 Offset = Hash_toVec2(Hash_IVec2(iVec2_Add(N, Cell)));
-        vec2 Point = Vec2_Sub(Vec2_Add(iVec2_toVec2(Cell), Offset), F);
+        ivec2 LocalCell = (ivec2){ .x = x, .y = y };
+        ivec2 Cell = iVec2_Add(N, LocalCell);
+        vec2 Offset = Hash_toVec2(Hash_IVec2(Cell));
+        vec2 Point = Vec2_Sub(Vec2_Add(iVec2_toVec2(LocalCell), Offset), F);
 
         f32 Dist = Vec2_Length(Point);
         if (Dist < MinDist)
@@ -509,28 +510,34 @@ voronoi Noise_Voronoi(vec2 P)
         }
     }
 
-    f32 MinBorderDist = 8.0f;
-    ivec2 MinBorderCell = { 0 };
-    for (i32 x = -2; x <= 2; ++x)
-    for (i32 y = -2; y <= 2; ++y)
+    if (Result)
     {
-        ivec2 Cell = (ivec2){ .x = x, .y = y };
-        vec2 Offset = Hash_toVec2(Hash_IVec2(iVec2_Add(N, Cell)));
-        vec2 Point = Vec2_Sub(Vec2_Add(iVec2_toVec2(Cell), Offset), F);
-
-        vec2 Border = Vec2_Mul(Vec2_Add(Point, MinPoint), Vec2_Set1(0.5f));
-        f32 BorderDist = Vec2_Dot(Border, Vec2_Normalize(Vec2_Sub(Point, MinPoint)));
-        if (BorderDist < MinBorderDist)
+        f32 MinBorderDist = 8.0f;
+        ivec2 MinBorderCell = { 0 };
+        for (i32 x = -2; x <= 2; ++x)
+        for (i32 y = -2; y <= 2; ++y)
         {
-            MinBorderDist = BorderDist;
-            MinBorderCell = Cell;
+            ivec2 LocalCell = (ivec2){ .x = x, .y = y };
+            ivec2 Cell = iVec2_Add(N, LocalCell);
+            vec2 Offset = Hash_toVec2(Hash_IVec2(Cell));
+            vec2 Point = Vec2_Sub(Vec2_Add(iVec2_toVec2(LocalCell), Offset), F);
+
+            vec2 Border = Vec2_Mul(Vec2_Add(Point, MinPoint), Vec2_Set1(0.5f));
+            f32 BorderDist = Vec2_Dot(Border, Vec2_Normalize(Vec2_Sub(Point, MinPoint)));
+            if (BorderDist < MinBorderDist)
+            {
+                MinBorderDist = BorderDist;
+                MinBorderCell = Cell;
+            }
         }
+
+        *Result = (voronoi_result) {
+            .PointDist = MinDist,
+            .BorderDist = MinBorderDist,
+            .PointCell = MinCell,
+            .BorderCell = MinBorderCell
+        };
     }
 
-    return (voronoi) {
-        .PointDist = MinDist,
-        .BorderDist = MinBorderDist,
-        .PointCell = MinCell,
-        .BorderCell = MinBorderCell
-    };
+    return MinDist;
 }

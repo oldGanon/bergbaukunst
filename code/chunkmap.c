@@ -245,6 +245,7 @@ void ChunkMap_DeleteChunk(chunk_map *Map, i32 x, i32 y)
 
 chunk *ChunkMap_GetChunkById(const chunk_map *Map, u64 ChunkId)
 {
+    if (!ChunkId) return 0;
     return Map->Chunks + ChunkId;
 }
 

@@ -41,13 +41,25 @@ inline u64 Hash_U64Inverse(u64 x)
 
 inline u64 Hash_U64Seeded(u64 Seed, u64 x)
 {
-    x += Seed;
+    x ^= Seed;
     x ^= x >> 30;
     x *= 0xbf58476d1ce4e5b9U;
     x ^= x >> 27;
     x *= 0x94d049bb133111ebU;
     x ^= x >> 31;
     return x;
+}
+
+inline u64 Hash_IVec2(ivec2 v)
+{
+    u64 x = ((u64)v.x << 32) | ((u64)v.y & 0xFFFFFFFFULL);
+    return Hash_U64(x);
+}
+
+inline u64 Hash_IVec2Seeded(u64 Seed, ivec2 v)
+{
+    u64 x = (((u64)v.x << 32) | ((u64)v.y & 0xFFFFFFFFULL)) ^ Seed;
+    return Hash_U64(x);
 }
 
 inline u64 Hash_Bytes(const void *Data, size Length)
@@ -74,9 +86,4 @@ inline f64 Hash_toF64(u64 Hash)
 inline vec2 Hash_toVec2(u64 Hash)
 {
     return (vec2){ .x = Hash_toF32(Hash), .y = Hash_toF32(Hash << 32) };
-}
-
-inline u64 Hash_IVec2(ivec2 v)
-{
-    return Hash_U64(((u64)v.x << 32) | ((u64)v.y & 0xFFFFFFFFULL));
 }
