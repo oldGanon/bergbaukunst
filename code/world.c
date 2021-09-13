@@ -112,7 +112,7 @@ void World_GenerateChunkMesh(world *World, chunk *Chunk)
 
         block_group BlockGroup = World_GetBlockGroup(World, Chunk, iBlockPosition);
 
-        vec3 BlockPosition = iVec3_ToVec3(iBlockPosition);
+        vec3 BlockPosition = iVec3_toVec3(iBlockPosition);
         switch (Block.Id)
         {
             case BLOCK_ID_DIRT:

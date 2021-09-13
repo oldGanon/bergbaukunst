@@ -31,7 +31,7 @@ typedef struct chunk_map_value
 
 inline u64 ChunkMap_Coord(i32 x, i32 y)
 {
-    return ((u64)x & 0xFFFFFFFFULL)  | ((u64)y << 32);
+    return ((u64)x << 32) | ((u64)y & 0xFFFFFFFFULL);
 }
 
 inline u64 ChunkMap_Hash(u64 Coord)

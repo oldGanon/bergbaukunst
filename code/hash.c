@@ -39,11 +39,44 @@ inline u64 Hash_U64Inverse(u64 x)
     return x;
 }
 
+inline u64 Hash_U64Seeded(u64 Seed, u64 x)
+{
+    x += Seed;
+    x ^= x >> 30;
+    x *= 0xbf58476d1ce4e5b9U;
+    x ^= x >> 27;
+    x *= 0x94d049bb133111ebU;
+    x ^= x >> 31;
+    return x;
+}
+
 inline u64 Hash_Bytes(const void *Data, size Length)
 {
     // FNV1a
-    u64 Hash = 14695981039346656037ULL;
+    u64 Hash = 14695981039346656037U;
     const u8 *Bytes = Data;
-    while (Length--) Hash = (Hash ^ *Bytes++) * 1099511628211ULL;
+    while (Length--) Hash = (Hash ^ *Bytes++) * 1099511628211U;
     return Hash;
+}
+
+inline f32 Hash_toF32(u64 Hash)
+{
+    const union { u32 i; f32 f; } u = { .i = (0x7FULL << 23) | (Hash >> 41) };
+    return u.f - 1.0f;
+}
+
+inline f64 Hash_toF64(u64 Hash)
+{
+    const union { u64 i; f64 f; } u = { .i = (0x3FFULL << 52) | (Hash >> 12) };
+    return u.f - 1.0;
+}
+
+inline vec2 Hash_toVec2(u64 Hash)
+{
+    return (vec2){ .x = Hash_toF32(Hash), .y = Hash_toF32(Hash << 32) };
+}
+
+inline u64 Hash_IVec2(ivec2 v)
+{
+    return Hash_U64(((u64)v.x << 32) | ((u64)v.y & 0xFFFFFFFFULL));
 }

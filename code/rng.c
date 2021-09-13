@@ -17,16 +17,17 @@ u64 Rng_U64(rng *RNG)
 
 inline f32 Rng_F32(rng *RNG)
 {
-    u64 N = Rng_U64(RNG);
-    const union { u32 i; f32 f; } u = { .i = (0x7FULL << 23) | (N >> 41) };
-    return u.f - 1.0f;
+    return  Hash_toF32(Rng_U64(RNG));
 }
 
 inline f64 Rng_F64(rng *RNG)
 {
-    u64 N = Rng_U64(RNG);
-    const union { u64 i; f64 f; } u = { .i = (0x3FFULL << 52) | (N >> 12) };
-    return u.f - 1.0;
+    return  Hash_toF64(Rng_U64(RNG));
+}
+
+inline vec2 Rng_Vec2(rng *RNG)
+{
+    return  Hash_toVec2(Rng_U64(RNG));
 }
 
 rng Rng_Init(u64 Seed)

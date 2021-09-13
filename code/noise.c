@@ -204,24 +204,25 @@ f32 Noise_Simplex2D(const noise *Noise, vec2 p, vec2 *grad)
     f32 n2 = t2_4 * v2;
 
     // derivatives
-    // f32 dn0_dx = (-8.0f * t0_3 * x0 * v0) + (t0_4 * g0.x);
-    // f32 dn0_dy = (-8.0f * t0_3 * y0 * v0) + (t0_4 * g0.y);
-    // f32 dn1_dx = (-8.0f * t0_3 * x1 * v1) + (t1_4 * g1.x);
-    // f32 dn1_dy = (-8.0f * t0_3 * y1 * v1) + (t1_4 * g1.y);
-    // f32 dn2_dx = (-8.0f * t0_3 * x2 * v2) + (t2_4 * g2.x);
-    // f32 dn3_dx = (-8.0f * t0_3 * y2 * v2) + (t2_4 * g2.y);
+    // f32 dn0_dx  = (-8.0f * x0 * t0_3 * v0) + (t0_4 * g0.x);
+    // f32 dn0_dy  = (-8.0f * y0 * t0_3 * v0) + (t0_4 * g0.y);
+    // f32 dn1_dx += (-8.0f * x1 * t0_3 * v1) + (t1_4 * g1.x);
+    // f32 dn1_dy += (-8.0f * y1 * t0_3 * v1) + (t1_4 * g1.y);
+    // f32 dn2_dx += (-8.0f * x2 * t0_3 * v2) + (t2_4 * g2.x);
+    // f32 dn3_dx += (-8.0f * y2 * t0_3 * v2) + (t2_4 * g2.y);
 
     // derivatives
     if(grad)
     {
-        *grad =                 Vec2_Mul(p0, Vec2_Set1(t0_2 * t0 * v0));
-        *grad = Vec2_Add(*grad, Vec2_Mul(p1, Vec2_Set1(t1_2 * t1 * v1)));
-        *grad = Vec2_Add(*grad, Vec2_Mul(p2, Vec2_Set1(t2_2 * t2 * v2)));
-        *grad = Vec2_Mul(*grad, Vec2_Set1(-8.0f));
-        *grad = Vec2_Add(*grad, Vec2_Mul(g0, Vec2_Set1(t0_4)));
-        *grad = Vec2_Add(*grad, Vec2_Mul(g1, Vec2_Set1(t1_4)));
-        *grad = Vec2_Add(*grad, Vec2_Mul(g2, Vec2_Set1(t2_4)));
-        *grad = Vec2_Mul(*grad, Vec2_Set1(SCALE));
+        vec2 g =        Vec2_Mul(p0, Vec2_Set1(t0_2 * t0 * v0));
+        g = Vec2_Add(g, Vec2_Mul(p1, Vec2_Set1(t1_2 * t1 * v1)));
+        g = Vec2_Add(g, Vec2_Mul(p2, Vec2_Set1(t2_2 * t2 * v2)));
+        g = Vec2_Mul(g, Vec2_Set1(-8.0f));
+        g = Vec2_Add(g, Vec2_Mul(g0, Vec2_Set1(t0_4)));
+        g = Vec2_Add(g, Vec2_Mul(g1, Vec2_Set1(t1_4)));
+        g = Vec2_Add(g, Vec2_Mul(g2, Vec2_Set1(t2_4)));
+        g = Vec2_Mul(g, Vec2_Set1(SCALE));
+        *grad = g;
     }
 
     return SCALE * (n0 + n1 + n2);
@@ -443,7 +444,6 @@ f32 Noise_Simplex4D(f32 x, f32 y, f32 z, f32 w)
 }
 #endif
 
-
 f32 Noise_FBM2D(const noise *Noise, vec2 Position, u32 Octaves)
 {
     f32 Result = 0.0f;
@@ -475,4 +475,62 @@ noise Noise_Random(rng *Rng)
         Noise.perm[i+256] = Noise.perm[i];
 
     return Noise;
+}
+
+typedef struct voronoi
+{
+    f32 PointDist;
+    f32 BorderDist;
+    ivec2 PointCell;
+    ivec2 BorderCell;
+} voronoi;
+
+voronoi Noise_Voronoi(vec2 P)
+{
+    ivec2 N = Vec2_FloorToIVec2(P);
+    vec2 F = Vec2_Fract(P);
+
+    f32 MinDist = 8.0f;
+    vec2 MinPoint = { 0 };
+    ivec2 MinCell = { 0 };
+    for (i32 x = -2; x <= 2; ++x)
+    for (i32 y = -2; y <= 2; ++y)
+    {
+        ivec2 Cell = (ivec2){ .x = x, .y = y };
+        vec2 Offset = Hash_toVec2(Hash_IVec2(iVec2_Add(N, Cell)));
+        vec2 Point = Vec2_Sub(Vec2_Add(iVec2_toVec2(Cell), Offset), F);
+
+        f32 Dist = Vec2_Length(Point);
+        if (Dist < MinDist)
+        {
+            MinDist = Dist;
+            MinPoint = Point;
+            MinCell = Cell;
+        }
+    }
+
+    f32 MinBorderDist = 8.0f;
+    ivec2 MinBorderCell = { 0 };
+    for (i32 x = -2; x <= 2; ++x)
+    for (i32 y = -2; y <= 2; ++y)
+    {
+        ivec2 Cell = (ivec2){ .x = x, .y = y };
+        vec2 Offset = Hash_toVec2(Hash_IVec2(iVec2_Add(N, Cell)));
+        vec2 Point = Vec2_Sub(Vec2_Add(iVec2_toVec2(Cell), Offset), F);
+
+        vec2 Border = Vec2_Mul(Vec2_Add(Point, MinPoint), Vec2_Set1(0.5f));
+        f32 BorderDist = Vec2_Dot(Border, Vec2_Normalize(Vec2_Sub(Point, MinPoint)));
+        if (BorderDist < MinBorderDist)
+        {
+            MinBorderDist = BorderDist;
+            MinBorderCell = Cell;
+        }
+    }
+
+    return (voronoi) {
+        .PointDist = MinDist,
+        .BorderDist = MinBorderDist,
+        .PointCell = MinCell,
+        .BorderCell = MinBorderCell
+    };
 }

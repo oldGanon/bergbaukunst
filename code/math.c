@@ -217,6 +217,19 @@ inline f32 Vec2_Length(vec2 A)
     return _mm_cvtss_f32(Sum);
 }
 
+inline vec2 Vec2_Normalize(vec2 A)
+{
+    __m128 V = LOAD_VEC2(A);
+    __m128 VV = _mm_mul_ps(V, V);
+    __m128 Shf = _mm_movehdup_ps(VV);
+    __m128 Sum = _mm_add_ps(VV, Shf);
+    Sum = _mm_shuffle_ps(Sum, Sum, _MM_SHUFFLE(0,0,0,0));
+    Sum = _mm_sqrt_ps(Sum);
+    V = _mm_div_ps(V, Sum);
+    STORE_VEC2(A, V);
+    return A;
+}
+
 inline f32 Vec2_Dot(vec2 A, vec2 B)
 {
     __m128 V = _mm_mul_ps(LOAD_VEC2(A), LOAD_VEC2(B));
@@ -257,7 +270,6 @@ inline vec3 Vec3_Modulo(vec3 N, vec3 D) { return Vec3_Sub(N, Vec3_Mul(D, Vec3_Fl
 inline f32 Vec3_Sum(vec3 A)
 {
     __m128 V = LOAD_VEC3(A);
-
     __m128 Shf = _mm_movehdup_ps(V);
     __m128 Sum = _mm_add_ps(V, Shf);
     Shf = _mm_movehl_ps(Shf, Sum);
@@ -269,7 +281,6 @@ inline f32 Vec3_LengthSq(vec3 A)
 {
     __m128 V = LOAD_VEC3(A);
     V = _mm_mul_ps(V, V);
-
     __m128 Shf = _mm_movehdup_ps(V);
     __m128 Sum = _mm_add_ps(V, Shf);
     Shf = _mm_movehl_ps(Shf, Sum);
@@ -281,7 +292,6 @@ inline f32 Vec3_Length(vec3 A)
 {
     __m128 V = LOAD_VEC3(A);
     V = _mm_mul_ps(V, V);
-
     __m128 Shf = _mm_movehdup_ps(V);
     __m128 Sum = _mm_add_ps(V, Shf);
     Shf = _mm_movehl_ps(Shf, Sum);
@@ -289,10 +299,24 @@ inline f32 Vec3_Length(vec3 A)
     return _mm_cvtss_f32(_mm_sqrt_ss(Sum));
 }
 
+inline vec3 Vec3_Normalize(vec3 A)
+{
+    __m128 V = LOAD_VEC3(A);
+    __m128 VV = _mm_mul_ps(V, V);
+    __m128 Shf = _mm_movehdup_ps(VV);
+    __m128 Sum = _mm_add_ps(VV, Shf);
+    Shf = _mm_movehl_ps(Shf, Sum);
+    Sum = _mm_add_ss(Sum, Shf);
+    Sum = _mm_shuffle_ps(Sum, Sum, _MM_SHUFFLE(0,0,0,0));
+    Sum = _mm_sqrt_ps(Sum);
+    V = _mm_div_ps(V, Sum);
+    STORE_VEC3(A, V);
+    return A;
+}
+
 inline f32 Vec3_Dot(vec3 A, vec3 B)
 {
     __m128 V = _mm_mul_ps(LOAD_VEC3(A), LOAD_VEC3(B));
-
     __m128 Shf = _mm_movehdup_ps(V);
     __m128 Sum = _mm_add_ps(V, Shf);
     Shf = _mm_movehl_ps(Shf, Sum);
@@ -333,8 +357,8 @@ inline ivec2 iVec2_Xor(ivec2 A, ivec2 B) { STORE_IVEC2(A, _mm_xor_si128(LOAD_IVE
 /******************/
 /* Vec2 <-> iVec2 */
 /******************/
-inline vec2 iVec2_ToVec2(ivec2 A) { vec2 B; STORE_VEC2(B, _mm_cvtepi32_ps(LOAD_IVEC2(A))); return B; }
-inline ivec2 Vec2_ToIVec2(vec2 A) { ivec2 B; STORE_IVEC2(B, _mm_cvtps_epi32(LOAD_VEC2(A))); return B; }
+inline vec2 iVec2_toVec2(ivec2 A) { vec2 B; STORE_VEC2(B, _mm_cvtepi32_ps(LOAD_IVEC2(A))); return B; }
+inline ivec2 Vec2_toIVec2(vec2 A) { ivec2 B; STORE_IVEC2(B, _mm_cvtps_epi32(LOAD_VEC2(A))); return B; }
 inline ivec2 Vec2_RoundToIVec2(vec2 A) { ivec2 B; STORE_IVEC2(B, _mm_cvtps_epi32(_mm_round_ps(LOAD_VEC2(A), _MM_FROUND_TO_NEAREST_INT|_MM_FROUND_NO_EXC))); return B; }
 inline ivec2 Vec2_TruncToIVec2(vec2 A) { ivec2 B; STORE_IVEC2(B, _mm_cvtps_epi32(_mm_round_ps(LOAD_VEC2(A), _MM_FROUND_TO_ZERO|_MM_FROUND_NO_EXC))); return B; }
 inline ivec2 Vec2_CeilToIVec2(vec2 A)  { ivec2 B; STORE_IVEC2(B, _mm_cvtps_epi32(_mm_ceil_ps(LOAD_VEC2(A)))); return B; }
@@ -363,8 +387,8 @@ inline ivec3 iVec3_Max(ivec3 A, ivec3 B) { STORE_IVEC3(A, _mm_max_epi32(LOAD_IVE
 /******************/
 /* Vec3 <-> iVec3 */
 /******************/
-inline vec3 iVec3_ToVec3(ivec3 A) { vec3 B; STORE_VEC3(B, _mm_cvtepi32_ps(LOAD_IVEC3(A))); return B; }
-inline ivec3 Vec3_ToIVec3(vec3 A) { ivec3 B; STORE_IVEC3(B, _mm_cvtps_epi32(LOAD_VEC3(A))); return B; }
+inline vec3 iVec3_toVec3(ivec3 A) { vec3 B; STORE_VEC3(B, _mm_cvtepi32_ps(LOAD_IVEC3(A))); return B; }
+inline ivec3 Vec3_toIVec3(vec3 A) { ivec3 B; STORE_IVEC3(B, _mm_cvtps_epi32(LOAD_VEC3(A))); return B; }
 inline ivec3 Vec3_RoundToIVec3(vec3 A) { ivec3 B; STORE_IVEC3(B, _mm_cvtps_epi32(_mm_round_ps(LOAD_VEC3(A), _MM_FROUND_TO_NEAREST_INT|_MM_FROUND_NO_EXC))); return B; }
 inline ivec3 Vec3_TruncToIVec3(vec3 A) { ivec3 B; STORE_IVEC3(B, _mm_cvtps_epi32(_mm_round_ps(LOAD_VEC3(A), _MM_FROUND_TO_ZERO|_MM_FROUND_NO_EXC))); return B; }
 inline ivec3 Vec3_CeilToIVec3(vec3 A)  { ivec3 B; STORE_IVEC3(B, _mm_cvtps_epi32(_mm_ceil_ps(LOAD_VEC3(A)))); return B; }
