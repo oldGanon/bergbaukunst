@@ -176,7 +176,6 @@ void World_PaddedChunk(world *World, chunk *Chunk, padded_chunk *PaddedChunk)
 block_group PaddedChunk_GetBlockGroup(padded_chunk *Chunk, ivec3 WorldPosition)
 {
     block_group BlockGroup;
-    // WorldPosition = iVec3_Add(WorldPosition, iVec3_Set1(1));
     for (i32 z = 0; z < 3; ++z)
     for (i32 y = 0; y < 3; ++y)
     for (i32 x = 0; x < 3; ++x)
@@ -267,57 +266,10 @@ void World_Draw(world *World, const bitmap Target, bitmap TerrainTexture, const 
     ivec2 Min = iVec2_Sub(Mid, iVec2_Set1(VIEW_DISTANCE));
     ivec2 Max = iVec2_Add(Mid, iVec2_Set1(VIEW_DISTANCE));
 
-    vec3 Forward = Camera_Forward(Camera);
-
-    if (Abs(Forward.x) < Abs(Forward.y))
+    for (i32 y = Min.y; y <= Max.y; ++y)
+    for (i32 x = Min.x; x <= Max.x; ++x)
     {
-        for (i32 y = Min.y; y < Mid.y; ++y)
-        {
-            for (i32 x = Min.x; x < Mid.x; ++x)
-            {
-                World_DrawChunk(World, x, y, Target, TerrainTexture, Camera);
-            }
-            for (i32 x = Max.x; x >= Mid.x; --x)
-            {
-                World_DrawChunk(World, x, y, Target, TerrainTexture, Camera);
-            }
-        }
-        for (i32 y = Max.y; y >= Mid.y; --y)
-        {
-            for (i32 x = Min.x; x < Mid.x; ++x)
-            {
-                World_DrawChunk(World, x, y, Target, TerrainTexture, Camera);
-            }
-            for (i32 x = Max.x; x >= Mid.x; --x)
-            {
-                World_DrawChunk(World, x, y, Target, TerrainTexture, Camera);
-            }
-        }
-    }
-    else
-    {
-        for (i32 x = Min.x; x < Mid.x; ++x)
-        {
-            for (i32 y = Min.y; y < Mid.y; ++y)
-            {
-                World_DrawChunk(World, x, y, Target, TerrainTexture, Camera);
-            }
-            for (i32 y = Max.y; y >= Mid.y; --y)
-            {
-                World_DrawChunk(World, x, y, Target, TerrainTexture, Camera);
-            }
-        }
-        for (i32 x = Max.x; x >= Mid.x; --x)
-        {
-            for (i32 y = Min.y; y < Mid.y; ++y)
-            {
-                World_DrawChunk(World, x, y, Target, TerrainTexture, Camera);
-            }
-            for (i32 y = Max.y; y >= Mid.y; --y)
-            {
-                World_DrawChunk(World, x, y, Target, TerrainTexture, Camera);
-            }
-        }
+        World_DrawChunk(World, x, y, Target, TerrainTexture, Camera);
     }
 }
 

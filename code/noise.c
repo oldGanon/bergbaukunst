@@ -105,38 +105,45 @@ inline f32 Noise_grad4(u32 hash, vec4 p)
 }
 #endif
 
-f32 Noise_Simplex1D(const noise *Noise, f32 x, f32 *grad)
+f32 Noise_Simplex1D(u64 Seed, f32 x, f32 *grad)
 {
     const f32 SCALE = 0.25f;
 
-    const u8 *perm = Noise_Default.perm;
-    if (Noise) perm = Noise->perm;
-
+    // fractional positions
     f32 xi = F32_Floor(x);
     f32 x0 = x - xi;
     f32 x1 = x0 - 1.0f;
 
-    i32 i0 = F32_FloatToI32(xi);
-    i32 i1 = i0 + 1;
+    // integer positions
+    i32 p0 = F32_FloatToI32(xi);
+    i32 p1 = p0 + 1;
 
-    f32 x02 = (x0 * x0);
-    f32 t0 = 1.0f - x02;
+    // gradients
+    f32 g0 = Noise_grad1(Hash_U32Seeded(Seed, p0));
+    f32 g1 = Noise_grad1(Hash_U32Seeded(Seed, p1));
+
+    // values
+    f32 v0 = x0 * g0;
+    f32 v1 = x1 * g1;
+
+    // interpolation values
+    f32 t0 = 1.0f - (x0 * x0);
     f32 t02 = t0 * t0;
     f32 t04 = t02 * t02;
-    f32 g0 = Noise_grad1(perm[i0 & 0xFF]);
-    f32 n0 = t04 * x0 * g0;
 
-    f32 x12 = (x1 * x1);
-    f32 t1 = 1.0f - x12;
+    f32 t1 = 1.0f - (x1 * x1);
     f32 t12 = t1 * t1;
     f32 t14 = t12 * t12;
-    f32 g1 = Noise_grad1(perm[i1 & 0xFF]);
-    f32 n1 = t14 * x1 * g1;
 
+    // simplex vertex contributions
+    f32 n0 = t04 * v0;
+    f32 n1 = t14 * v1;
+
+    // derivatives
     if (grad)
     {
-        f32 g = t02 * t0 * g0 * x02;
-            g += t12 * t1 * g1 * x12;
+        f32 g = t02 * t0 * v0 * x0;
+            g += t12 * t1 * v1 * x1;
             g *= -8.0f;
             g += t04 * g0 + t14 * g1;
             g *= SCALE;
@@ -146,22 +153,15 @@ f32 Noise_Simplex1D(const noise *Noise, f32 x, f32 *grad)
     return SCALE * (n0 + n1);
 }
 
-f32 Noise_Simplex2D(const noise *Noise, vec2 p, vec2 *grad)
+f32 Noise_Simplex2D(u64 Seed, vec2 p, vec2 *grad)
 {
     const f32 SCALE = 40.0f;
     const f32 F2 = 0.36602540378f;
     const f32 G2 = 0.2113248654f;
 
-    const u8 *perm = Noise_Default.perm;
-    if (Noise) perm = Noise->perm;
-
     // skew to regular grid coordinates
     vec2 s = Vec2_Set1(Vec2_Sum(p) * F2);
-    vec2 ps = Floor(Vec2_Add(p, s));
-
-    // simplex indices
-    u8 i = F32_FloatToI32(ps.x) & 0xFF;
-    u8 j = F32_FloatToI32(ps.y) & 0xFF;
+    vec2 ps = Vec2_Floor(Vec2_Add(p, s));
 
     // unskew to simplex grid coordinates
     vec2 u = Vec2_Set1(Vec2_Sum(ps) * G2);
@@ -169,16 +169,24 @@ f32 Noise_Simplex2D(const noise *Noise, vec2 p, vec2 *grad)
     
     // positions relative to simplex vertices 
     vec2 p0 = Vec2_Sub(p, pu);
-    u8 i1 = (p0.x > p0.y);
-    u8 j1 = i1 ^ 1;
-    vec2 ij1 = (vec2){ i1, j1 };
-    vec2 p1 = Vec2_Add(Vec2_Sub(p0, ij1), Vec2_Set1(G2));
+    ivec2 ij = (p0.x > p0.y) ? (ivec2){1,0} : (ivec2){0,1};
+    vec2 p1 = Vec2_Add(Vec2_Sub(p0, iVec2_toVec2(ij)), Vec2_Set1(G2));
     vec2 p2 = Vec2_Add(p0, Vec2_Set1(-1.0f + 2.0f * G2));
 
+    // simplex indices
+    ivec2 ip0 = Vec2_toIVec2(ps);
+    ivec2 ip1 = iVec2_Add(ip0, ij);
+    ivec2 ip2 = iVec2_Add(ip0, iVec2_Set1(1));
+
+    // hashes
+    u64 h0 = Hash_IVec2Seeded(Seed, ip0);
+    u64 h1 = Hash_IVec2Seeded(Seed, ip1);
+    u64 h2 = Hash_IVec2Seeded(Seed, ip2);
+
     // gradients
-    vec2 g0 = Noise_grad2[perm[i+   perm[j   ]] & 7];
-    vec2 g1 = Noise_grad2[perm[i+i1+perm[j+j1]] & 7];
-    vec2 g2 = Noise_grad2[perm[i+ 1+perm[j+ 1]] & 7];
+    vec2 g0 = Noise_grad2[h0 & 7];
+    vec2 g1 = Noise_grad2[h1 & 7];
+    vec2 g2 = Noise_grad2[h2 & 7];
 
     // values
     f32 v0 = Vec2_Dot(g0, p0);
@@ -444,14 +452,14 @@ f32 Noise_Simplex4D(f32 x, f32 y, f32 z, f32 w)
 }
 #endif
 
-f32 Noise_FBM2D(const noise *Noise, vec2 Position, u32 Octaves)
+f32 Noise_FBM2D(u64 Seed, vec2 Position, u32 Octaves)
 {
     f32 Result = 0.0f;
-    f32 Amplitude = 0.5f;
+    f32 Amplitude = 1.0f;
 
     for (u32 i = 0; i < Octaves; ++i)
     {
-        Result += Amplitude * Noise_Simplex2D(Noise, Position, 0);
+        Result += Amplitude * Noise_Simplex2D(Seed, Position, 0);
         Position = Vec2_Mul(Position, Vec2_Set1(2.0f));
         Amplitude *= 0.5f;
     }

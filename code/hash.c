@@ -19,6 +19,17 @@ inline u32 Hash_U32Inverse(u32 x)
     return x;
 }
 
+inline u32 Hash_U32Seeded(u64 Seed, u32 x)
+{
+    x ^= Seed >> 32;
+    x ^= x >> 16;
+    x *= 0x7feb352dU;
+    x ^= x >> 15;
+    x *= 0x846ca68bU;
+    x ^= x >> 16;
+    return x;
+}
+
 inline u64 Hash_U64(u64 x)
 {
     x ^= x >> 30;

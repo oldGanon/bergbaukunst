@@ -78,6 +78,7 @@ void Game_Update(game *Game, const input Input, f32 DeltaTime)
 
 void Game_Draw(game *Game, bitmap Buffer)
 {
+    Draw_RaserizerClear();
     Bitmap_Clear(Buffer, COLOR_SKYBLUE);
 
     World_Draw(&Game->World, Buffer, Game->Terrain, Game->Camera);

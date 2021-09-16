@@ -21,34 +21,66 @@ global const u8 WorldGen_BiomeList[] = {
 
 typedef struct world_gen
 {
-	noise ContinentNoise;
-	noise ContourNoiseX;
-	noise ContourNoiseY;
+	u64 OceanSeed;
+	u64 PlainSeed;
+	u64 ForestSeed;
+	u64 DesertSeed;
+	u64 MountainSeed;
+	u64 BiomeContourSeedX;
+	u64 BiomeContourSeedY;
 } world_gen;
 
 global world_gen GlobalWorldGen;
 
-u32 WorldGen_GetBiome(vec2 Position)
+f32 WorldGen_Noise(u64 Seed, vec2 Position, f32 Lowest, f32 Highest, f32 MaxIncline)
 {
-	u32 BiomeSize = 64;
-	vec2 BiomeSize2 = Vec2_Set1((f32)BiomeSize);
-	vec2 BiomePosition = Vec2_Div(Position, BiomeSize2);
+	f32 Period = (Highest - Lowest) / MaxIncline;
+	f32 Frequency = 1.0f / Period;
+	u32 Octaves = Log2(F32_FloorToI32(Period));
+	Position = Vec2_Mul(Position, Vec2_Set1(Frequency));
+	f32 Value = Noise_FBM2D(Seed, Position, Octaves);
+	f32 Height = Lerp(Lowest, Highest, Value * 0.5f + 0.5f);
+	return Height;
+}
 
-	u32 ContourSize = 16;
-	vec2 ContourSize2 = Vec2_Set1((f32)ContourSize);
-	vec2 ContourPosition = Vec2_Div(Position, ContourSize2);
-	u32 Octaves = Log2(ContourSize);
-	f32 ContourX = Noise_FBM2D(&GlobalWorldGen.ContourNoiseX, ContourPosition, Octaves);
-	f32 ContourY = Noise_FBM2D(&GlobalWorldGen.ContourNoiseY, ContourPosition, Octaves);
-	vec2 ContourOffset = (vec2){ ContourX, ContourY };
-	BiomePosition = Vec2_Add(BiomePosition, Vec2_Mul(ContourOffset, Vec2_Div(ContourSize2, BiomeSize2)));
+f32 WorldGen_OceanNoise(vec2 Position)
+{
+	f32 Lowest = 32.0f;
+	f32 Highest = 64.0f;
+	f32 MaxIncline = 1.0f;
+	return WorldGen_Noise(GlobalWorldGen.OceanSeed, Position, Lowest, Highest, MaxIncline);
+}
 
-	voronoi_result Voronoi;
-	Noise_Voronoi(BiomePosition, &Voronoi);
+f32 WorldGen_PlainNoise(vec2 Position)
+{
+	f32 Lowest = 64.0f;
+	f32 Highest = 72.0f;
+	f32 MaxIncline = 0.25f;
+	return WorldGen_Noise(GlobalWorldGen.PlainSeed, Position, Lowest, Highest, MaxIncline);
+}
 
-	u64 BiomeIndex = Hash_IVec2(Voronoi.PointCell);
-	u32 Biome = WorldGen_BiomeList[BiomeIndex % sizeof(WorldGen_BiomeList)];
-	return Biome;
+f32 WorldGen_ForestNoise(vec2 Position)
+{
+	f32 Lowest = 64.0f;
+	f32 Highest = 72.0f;
+	f32 MaxIncline = 0.25f;
+	return WorldGen_Noise(GlobalWorldGen.ForestSeed, Position, Lowest, Highest, MaxIncline);
+}
+
+f32 WorldGen_DesertNoise(vec2 Position)
+{
+	f32 Lowest = 64.0f;
+	f32 Highest = 72.0f;
+	f32 MaxIncline = 0.25f;
+	return WorldGen_Noise(GlobalWorldGen.DesertSeed, Position, Lowest, Highest, MaxIncline);
+}
+
+f32 WorldGen_MountainNoise(vec2 Position)
+{
+	f32 Lowest = 64.0f;
+	f32 Highest = 96.0f;
+	f32 MaxIncline = 0.25f;
+	return WorldGen_Noise(GlobalWorldGen.MountainSeed, Position, Lowest, Highest, MaxIncline);
 }
 
 void WorldGen_GenerateChunk(chunk *Chunk)
@@ -59,13 +91,76 @@ void WorldGen_GenerateChunk(chunk *Chunk)
         vec2 p = (vec2){ (f32)(Chunk->x * CHUNK_WIDTH + xx),
                          (f32)(Chunk->y * CHUNK_WIDTH + yy) };
 #if 1
-        switch (WorldGen_GetBiome(p))
+        u32 BiomeSize = 64;
+		vec2 BiomeSize2 = Vec2_Set1((f32)BiomeSize);
+		vec2 BiomePosition = Vec2_Div(p, BiomeSize2);
+
+		voronoi_result VoronoiBase;
+		Noise_Voronoi(BiomePosition, &VoronoiBase);
+
+		u32 ContourSize = 16;
+		vec2 ContourSize2 = Vec2_Set1((f32)ContourSize);
+		vec2 ContourPosition = Vec2_Div(p, ContourSize2);
+		u32 Octaves = Log2(ContourSize);
+		f32 ContourX = Noise_FBM2D(GlobalWorldGen.BiomeContourSeedX, ContourPosition, Octaves);
+		f32 ContourY = Noise_FBM2D(GlobalWorldGen.BiomeContourSeedY, ContourPosition, Octaves);
+		vec2 ContourOffset = (vec2){ ContourX, ContourY };
+		BiomePosition = Vec2_Add(BiomePosition, Vec2_Mul(ContourOffset, Vec2_Div(ContourSize2, BiomeSize2)));
+
+		voronoi_result Voronoi;
+		Noise_Voronoi(BiomePosition, &Voronoi);
+
+
+		u64 BiomeIndex = Hash_IVec2(Voronoi.PointCell);
+		u32 Biome = WorldGen_BiomeList[BiomeIndex % sizeof(WorldGen_BiomeList)];
+		u64 BorderBiomeIndex = Hash_IVec2(Voronoi.BorderCell);
+		u32 BorderBiome = WorldGen_BiomeList[BorderBiomeIndex % sizeof(WorldGen_BiomeList)];
+
+		u64 BaseBiomeIndex = Hash_IVec2(VoronoiBase.PointCell);
+		u32 BaseBiome = WorldGen_BiomeList[BaseBiomeIndex % sizeof(WorldGen_BiomeList)];
+		u64 BaseBorderBiomeIndex = Hash_IVec2(VoronoiBase.BorderCell);
+		u32 BaseBorderBiome = WorldGen_BiomeList[BaseBorderBiomeIndex % sizeof(WorldGen_BiomeList)];
+
+        block Block;
+        switch (Biome)
         {
-			case BIOME_OCEAN: break;
-			case BIOME_PLAIN: Chunk->Blocks[0][yy][xx] = (block){ .Id = BLOCK_ID_GRAS }; break;
-			case BIOME_FOREST: Chunk->Blocks[0][yy][xx] = (block){ .Id = BLOCK_ID_GRAS }; break;
-			case BIOME_DESERT: Chunk->Blocks[0][yy][xx] = (block){ .Id = BLOCK_ID_SAND }; break;
-			case BIOME_MOUNTAIN: Chunk->Blocks[0][yy][xx] = (block){ .Id = BLOCK_ID_STONE }; break;
+        	default: 			 Block = (block){ .Id = BLOCK_ID_AIR }; break;
+			case BIOME_OCEAN: 	 Block = (block){ .Id = BLOCK_ID_DIRT }; break;
+			case BIOME_PLAIN: 	 Block = (block){ .Id = BLOCK_ID_GRAS }; break;
+			case BIOME_FOREST: 	 Block = (block){ .Id = BLOCK_ID_GRAS }; break;
+			case BIOME_DESERT: 	 Block = (block){ .Id = BLOCK_ID_SAND }; break;
+			case BIOME_MOUNTAIN: Block = (block){ .Id = BLOCK_ID_STONE }; break;
+        }
+
+        f32 Surface;
+        switch (BaseBiome)
+        {
+        	default:             Surface = -1; break;
+			case BIOME_OCEAN: 	 Surface = WorldGen_OceanNoise(p); break;
+			case BIOME_PLAIN: 	 Surface = WorldGen_PlainNoise(p); break;
+			case BIOME_FOREST: 	 Surface = WorldGen_ForestNoise(p); break;
+			case BIOME_DESERT: 	 Surface = WorldGen_DesertNoise(p); break;
+			case BIOME_MOUNTAIN: Surface = WorldGen_MountainNoise(p); break;
+        }
+
+        f32 BorderSurface;
+        switch (BaseBorderBiome)
+        {
+        	default:             BorderSurface = -1; break;
+			case BIOME_OCEAN: 	 BorderSurface = WorldGen_OceanNoise(p); break;
+			case BIOME_PLAIN: 	 BorderSurface = WorldGen_PlainNoise(p); break;
+			case BIOME_FOREST: 	 BorderSurface = WorldGen_ForestNoise(p); break;
+			case BIOME_DESERT: 	 BorderSurface = WorldGen_DesertNoise(p); break;
+			case BIOME_MOUNTAIN: BorderSurface = WorldGen_MountainNoise(p); break;
+        }
+
+        f32 Blend = Clamp(VoronoiBase.BorderDist * 4+ 0.5f, 0.5f, 1.0f);
+        Surface = Lerp(BorderSurface, Surface, Blend);
+
+        i32 iSurface = F32_FloorToI32(Surface);
+        for (i32 zz = iSurface; zz >= 0; --zz)
+        {
+            Chunk->Blocks[zz][yy][xx] = Block;
         }
 #else
         f32 DistanceBetweenPeaks = 128.0f;
@@ -92,7 +187,11 @@ void WorldGen_Init(void)
 	u64 Seed = 0xDEADDEADDEADDEAD;
 	rng Rng = Rng_Init(Seed);
 
-	GlobalWorldGen.ContinentNoise = Noise_Random(&Rng);
-	GlobalWorldGen.ContourNoiseX = Noise_Random(&Rng);
-	GlobalWorldGen.ContourNoiseY = Noise_Random(&Rng);
+	GlobalWorldGen.OceanSeed = Rng_U64(&Rng);
+	GlobalWorldGen.PlainSeed = Rng_U64(&Rng);
+	GlobalWorldGen.ForestSeed = Rng_U64(&Rng);
+	GlobalWorldGen.DesertSeed = Rng_U64(&Rng);
+	GlobalWorldGen.MountainSeed = Rng_U64(&Rng);
+	GlobalWorldGen.BiomeContourSeedX = Rng_U64(&Rng);
+	GlobalWorldGen.BiomeContourSeedY = Rng_U64(&Rng);
 }

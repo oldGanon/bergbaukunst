@@ -870,21 +870,25 @@ void Draw_QuadTexturedVerts(bitmap Target, bitmap Texture, vertex A, vertex B, v
 //
 
 #define TRIANGLE_BATCH_SIZE 65536
-global struct
+typedef struct draw_rasterizer
 {
     bitmap Target;
     bitmap Texture;
 
+    f32 DepthBuffer[SCREEN_WIDTH * SCREEN_HEIGHT];
+
     u32 TriangleCount;
     vertex Triangles[TRIANGLE_BATCH_SIZE*3];
-} GlobalTriangleBatch;
+} draw_rasterizer;
+global draw_rasterizer GlobalRasterizer;
 
-void Draw_BatchRasterize()
+void Draw_BatchRasterize(void)
 {
-    bitmap Target = GlobalTriangleBatch.Target;
-    bitmap Texture = GlobalTriangleBatch.Texture;
-    vertex *Triangles = GlobalTriangleBatch.Triangles;
-    u32 TriangleCount = GlobalTriangleBatch.TriangleCount;
+    bitmap Target = GlobalRasterizer.Target;
+    bitmap Texture = GlobalRasterizer.Texture;
+    f32 *DepthBuffer = GlobalRasterizer.DepthBuffer;
+    vertex *Triangles = GlobalRasterizer.Triangles;
+    u32 TriangleCount = GlobalRasterizer.TriangleCount;
 
     __m256 ClipMinX = _mm256_setzero_ps();
     __m256 ClipMinY = _mm256_setzero_ps();
@@ -1065,10 +1069,13 @@ void Draw_BatchRasterize()
             i32 iMaxY = _mm256_cvtsi256_si32(_mm256_cvtps_epi32(_mm256_permutevar8x32_ps(MaxY, Tri8)));
 
             i32 RowPixel = iMinY * Target.Pitch + iMinX;
+            
+            i32 RowDepthPixel = iMinY * SCREEN_WIDTH + iMinX * PACK_HEIGHT;
 
             for(i32 y = iMinY; y < iMaxY; y += PACK_HEIGHT)
             {
                 i32 Pixel = RowPixel;
+                i32 DepthPixel = RowDepthPixel;
                 __m256 Alpha = F12_Row;
                 __m256 Beta  = F20_Row;
                 __m256 Gamma = F01_Row;
@@ -1081,9 +1088,17 @@ void Draw_BatchRasterize()
 
                 for(i32 x = iMinX; x < iMaxX; x += PACK_WIDTH)
                 {
-                    __m256i Mask = _mm256_srai_epi32(_mm256_castps_si256(_mm256_or_ps(_mm256_or_ps(Alpha, Beta), Gamma)), 32);
+                    __m256 Depth = _mm256_loadu_ps(DepthBuffer + DepthPixel);
+                    __m256i DepthMask = _mm256_castps_si256(_mm256_cmp_ps(ZZ, Depth, _CMP_LE_OQ));   
+                    __m256i EdgeMask = _mm256_srai_epi32(_mm256_castps_si256(_mm256_or_ps(_mm256_or_ps(Alpha, Beta), Gamma)), 32);
+                    __m256i Mask = _mm256_or_si256(DepthMask, EdgeMask);
                     if (!_mm256_test_all_ones(Mask))
                     {
+                        // depth update
+                        Depth = _mm256_blendv_ps(ZZ, Depth, _mm256_castsi256_ps(Mask));
+                        _mm256_storeu_ps(DepthBuffer + DepthPixel, Depth);
+
+                        // interpolation factors
                         __m256 ZZZ = _mm256_div_ps(One, ZZ);
                         __m256 AAA = _mm256_mul_ps(AA, ZZZ);
                         __m256 BBB = _mm256_mul_ps(BB, ZZZ);
@@ -1122,6 +1137,7 @@ void Draw_BatchRasterize()
                     }
 
                     Pixel += PACK_WIDTH;
+                    DepthPixel += PACK_WIDTH * PACK_HEIGHT;
                     Alpha = _mm256_add_ps(Alpha, F12_dx8);
                     Beta  = _mm256_add_ps(Beta,  F20_dx8);
                     Gamma = _mm256_add_ps(Gamma, F01_dx8);
@@ -1131,6 +1147,7 @@ void Draw_BatchRasterize()
                 }
 
                 RowPixel += PACK_HEIGHT * Target.Pitch;
+                RowDepthPixel += PACK_HEIGHT * SCREEN_WIDTH;
                 F12_Row = _mm256_add_ps(F12_Row, F12_dy8);
                 F20_Row = _mm256_add_ps(F20_Row, F20_dy8);
                 F01_Row = _mm256_add_ps(F01_Row, F01_dy8);
@@ -1139,19 +1156,24 @@ void Draw_BatchRasterize()
     }
 }
 
+void Draw_RaserizerClear(void)
+{
+    memset(GlobalRasterizer.DepthBuffer, 0, SCREEN_WIDTH * SCREEN_WIDTH * sizeof(f32));
+}
+
 void Draw_BatchInit(bitmap Target, bitmap Texture)
 {
-    GlobalTriangleBatch.Target = Target;
-    GlobalTriangleBatch.Texture = Texture;
-    GlobalTriangleBatch.TriangleCount = 0;
+    GlobalRasterizer.Target = Target;
+    GlobalRasterizer.Texture = Texture;
+    GlobalRasterizer.TriangleCount = 0;
 }
 
 void Draw_BatchFlush(void)
 {
-    if (GlobalTriangleBatch.TriangleCount)
+    if (GlobalRasterizer.TriangleCount)
     {
         Draw_BatchRasterize();
-        GlobalTriangleBatch.TriangleCount = 0;
+        GlobalRasterizer.TriangleCount = 0;
     }
 }
 
@@ -1162,18 +1184,18 @@ void Draw_TriangleBatched(vertex A, vertex B, vertex C)
     for (u32 i = 0; i < TriangleCount; ++i)
     {
         vertex *V = Vertices + (i * 3);
-        V[0].Position = Draw__PerspectiveDivide(GlobalTriangleBatch.Target, V[0].Position);
-        V[1].Position = Draw__PerspectiveDivide(GlobalTriangleBatch.Target, V[1].Position);
-        V[2].Position = Draw__PerspectiveDivide(GlobalTriangleBatch.Target, V[2].Position);
+        V[0].Position = Draw__PerspectiveDivide(GlobalRasterizer.Target, V[0].Position);
+        V[1].Position = Draw__PerspectiveDivide(GlobalRasterizer.Target, V[1].Position);
+        V[2].Position = Draw__PerspectiveDivide(GlobalRasterizer.Target, V[2].Position);
 
-        if (!Draw__PrepareTriangleVerts(GlobalTriangleBatch.Target, &V[0], &V[1], &V[2])) return;
+        if (!Draw__PrepareTriangleVerts(GlobalRasterizer.Target, &V[0], &V[1], &V[2])) return;
 
-        u64 Batch = GlobalTriangleBatch.TriangleCount >> 3;
-        u64 Triangle = GlobalTriangleBatch.TriangleCount & 7;
-        GlobalTriangleBatch.Triangles[Batch * 24 + Triangle +  0] = V[0];
-        GlobalTriangleBatch.Triangles[Batch * 24 + Triangle +  8] = V[1];
-        GlobalTriangleBatch.Triangles[Batch * 24 + Triangle + 16] = V[2];
-        if (++GlobalTriangleBatch.TriangleCount >= TRIANGLE_BATCH_SIZE)
+        u64 Batch = GlobalRasterizer.TriangleCount >> 3;
+        u64 Triangle = GlobalRasterizer.TriangleCount & 7;
+        GlobalRasterizer.Triangles[Batch * 24 + Triangle +  0] = V[0];
+        GlobalRasterizer.Triangles[Batch * 24 + Triangle +  8] = V[1];
+        GlobalRasterizer.Triangles[Batch * 24 + Triangle + 16] = V[2];
+        if (++GlobalRasterizer.TriangleCount >= TRIANGLE_BATCH_SIZE)
             Draw_BatchFlush();
     }
 }
