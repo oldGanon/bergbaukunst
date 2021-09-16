@@ -132,10 +132,10 @@ void Draw_QuadTexturedVerts(bitmap, const bitmap, vertex, vertex, vertex, vertex
 )(BUFFER, COLOR, X, __VA_ARGS__)
 
 // Util
-inline vec3 Draw__PerspectiveDivide(bitmap Target, vec3 Position)
+inline vec3 Draw__PerspectiveDivide(i32 Width, i32 Height, vec3 Position)
 {
-    f32 HalfWidth = Target.Width * 0.5f;
-    f32 HalfHeight = Target.Height * 0.5f;
+    f32 HalfWidth = Width * 0.5f;
+    f32 HalfHeight = Height * 0.5f;
     Position.x = (Position.x - HalfWidth) / Position.z + HalfWidth;
     Position.y = (Position.y - HalfHeight) / Position.z + HalfHeight;
     return Position;
@@ -258,7 +258,7 @@ void Draw_PointVec2(bitmap Target, color Color, vec2 Point)
 void Draw_PointVec3(bitmap Target, color Color, vec3 Point)
 {
     if (Point.z <= 0) return;
-    Point = Draw__PerspectiveDivide(Target, Point);
+    Point = Draw__PerspectiveDivide(Target.Width, Target.Height, Point);
     Bitmap_SetPixel(Target, Color, F32_FloorToI32(Point.x), F32_FloorToI32(Point.y));
 }
 
@@ -408,8 +408,8 @@ void Draw_LineVec3(bitmap Target, color Color, vec3 A, vec3 B)
     if (A.z <= CAMERA_NEAR && B.z <= CAMERA_NEAR) return;
     if (A.z <= CAMERA_NEAR) A = Vec3_Lerp(B, A, (B.z - CAMERA_NEAR) / (B.z - A.z));
     if (B.z <= CAMERA_NEAR) B = Vec3_Lerp(A, B, (A.z - CAMERA_NEAR) / (A.z - B.z));
-    A = Draw__PerspectiveDivide(Target, A);
-    B = Draw__PerspectiveDivide(Target, B);
+    A = Draw__PerspectiveDivide(Target.Width, Target.Height, A);
+    B = Draw__PerspectiveDivide(Target.Width, Target.Height, B);
     Draw_LineVec2(Target, Color, A.xy, B.xy);
 }
 
@@ -598,7 +598,7 @@ inline u32 Draw__TriangleClipZ(vertex *V)
     return 0;
 }
 
-inline bool Draw__PrepareTriangleVerts(const bitmap Target, vertex *A, vertex *B, vertex *C)
+inline bool Draw__PrepareTriangleVerts(i32 Width, i32 Height, vertex *A, vertex *B, vertex *C)
 {
     // triangle winding order
     f32 Cross = (B->Position.x - A->Position.x) * (C->Position.y - A->Position.y) - 
@@ -617,7 +617,7 @@ inline bool Draw__PrepareTriangleVerts(const bitmap Target, vertex *A, vertex *B
     
     // triangle offscreen right
     f32 MinX = Min(Min(A->Position.x, B->Position.x), C->Position.x);
-    if (MinX > (f32)Target.Width) return false;
+    if (MinX > (f32)Width) return false;
 
      // triangle offscreen bottom
     f32 MaxY = Max(Max(A->Position.y, B->Position.y), C->Position.y);
@@ -625,7 +625,7 @@ inline bool Draw__PrepareTriangleVerts(const bitmap Target, vertex *A, vertex *B
 
     // triangle offscreen top
     f32 MinY = Min(Min(A->Position.y, B->Position.y), C->Position.y);
-    if (MinY > (f32)Target.Height) return false;
+    if (MinY > (f32)Height) return false;
 
     // triangle too small
     if (Abs(Floor(MaxX) - Floor(MinX)) < 1.0f) return false;
@@ -834,11 +834,11 @@ void Draw_TriangleTexturedVerts(bitmap Target, const bitmap Texture, vertex A, v
     for (u32 i = 0; i < TriangleCount; ++i)
     {
         vertex *V = Vertices + (i * 3);
-        V[0].Position = Draw__PerspectiveDivide(Target, V[0].Position);
-        V[1].Position = Draw__PerspectiveDivide(Target, V[1].Position);
-        V[2].Position = Draw__PerspectiveDivide(Target, V[2].Position);
+        V[0].Position = Draw__PerspectiveDivide(Target.Width, Target.Height, V[0].Position);
+        V[1].Position = Draw__PerspectiveDivide(Target.Width, Target.Height, V[1].Position);
+        V[2].Position = Draw__PerspectiveDivide(Target.Width, Target.Height, V[2].Position);
 
-        if (!Draw__PrepareTriangleVerts(Target, &V[0], &V[1], &V[2])) return;
+        if (!Draw__PrepareTriangleVerts(Target.Width, Target.Height, &V[0], &V[1], &V[2])) return;
         Draw__TriangleTexturedShadedVerts3D(Target, Texture, V[0], V[1], V[2]);
     }
 }
@@ -870,39 +870,48 @@ void Draw_QuadTexturedVerts(bitmap Target, bitmap Texture, vertex A, vertex B, v
 //
 
 #define TRIANGLE_BATCH_SIZE 65536
-typedef struct draw_rasterizer
+typedef struct rasterizer
 {
-    bitmap Target;
     bitmap Texture;
 
+    u8 ColorBuffer[SCREEN_WIDTH * SCREEN_HEIGHT];
     f32 DepthBuffer[SCREEN_WIDTH * SCREEN_HEIGHT];
 
     u32 TriangleCount;
-    vertex Triangles[TRIANGLE_BATCH_SIZE*3];
-} draw_rasterizer;
-global draw_rasterizer GlobalRasterizer;
+    vertex Triangles[TRIANGLE_BATCH_SIZE * 3];
+} rasterizer;
 
-void Draw_BatchRasterize(void)
+global rasterizer GlobalRasterizer;
+
+void Raserizer_Rasterize(void)
 {
-    bitmap Target = GlobalRasterizer.Target;
     bitmap Texture = GlobalRasterizer.Texture;
+    u8 *ColorBuffer = GlobalRasterizer.ColorBuffer;
     f32 *DepthBuffer = GlobalRasterizer.DepthBuffer;
     vertex *Triangles = GlobalRasterizer.Triangles;
     u32 TriangleCount = GlobalRasterizer.TriangleCount;
 
     __m256 ClipMinX = _mm256_setzero_ps();
     __m256 ClipMinY = _mm256_setzero_ps();
-    __m256 ClipMaxX = _mm256_set1_ps((f32)Target.Width);
-    __m256 ClipMaxY = _mm256_set1_ps((f32)Target.Height);
+    __m256 ClipMaxX = _mm256_set1_ps((f32)SCREEN_WIDTH);
+    __m256 ClipMaxY = _mm256_set1_ps((f32)SCREEN_HEIGHT);
 
     _mm_setcsr(_mm_getcsr() | 0x8040);
 #define PACK_WIDTH_SHIFT 2
 #define PACK_HEIGHT_SHIFT 1
 #define PACK_WIDTH (1 << PACK_WIDTH_SHIFT)
 #define PACK_HEIGHT (1 << PACK_HEIGHT_SHIFT)
+#define PACK_WIDTH_MASK (PACK_WIDTH - 1)
+#define PACK_HEIGHT_MASK (PACK_HEIGHT - 1)
 
-    __m256 ColOffset = _mm256_setr_ps(0, 1, 2, 3, 0, 1, 2, 3);
-    __m256 RowOffset = _mm256_setr_ps(0, 0, 0, 0, 1, 1, 1, 1);
+    __m256 ColOffset = _mm256_setr_ps(0 & PACK_WIDTH_MASK, 1 & PACK_WIDTH_MASK, 
+                                      2 & PACK_WIDTH_MASK, 3 & PACK_WIDTH_MASK, 
+                                      4 & PACK_WIDTH_MASK, 5 & PACK_WIDTH_MASK,
+                                      6 & PACK_WIDTH_MASK, 7 & PACK_WIDTH_MASK);
+    __m256 RowOffset = _mm256_setr_ps(0 >> PACK_WIDTH_SHIFT, 1 >> PACK_WIDTH_SHIFT,
+                                      2 >> PACK_WIDTH_SHIFT, 3 >> PACK_WIDTH_SHIFT,
+                                      4 >> PACK_WIDTH_SHIFT, 5 >> PACK_WIDTH_SHIFT,
+                                      6 >> PACK_WIDTH_SHIFT, 7 >> PACK_WIDTH_SHIFT);
     __m256 One = _mm256_set1_ps(1);
     __m256 PackWidth8 = _mm256_set1_ps(PACK_WIDTH);
     __m256 PackHeight8 = _mm256_set1_ps(PACK_HEIGHT);
@@ -1068,8 +1077,7 @@ void Draw_BatchRasterize(void)
             i32 iMaxX = _mm256_cvtsi256_si32(_mm256_cvtps_epi32(_mm256_permutevar8x32_ps(MaxX, Tri8)));
             i32 iMaxY = _mm256_cvtsi256_si32(_mm256_cvtps_epi32(_mm256_permutevar8x32_ps(MaxY, Tri8)));
 
-            i32 RowPixel = iMinY * Target.Pitch + iMinX;
-            
+            i32 RowPixel = iMinY * SCREEN_WIDTH + iMinX;
             i32 RowDepthPixel = iMinY * SCREEN_WIDTH + iMinX * PACK_HEIGHT;
 
             for(i32 y = iMinY; y < iMaxY; y += PACK_HEIGHT)
@@ -1118,8 +1126,8 @@ void Draw_BatchRasterize(void)
                         __m256i iUU8 = _mm256_add_epi32(iUUU, _mm256_mullo_epi32(VMul, iVVV));
 
                         // gather
-                        color *Dst0 = Target.Pixels + Pixel;
-                        color *Dst1 = Dst0 + Target.Pitch;
+                        u8 *Dst0 = ColorBuffer + Pixel;
+                        u8 *Dst1 = Dst0 + SCREEN_WIDTH;
                         __m256i Dst = _mm256_set_m128i(_mm_loadu_si32(Dst1), _mm_loadu_si32(Dst0));
                         Dst = _mm256_shuffle_epi8(Dst, _mm256_set_epi8(3,3,3,3,2,2,2,2,1,1,1,1,0,0,0,0,3,3,3,3,2,2,2,2,1,1,1,1,0,0,0,0));
 
@@ -1146,7 +1154,7 @@ void Draw_BatchRasterize(void)
                     BB = _mm256_add_ps(BB, BB_dx);
                 }
 
-                RowPixel += PACK_HEIGHT * Target.Pitch;
+                RowPixel += PACK_HEIGHT * SCREEN_WIDTH;
                 RowDepthPixel += PACK_HEIGHT * SCREEN_WIDTH;
                 F12_Row = _mm256_add_ps(F12_Row, F12_dy8);
                 F20_Row = _mm256_add_ps(F20_Row, F20_dy8);
@@ -1156,39 +1164,50 @@ void Draw_BatchRasterize(void)
     }
 }
 
-void Draw_RaserizerClear(void)
+void Raserizer_Clear(color Color)
 {
-    memset(GlobalRasterizer.DepthBuffer, 0, SCREEN_WIDTH * SCREEN_WIDTH * sizeof(f32));
+    memset(GlobalRasterizer.ColorBuffer, Color.Value, SCREEN_WIDTH * SCREEN_HEIGHT * sizeof(u8));
+    memset(GlobalRasterizer.DepthBuffer, 0, SCREEN_WIDTH * SCREEN_HEIGHT * sizeof(f32));
 }
 
-void Draw_BatchInit(bitmap Target, bitmap Texture)
-{
-    GlobalRasterizer.Target = Target;
-    GlobalRasterizer.Texture = Texture;
-    GlobalRasterizer.TriangleCount = 0;
-}
-
-void Draw_BatchFlush(void)
+void Raserizer_Flush(void)
 {
     if (GlobalRasterizer.TriangleCount)
     {
-        Draw_BatchRasterize();
+        Raserizer_Rasterize();
         GlobalRasterizer.TriangleCount = 0;
     }
 }
 
-void Draw_TriangleBatched(vertex A, vertex B, vertex C)
+void Raserizer_SetTexture(bitmap Texture)
+{
+    Raserizer_Flush();
+    GlobalRasterizer.Texture = Texture;
+}
+
+void Raserizer_Blit(bitmap Target)
+{
+    if (Target.Width != SCREEN_WIDTH) return;
+    if (Target.Height != SCREEN_HEIGHT) return;
+
+    Raserizer_Flush();
+    for (u32 y = 0; y < Target.Height; ++y)
+    for (u32 x = 0; x < Target.Width; ++x)
+        Target.Pixels[y * Target.Pitch + x].Value = GlobalRasterizer.ColorBuffer[y * SCREEN_WIDTH + x];
+}
+
+void Raserizer_DrawTriangle(vertex A, vertex B, vertex C)
 {
     vertex Vertices[6] = { A, B, C };
     u32 TriangleCount = Draw__TriangleClipZ(Vertices);
     for (u32 i = 0; i < TriangleCount; ++i)
     {
         vertex *V = Vertices + (i * 3);
-        V[0].Position = Draw__PerspectiveDivide(GlobalRasterizer.Target, V[0].Position);
-        V[1].Position = Draw__PerspectiveDivide(GlobalRasterizer.Target, V[1].Position);
-        V[2].Position = Draw__PerspectiveDivide(GlobalRasterizer.Target, V[2].Position);
+        V[0].Position = Draw__PerspectiveDivide(SCREEN_WIDTH, SCREEN_HEIGHT, V[0].Position);
+        V[1].Position = Draw__PerspectiveDivide(SCREEN_WIDTH, SCREEN_HEIGHT, V[1].Position);
+        V[2].Position = Draw__PerspectiveDivide(SCREEN_WIDTH, SCREEN_HEIGHT, V[2].Position);
 
-        if (!Draw__PrepareTriangleVerts(GlobalRasterizer.Target, &V[0], &V[1], &V[2])) return;
+        if (!Draw__PrepareTriangleVerts(SCREEN_WIDTH, SCREEN_HEIGHT, &V[0], &V[1], &V[2])) return;
 
         u64 Batch = GlobalRasterizer.TriangleCount >> 3;
         u64 Triangle = GlobalRasterizer.TriangleCount & 7;
@@ -1196,14 +1215,14 @@ void Draw_TriangleBatched(vertex A, vertex B, vertex C)
         GlobalRasterizer.Triangles[Batch * 24 + Triangle +  8] = V[1];
         GlobalRasterizer.Triangles[Batch * 24 + Triangle + 16] = V[2];
         if (++GlobalRasterizer.TriangleCount >= TRIANGLE_BATCH_SIZE)
-            Draw_BatchFlush();
+            Raserizer_Flush();
     }
 }
 
-void Draw_QuadBatched(vertex A, vertex B, vertex C, vertex D)
+void Raserizer_DrawQuad(vertex A, vertex B, vertex C, vertex D)
 {
     // TODO: check convex
     // TODO: check coplanar
-    Draw_TriangleBatched(A, B, C);
-    Draw_TriangleBatched(C, D, A);
+    Raserizer_DrawTriangle(A, B, C);
+    Raserizer_DrawTriangle(C, D, A);
 }

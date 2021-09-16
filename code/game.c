@@ -78,10 +78,9 @@ void Game_Update(game *Game, const input Input, f32 DeltaTime)
 
 void Game_Draw(game *Game, bitmap Buffer)
 {
-    Draw_RaserizerClear();
-    Bitmap_Clear(Buffer, COLOR_SKYBLUE);
-
+    Raserizer_Clear(COLOR_SKYBLUE);
     World_Draw(&Game->World, Buffer, Game->Terrain, Game->Camera);
+    Raserizer_Blit(Buffer);
 
     Draw_String(Buffer, Game->Font, COLOR_WHITE, (ivec2){8,8}, "ver. 0.001a");
 

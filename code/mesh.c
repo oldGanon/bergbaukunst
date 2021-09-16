@@ -67,7 +67,7 @@ void Mesh_AddQuad(quad_mesh *Mesh, quad Quad)
 
 void Mesh_Draw(bitmap Target, const camera Camera, bitmap Texture, vec3 Position, quad_mesh *Mesh)
 {
-    Draw_BatchInit(Target, Texture);
+    Raserizer_SetTexture(Texture);
     for (u32 i = 0; i < Mesh->Count; i++) 
     {
         vertex V0 = Mesh->Quads[i].Verts[0];
@@ -80,7 +80,7 @@ void Mesh_Draw(bitmap Target, const camera Camera, bitmap Texture, vec3 Position
         V2.Position = Camera_WorldToScreen(Camera, Target, Vec3_Add(V2.Position, Position));
         V3.Position = Camera_WorldToScreen(Camera, Target, Vec3_Add(V3.Position, Position));
 
-        Draw_QuadBatched(V0, V1, V2, V3);
+        Raserizer_DrawQuad(V0, V1, V2, V3);
     }
-    Draw_BatchFlush();
+    Raserizer_Flush();
 }
