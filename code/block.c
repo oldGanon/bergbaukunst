@@ -60,11 +60,18 @@ const vec3 BlockFace_Normal[6] = {
     [BLOCK_FACE_TOP]    = { 0, 0,+1 },
 };
 
-f32 Box_TraceRay(vec3 RayOrigin, vec3 RayDirection, vec3 BoxMin, vec3 BoxMax)
+typedef struct box
+{
+    vec3 Min, Max;
+} box;
+
+#define BOX_EMPTY (box){.Min = {INFINITY,INFINITY,INFINITY},.Max = {-INFINITY,-INFINITY,-INFINITY}}
+
+f32 Box_TraceRay(vec3 RayOrigin, vec3 RayDirection, box Box)
 {
     vec3 Inverse = Inverse(RayDirection);
-    vec3 t0 = Mul(Sub(BoxMin, RayOrigin), Inverse);
-    vec3 t1 = Mul(Sub(BoxMax, RayOrigin), Inverse);
+    vec3 t0 = Mul(Sub(Box.Min, RayOrigin), Inverse);
+    vec3 t1 = Mul(Sub(Box.Max, RayOrigin), Inverse);
     vec3 tmin3 = Min(t0, t1);
     vec3 tmax3 = Max(t0, t1);
     f32 tmin = Max(Max(tmin3.x, tmin3.y), tmin3.z);
@@ -85,25 +92,47 @@ f32 Block_TraceRay(block Block, vec3 BlockPosition, vec3 RayOrigin, vec3 RayDire
 
         default:
         {
-            vec3 BlockMin = BlockPosition;
-            vec3 BlockMax = Add(BlockPosition, Vec3_Set1(1));
-            return Box_TraceRay(RayOrigin, RayDirection, BlockMin, BlockMax);
+            box BlockBox = {
+                .Min = BlockPosition,
+                .Max = Add(BlockPosition, Vec3_Set1(1))
+            };
+            return Box_TraceRay(RayOrigin, RayDirection, BlockBox);
         } break;
     }
 }
 
-bool Box_Intersect(vec3 AMin, vec3 AMax, vec3 BMin, vec3 BMax)
+bool Box_Empty(box A)
 {
-    if (AMin.x > BMax.x) return false;
-    if (AMin.y > BMax.y) return false;
-    if (AMin.z > BMax.z) return false;
-    if (BMin.x > AMax.x) return false;
-    if (BMin.y > AMax.y) return false;
-    if (BMin.z > AMax.z) return false;
+    if (A.Min.x >= A.Max.x) return true;
+    if (A.Min.y >= A.Max.y) return true;
+    if (A.Min.z >= A.Max.z) return true;
+    return false;
+}
+
+vec3 Box_Dimension(box A)
+{
+    return Vec3_Sub(A.Max, A.Min);
+}
+
+box Box_Move(box A, vec3 B)
+{
+    A.Min = Vec3_Add(A.Min, B);
+    A.Max = Vec3_Add(A.Max, B);
+    return A;
+}
+
+bool Box_Intersect(box A, box B)
+{
+    if (A.Min.x > B.Max.x) return false;
+    if (A.Min.y > B.Max.y) return false;
+    if (A.Min.z > B.Max.z) return false;
+    if (B.Min.x > A.Max.x) return false;
+    if (B.Min.y > A.Max.y) return false;
+    if (B.Min.z > A.Max.z) return false;
     return true;
 }
 
-bool Block_IntersectBox(block Block, vec3 BlockPosition, vec3 BoxMin, vec3 BoxMax)
+bool Block_BoxIntersect(block Block, vec3 BlockPosition, box Box)
 {
     if (!Block_Solid[Block.Id])
         return INFINITY;
@@ -114,9 +143,48 @@ bool Block_IntersectBox(block Block, vec3 BlockPosition, vec3 BoxMin, vec3 BoxMa
 
         default:
         {
-            vec3 BlockMin = BlockPosition;
-            vec3 BlockMax = Add(BlockPosition, Vec3_Set1(1));
-            return Box_Intersect(BlockMin, BlockMax, BoxMin, BoxMax);
+            box BlockBox = {
+                .Min = BlockPosition,
+                .Max = Add(BlockPosition, Vec3_Set1(1))
+            };
+            return Box_Intersect(BlockBox, Box);
+        } break;
+    }
+}
+
+
+box Box_Union(box A, box B)
+{
+    return (box){
+        .Min = Min(A.Min, B.Min),
+        .Max = Max(A.Max, B.Max),
+    };
+}
+
+box Box_Intersection(box A, box B)
+{
+    return (box){
+        .Min = Max(A.Min, B.Min),
+        .Max = Min(A.Max, B.Max),
+    };
+}
+
+box Block_BoxIntersection(block Block, vec3 BlockPosition, box Box)
+{
+    if (!Block_Solid[Block.Id])
+        return BOX_EMPTY;
+
+    switch (Block.Id)
+    {
+        case BLOCK_ID_AIR: return BOX_EMPTY;
+
+        default:
+        {
+            box BlockBox = {
+                .Min = BlockPosition,
+                .Max = Add(BlockPosition, Vec3_Set1(1))
+            };
+            return Box_Intersection(BlockBox, Box);
         } break;
     }
 }

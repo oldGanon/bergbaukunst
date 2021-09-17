@@ -527,6 +527,7 @@ f32 Noise_Voronoi(vec2 P, voronoi_result *Result)
         {
             ivec2 LocalCell = (ivec2){ .x = x, .y = y };
             ivec2 Cell = iVec2_Add(N, LocalCell);
+            if (Cell.x == MinCell.x && Cell.y == MinCell.y) continue;
             vec2 Offset = Hash_toVec2(Hash_IVec2(Cell));
             vec2 Point = Vec2_Sub(Vec2_Add(iVec2_toVec2(LocalCell), Offset), F);
 

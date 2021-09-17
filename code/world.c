@@ -247,6 +247,8 @@ void World_GenerateChunkMesh(world *World, chunk *Chunk)
     Chunk->MeshDirty = false;
 }
 
+
+
 void World_DrawChunk(world *World, i32 x, i32 y, const bitmap Target, bitmap TerrainTexture, const camera Camera)
 {
     chunk *Chunk = ChunkMap_GetChunk(&World->ChunkMap, x, y);
@@ -272,6 +274,8 @@ void World_Draw(world *World, const bitmap Target, bitmap TerrainTexture, const 
         World_DrawChunk(World, x, y, Target, TerrainTexture, Camera);
     }
 }
+
+
 
 inline ivec3 World_ToBlockPosition(ivec3 WorldPosition)
 {
@@ -333,6 +337,8 @@ void World_SetBlock(world *World, vec3 WorldPosition, block Block)
     if ((BlockPosition.x == CHUNK_WIDTH - 1) && (BlockPosition.y == CHUNK_WIDTH - 1))
         World_MarkChunkDirty(&World->ChunkMap, Chunk->Neighbors[2][2]);
 }
+
+
 
 f32 World_TraceRay(world *World, vec3 RayOrigin, vec3 RayDirection, f32 RayLength, trace_result *Result)
 {
@@ -397,6 +403,26 @@ f32 World_TraceRay(world *World, vec3 RayOrigin, vec3 RayDirection, f32 RayLengt
             else               LastFace = BLOCK_FACE_TOP;
         }
     }
+}
+
+box World_BoxIntersection(world *World, box Box)
+{
+    ivec3 Min = Vec3_FloorToIVec3(Box.Min);
+    ivec3 Max = Vec3_CeilToIVec3(Box.Max);
+
+    box Intersection = BOX_EMPTY;
+
+    for (i32 z = Min.z; z < Max.z; ++z)
+    for (i32 y = Min.y; y < Max.y; ++y)
+    for (i32 x = Min.x; x < Max.x; ++x)
+    {
+        ivec3 WorldPosition = { x, y, z };
+        vec3 BlockPosition = iVec3_toVec3(WorldPosition);
+        block Block = World_GetBlock(World, BlockPosition);
+        Intersection = Box_Union(Intersection, Block_BoxIntersection(Block, BlockPosition, Box));
+    }
+
+    return Intersection;
 }
 
 void Block_Highlight(bitmap Buffer, camera Camera, trace_result TraceResult)

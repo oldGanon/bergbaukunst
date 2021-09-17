@@ -165,6 +165,7 @@ inline u32 U32_Modulo(u32 N, u32 D) { return N % D; }
 /************/
 #define LOAD_VEC2(V) _mm_castpd_ps(_mm_load_sd((f64*)&V.E[0]))
 #define STORE_VEC2(V,M) _mm_store_sd((f64*)V.E,_mm_castps_pd(M))
+inline vec2 Vec2_Zero(void) { vec2 B; STORE_VEC2(B, _mm_setzero_ps()); return B; }
 inline vec2 Vec2_Set1(f32 A) { vec2 B; STORE_VEC2(B, _mm_set1_ps(A)); return B; }
 inline vec2 Vec2_Add(vec2 A, vec2 B) { STORE_VEC2(A, _mm_add_ps(LOAD_VEC2(A), LOAD_VEC2(B))); return A; }
 inline vec2 Vec2_Sub(vec2 A, vec2 B) { STORE_VEC2(A, _mm_sub_ps(LOAD_VEC2(A), LOAD_VEC2(B))); return A; }
@@ -220,6 +221,7 @@ inline f32 Vec2_Length(vec2 A)
 inline vec2 Vec2_Normalize(vec2 A)
 {
     __m128 V = LOAD_VEC2(A);
+    if (_mm_test_all_zeros(_mm_castps_si128(V), _mm_set1_epi32(0x7FFFFFFF))) return A;
     __m128 VV = _mm_mul_ps(V, V);
     __m128 Shf = _mm_movehdup_ps(VV);
     __m128 Sum = _mm_add_ps(VV, Shf);
@@ -244,6 +246,7 @@ inline f32 Vec2_Dot(vec2 A, vec2 B)
 /************/
 #define LOAD_VEC3(V) _mm_loadu_ps(V.E)
 #define STORE_VEC3(V,M) _mm_storeu_ps(V.E,M)
+inline vec3 Vec3_Zero(void) { vec3 B; STORE_VEC3(B, _mm_setzero_ps()); return B; }
 inline vec3 Vec3_Set1(f32 A) { vec3 B; STORE_VEC3(B, _mm_set1_ps(A)); return B; }
 inline vec3 Vec3_Add(vec3 A, vec3 B) { STORE_VEC3(A, _mm_add_ps(LOAD_VEC3(A), LOAD_VEC3(B))); return A; }
 inline vec3 Vec3_Sub(vec3 A, vec3 B) { STORE_VEC3(A, _mm_sub_ps(LOAD_VEC3(A), LOAD_VEC3(B))); return A; }
@@ -302,6 +305,7 @@ inline f32 Vec3_Length(vec3 A)
 inline vec3 Vec3_Normalize(vec3 A)
 {
     __m128 V = LOAD_VEC3(A);
+    if (_mm_test_all_zeros(_mm_castps_si128(V), _mm_set1_epi32(0x7FFFFFFF))) return A;
     __m128 VV = _mm_mul_ps(V, V);
     __m128 Shf = _mm_movehdup_ps(VV);
     __m128 Sum = _mm_add_ps(VV, Shf);
