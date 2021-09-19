@@ -39,6 +39,7 @@ typedef size_t index;
 #define SCREEN_HEIGHT 360 // 1080
 #define SCREEN_SCALE 2
 #define BYTES_PER_PIXEL 1
+#define UPDATES_PER_SECOND 60
 
 int _fltused = 0;
 
@@ -477,9 +478,10 @@ int WINAPI CALLBACK WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR 
     // TIMING
     LARGE_INTEGER PerfCountFrequency;
     QueryPerformanceFrequency(&PerfCountFrequency);
-    u64 TargetTimePerFrame = PerfCountFrequency.QuadPart / 60;
-    u64 TargetTimePerFrameCarry = TargetTimePerFrame + PerfCountFrequency.QuadPart % 60;
+    u64 TimePerSecond = PerfCountFrequency.QuadPart;
+    u64 TimePerUpdate = TimePerSecond / UPDATES_PER_SECOND;
     u64 LastTime = Win32_GetTime();
+    u64 LastInputTime = LastTime;
 
     // GAME STATE
     input Input = { 0 };
@@ -595,12 +597,24 @@ int WINAPI CALLBACK WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR 
 
         if (GlobalFocus)
         {
+            // INPUT
+            u64 InputTimeElapsed = Win32_TimeSince(LastTime);
+            LastInputTime += InputTimeElapsed;
+            Game_Input(Game, Input, (f32)InputTimeElapsed / TimePerSecond);
+
             // UPDATE
-            Game_Update(Game, Input, 1.0f/60.0f);
+            u64 TimeElapsed = Win32_TimeSince(LastTime);
+            while (TimeElapsed >= TimePerUpdate)
+            {
+                TimeElapsed -= TimePerUpdate;
+                LastTime += TimePerUpdate;
+                Game_Update(Game, Input, (f32)TimePerUpdate / TimePerSecond);
+            }
 
             // DRAW
-            Game_Draw(Game, GlobalBackbuffer);
+            Game_Draw(Game, GlobalBackbuffer, (f32)TimeElapsed / TimePerSecond);
             
+            // BLIT
             HDC DeviceContext = GetDC(GlobalWindow);
             Win32_DisplayBitmap(DeviceContext);
             ReleaseDC(GlobalWindow, DeviceContext);
@@ -608,17 +622,8 @@ int WINAPI CALLBACK WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR 
             // AUDIO
             Win32_GatherSamples(AudioCursor);
 
-            // TIMING
-            Game->Frame++;
-            u64 Target = (Game->Frame % 60) ?  TargetTimePerFrame : TargetTimePerFrameCarry;
-            u64 TimeElapsed = Win32_TimeSince(LastTime);
-            if (TimeElapsed < Target)
-            {
-                // Sleep((DWORD)(1000 * (Target - TimeElapsed) / PerfCountFrequency.QuadPart));
-                Sleep(1);
-                while (TimeElapsed < Target) TimeElapsed = Win32_TimeSince(LastTime);
-            }
-            LastTime += TimeElapsed;
+            // SLEEP
+            // Sleep(1);
         }
     }
 

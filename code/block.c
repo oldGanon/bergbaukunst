@@ -123,12 +123,12 @@ box Box_Move(box A, vec3 B)
 
 bool Box_Intersect(box A, box B)
 {
-    if (A.Min.x > B.Max.x) return false;
-    if (A.Min.y > B.Max.y) return false;
-    if (A.Min.z > B.Max.z) return false;
-    if (B.Min.x > A.Max.x) return false;
-    if (B.Min.y > A.Max.y) return false;
-    if (B.Min.z > A.Max.z) return false;
+    if (A.Min.x >= B.Max.x) return false;
+    if (A.Min.y >= B.Max.y) return false;
+    if (A.Min.z >= B.Max.z) return false;
+    if (B.Min.x >= A.Max.x) return false;
+    if (B.Min.y >= A.Max.y) return false;
+    if (B.Min.z >= A.Max.z) return false;
     return true;
 }
 

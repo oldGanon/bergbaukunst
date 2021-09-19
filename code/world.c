@@ -11,7 +11,7 @@ void WorldGen_GenerateChunk(chunk *Chunk);
 #include "chunkmap.c"
 #include "worldgen.c"
 
-#define LOADED_CHUNKS 2
+#define LOADED_CHUNKS 32
 #define VIEW_DISTANCE 2
 
 typedef struct entity
@@ -425,19 +425,64 @@ box World_BoxIntersection(world *World, box Box)
     return Intersection;
 }
 
-void Block_Highlight(bitmap Buffer, camera Camera, trace_result TraceResult)
+void Block_HighlightFace(bitmap Buffer, camera Camera, trace_result TraceResult)
 {
-    vec3 BlockCorner = Vec3_Floor(TraceResult.BlockPosition);
+    vec3 BlockPosition = Vec3_Floor(TraceResult.BlockPosition);
 
-    Draw_Line(Buffer, COLOR_WHITE, Camera_WorldToScreen(Camera, Buffer, BlockCorner),
-                                   Camera_WorldToScreen(Camera, Buffer, (vec3) { BlockCorner.x + 1, BlockCorner.y, BlockCorner.z }));
+    vec3 Corners[8] = {
+        Camera_WorldToScreen(Camera, Buffer, BlockPosition),
+        Camera_WorldToScreen(Camera, Buffer, Vec3_Add(BlockPosition, (vec3) { 1, 0, 0 })),
+        Camera_WorldToScreen(Camera, Buffer, Vec3_Add(BlockPosition, (vec3) { 0, 1, 0 })),
+        Camera_WorldToScreen(Camera, Buffer, Vec3_Add(BlockPosition, (vec3) { 1, 1, 0 })),
+        Camera_WorldToScreen(Camera, Buffer, Vec3_Add(BlockPosition, (vec3) { 0, 0, 1 })),
+        Camera_WorldToScreen(Camera, Buffer, Vec3_Add(BlockPosition, (vec3) { 1, 0, 1 })),
+        Camera_WorldToScreen(Camera, Buffer, Vec3_Add(BlockPosition, (vec3) { 0, 1, 1 })),
+        Camera_WorldToScreen(Camera, Buffer, Vec3_Add(BlockPosition, (vec3) { 1, 1, 1 })),
+    };
 
-    Draw_Line(Buffer, COLOR_WHITE, Camera_WorldToScreen(Camera, Buffer, BlockCorner),
-                                   Camera_WorldToScreen(Camera, Buffer, (vec3) { BlockCorner.x, BlockCorner.y, BlockCorner.z + 1 }));
-
-    Draw_Line(Buffer, COLOR_WHITE, Camera_WorldToScreen(Camera, Buffer, (vec3) { BlockCorner.x + 1, BlockCorner.y, BlockCorner.z}),
-                                   Camera_WorldToScreen(Camera, Buffer, (vec3) { BlockCorner.x + 1, BlockCorner.y, BlockCorner.z + 1 }));
-
-    Draw_Line(Buffer, COLOR_WHITE, Camera_WorldToScreen(Camera, Buffer, (vec3) { BlockCorner.x + 1, BlockCorner.y, BlockCorner.z + 1 }),
-                                   Camera_WorldToScreen(Camera, Buffer, (vec3) { BlockCorner.x    , BlockCorner.y, BlockCorner.z + 1 }));
+    switch (TraceResult.BlockFace)
+    {
+        case BLOCK_FACE_LEFT:
+        {
+            Draw_Line(Buffer, COLOR_WHITE, Corners[0], Corners[2]);
+            Draw_Line(Buffer, COLOR_WHITE, Corners[2], Corners[6]);
+            Draw_Line(Buffer, COLOR_WHITE, Corners[6], Corners[4]);
+            Draw_Line(Buffer, COLOR_WHITE, Corners[4], Corners[0]);
+        } break;
+        case BLOCK_FACE_RIGHT:
+        {
+            Draw_Line(Buffer, COLOR_WHITE, Corners[1], Corners[3]);
+            Draw_Line(Buffer, COLOR_WHITE, Corners[3], Corners[7]);
+            Draw_Line(Buffer, COLOR_WHITE, Corners[7], Corners[5]);
+            Draw_Line(Buffer, COLOR_WHITE, Corners[5], Corners[1]);
+        } break;
+        case BLOCK_FACE_FRONT:
+        {
+            Draw_Line(Buffer, COLOR_WHITE, Corners[0], Corners[1]);
+            Draw_Line(Buffer, COLOR_WHITE, Corners[1], Corners[5]);
+            Draw_Line(Buffer, COLOR_WHITE, Corners[5], Corners[4]);
+            Draw_Line(Buffer, COLOR_WHITE, Corners[4], Corners[0]);
+        } break;
+        case BLOCK_FACE_BACK:
+        {
+            Draw_Line(Buffer, COLOR_WHITE, Corners[2], Corners[3]);
+            Draw_Line(Buffer, COLOR_WHITE, Corners[3], Corners[7]);
+            Draw_Line(Buffer, COLOR_WHITE, Corners[7], Corners[6]);
+            Draw_Line(Buffer, COLOR_WHITE, Corners[6], Corners[2]);
+        } break;
+        case BLOCK_FACE_BOTTOM:
+        {
+            Draw_Line(Buffer, COLOR_WHITE, Corners[0], Corners[1]);
+            Draw_Line(Buffer, COLOR_WHITE, Corners[1], Corners[3]);
+            Draw_Line(Buffer, COLOR_WHITE, Corners[3], Corners[2]);
+            Draw_Line(Buffer, COLOR_WHITE, Corners[2], Corners[0]);
+        } break;
+        case BLOCK_FACE_TOP:
+        {
+            Draw_Line(Buffer, COLOR_WHITE, Corners[4], Corners[5]);
+            Draw_Line(Buffer, COLOR_WHITE, Corners[5], Corners[7]);
+            Draw_Line(Buffer, COLOR_WHITE, Corners[7], Corners[6]);
+            Draw_Line(Buffer, COLOR_WHITE, Corners[6], Corners[4]);
+        } break;
+    }
 }

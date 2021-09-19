@@ -559,8 +559,8 @@ inline vertex Vertex_Lerp(vertex A, vertex B, f32 t)
 
 inline u32 Draw__TriangleClipZ(vertex *V)
 {
-    if (Max(Max(V[0].Position.z, V[1].Position.z), V[2].Position.z) > CAMERA_FAR)
-        return 0;
+    // if (Max(Max(V[0].Position.z, V[1].Position.z), V[2].Position.z) > CAMERA_FAR)
+    //     return 0;
 
     vertex T;
     u32 Z = ((V[0].Position.z < CAMERA_NEAR) ? 1 : 0) |

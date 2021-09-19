@@ -57,27 +57,25 @@ void Game_Init(game *Game)
     };
 }
 
+void Game_Input(game *Game, const input Input, f32 DeltaTime)
+{
+    if (Input.NoClip)
+        Game->Player.NoClip = !Game->Player.NoClip;
+
+    Player_Input(&Game->Player, &Game->World, Input, DeltaTime);
+}
+
 void Game_Update(game *Game, const input Input, f32 DeltaTime)
 {
-    camera *Camera = &Game->Camera;
-
-    f32 Speed = 0.25f;
-
-    if (Input.NoClip)
-    {
-        Game->Player.NoClip = !Game->Player.NoClip;
-    }
-
-    Player_Update(&Game->Player, Input, &Game->World, DeltaTime);
-
-    Camera_SetPosition(Camera, Game->Player.Position);
-    Camera_SetRotation(Camera, Game->Player.Yaw, Game->Player.Pitch);
-
+    ++Game->Frame;
+    Player_Update(&Game->Player, &Game->World, DeltaTime);
     World_Update(&Game->World, Game->Camera);
 }
 
-void Game_Draw(game *Game, bitmap Buffer)
+void Game_Draw(game *Game, bitmap Buffer, f32 DeltaTime)
 {
+    Player_Draw(&Game->Player, &Game->World, &Game->Camera, DeltaTime);
+
     Raserizer_Clear(COLOR_SKYBLUE);
     World_Draw(&Game->World, Buffer, Game->Terrain, Game->Camera);
     Raserizer_Blit(Buffer);
@@ -96,7 +94,7 @@ void Game_Draw(game *Game, bitmap Buffer)
     trace_result TraceResult;
     if (World_TraceRay(&Game->World, Game->Camera.Position, Camera_Direction(Game->Camera), 5.0f, &TraceResult) < 5.0f)
     {
-        Block_Highlight(Buffer, Game->Camera, TraceResult);
+        Block_HighlightFace(Buffer, Game->Camera, TraceResult);
     }
 
     ivec2 Center = (ivec2) { Buffer.Width / 2, Buffer.Height / 2 };
@@ -104,7 +102,4 @@ void Game_Draw(game *Game, bitmap Buffer)
     Draw_RectIVec2(Buffer, COLOR_WHITE, iVec2_Add(Center, (ivec2){-1, 1 }), (ivec2){ 2, 4 });
     Draw_RectIVec2(Buffer, COLOR_WHITE, iVec2_Add(Center, (ivec2){-5,-1 }), (ivec2){ 4, 2 });
     Draw_RectIVec2(Buffer, COLOR_WHITE, iVec2_Add(Center, (ivec2){ 1,-1 }), (ivec2){ 4, 2 });
-    
-    // Draw_RectIVec2(Buffer, COLOR_BLACK, (ivec2) { Buffer.Width / 2 - 1, Buffer.Height / 2 - 1}, (ivec2) {1, 1});
-    //Draw_RectInt(Buffer, COLOR_BLACK, Buffer.Width/2 - 3, Buffer.Height / 2 - 3, 5, 5 );
 }
