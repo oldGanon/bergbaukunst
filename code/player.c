@@ -227,14 +227,21 @@ void Player_Update(player *Player, input Input, world *World,  f32 DeltaTime)
         {
             vec3 PlacePosition = TraceResult.FreePosition;
 
-            vec3 PlayerBlock = Vec3_Floor(Player->Position);
-            if (!(PlayerBlock.x == PlacePosition.x &&
-                PlayerBlock.y == PlacePosition.y &&
-               (PlayerBlock.z == PlacePosition.z ||
-                PlayerBlock.z - 1 == PlacePosition.z)))
+            box PlayerBox = {
+            .Min = Vec3_Sub(Player->Position, (vec3) { 0.25f, 0.25f, 1.85f }),
+            .Max = Vec3_Add(Player->Position, (vec3) { 0.25f, 0.25f, 0.15f }),
+            };
+
+            box BlockBox  = {
+                .Min = { PlacePosition.x, PlacePosition.y, PlacePosition.z + 0.01 },
+                .Max = { PlacePosition.x + 1, PlacePosition.y + 1, PlacePosition.z + 1 - 0.01 },
+            };
+
+            if (!Box_Intersect(PlayerBox, BlockBox))
             {
-                World_SetBlock(World, PlacePosition, (block){ .Id = BLOCK_ID_GRAS });
+                World_SetBlock(World, PlacePosition, (block) { .Id = BLOCK_ID_GRAS });
             }
+
         }
     }
 }

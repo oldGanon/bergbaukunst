@@ -11,8 +11,8 @@ void WorldGen_GenerateChunk(chunk *Chunk);
 #include "chunkmap.c"
 #include "worldgen.c"
 
-#define LOADED_CHUNKS 32
-#define VIEW_DISTANCE 12
+#define LOADED_CHUNKS 2
+#define VIEW_DISTANCE 2
 
 typedef struct entity
 {
