@@ -26,8 +26,6 @@ typedef struct input
 
 typedef struct game
 {
-    u64 Frame;
-
     /* RESOURCES */
     palette Palette;
     bitmap Terrain;
@@ -37,7 +35,6 @@ typedef struct game
     player Player;
     world World;
 } game;
-
 
 void Game_Init(game *Game)
 {
@@ -59,15 +56,13 @@ void Game_Init(game *Game)
 
 void Game_Input(game *Game, const input Input, f32 DeltaTime)
 {
-    if (Input.NoClip)
-        Game->Player.NoClip = !Game->Player.NoClip;
+    if (Input.NoClip) Game->Player.NoClip = !Game->Player.NoClip;
 
     Player_Input(&Game->Player, &Game->World, Input, DeltaTime);
 }
 
 void Game_Update(game *Game, const input Input, f32 DeltaTime)
 {
-    ++Game->Frame;
     Player_Update(&Game->Player, &Game->World, DeltaTime);
     World_Update(&Game->World, Game->Camera);
 }

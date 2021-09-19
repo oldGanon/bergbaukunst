@@ -102,14 +102,12 @@ void Player_Input(player *Player, world *World, input Input, f32 DeltaTime)
 #define KEY_SENSITIVITY 0.05f
 #define MOUSE_SENSITIVITY (1.0f / 3500.0f)
 
-#define GRAVITY       25.0f
-#define JUMP_SPEED     8.0f
-#define STOP_SPEED     4.0f
-#define NO_CLIP_SPEED 10.0f
-
-#define ACCELERATION    10.0f
+#define GRAVITY         25.0f
+#define JUMP_SPEED       8.0f
+#define NO_CLIP_SPEED   10.0f
 #define GROUND_SPEED    10.0f
 #define AIR_SPEED        2.5f
+#define ACCELERATION    10.0f
 #define GROUND_FRICTION 10.0f
 #define AIR_FRICTION     0.0f
 
@@ -177,7 +175,7 @@ void Player_Input(player *Player, world *World, input Input, f32 DeltaTime)
         {
             World_SetBlock(World, TraceResult.BlockPosition, (block) { 0 });
         }
-        Player->Cooldown = 0.5f;
+        Player->Cooldown = 0.125f;
     }
 
     if (Input.Place && (Player->Cooldown == 0))
@@ -195,7 +193,7 @@ void Player_Input(player *Player, world *World, input Input, f32 DeltaTime)
             }
 
         }
-        Player->Cooldown = 0.5f;
+        Player->Cooldown = 0.125f;
     }
 }
 

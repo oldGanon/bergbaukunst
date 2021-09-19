@@ -598,7 +598,7 @@ int WINAPI CALLBACK WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR 
         if (GlobalFocus)
         {
             // INPUT
-            u64 InputTimeElapsed = Win32_TimeSince(LastTime);
+            u64 InputTimeElapsed = Win32_TimeSince(LastInputTime);
             LastInputTime += InputTimeElapsed;
             Game_Input(Game, Input, (f32)InputTimeElapsed / TimePerSecond);
 
