@@ -1,13 +1,19 @@
 
 typedef struct player
 {
+    // physics
     vec3 Position;
     vec3 Velocity;
     vec3 Acceleration;
-    bool OnGround;
-    bool Jump;
-    f32 Cooldown;
 
+    // input
+    vec3 MoveDir;
+    bool Jump;
+    bool Crouch;
+
+    // state
+    bool OnGround;
+    f32 Cooldown;
     f32 Yaw, Pitch;
     bool NoClip;
 } player;
@@ -45,56 +51,19 @@ box Player_Box(player *Player)
     };
 }
 
+vec3 Player_CheckMove(player *Player, world *World, vec3 Move)
+{
+    return World_CheckMoveBox(World, Player_Box(Player), Move);
+}
+
 void Player_Move(player *Player, world *World, vec3 Move)
 {
-    {
-        box PlayerBox = Player_Box(Player);
-        box MoveBox = PlayerBox;
-        if (Move.x < 0) { MoveBox.Max.x = MoveBox.Min.x; MoveBox.Min.x += Move.x;}
-        if (Move.x > 0) { MoveBox.Min.x = MoveBox.Max.x; MoveBox.Max.x += Move.x;}
-        box CollisionBox = World_BoxIntersection(World, MoveBox);
-        if (!Box_Empty(CollisionBox))
-        {
-            if (Move.x < 0) Move.x = CollisionBox.Max.x - PlayerBox.Min.x;
-            if (Move.x > 0) Move.x = CollisionBox.Min.x - PlayerBox.Max.x;
-            Player->Velocity.x = 0;
-        }
-        Player->Position.x += Move.x;
-    }
-
-    {
-        box PlayerBox = Player_Box(Player);
-        box MoveBox = PlayerBox;
-        if (Move.y < 0) { MoveBox.Max.y = MoveBox.Min.y; MoveBox.Min.y += Move.y; }
-        if (Move.y > 0) { MoveBox.Min.y = MoveBox.Max.y; MoveBox.Max.y += Move.y; }
-        box CollisionBox = World_BoxIntersection(World, MoveBox);
-        if (!Box_Empty(CollisionBox))
-        {
-            if (Move.y < 0) Move.y = CollisionBox.Max.y - PlayerBox.Min.y;
-            if (Move.y > 0) Move.y = CollisionBox.Min.y - PlayerBox.Max.y;
-            Player->Velocity.y = 0;
-        }
-        Player->Position.y += Move.y;
-    }
-
-    {
-        box PlayerBox = Player_Box(Player);
-        box MoveBox = PlayerBox;
-        if (Move.z < 0) { MoveBox.Max.z = MoveBox.Min.z; MoveBox.Min.z += Move.z; }
-        if (Move.z > 0) { MoveBox.Min.z = MoveBox.Max.z; MoveBox.Max.z += Move.z; }
-        box CollisionBox = World_BoxIntersection(World, MoveBox);
-        if (!Box_Empty(CollisionBox))
-        {
-            if (Move.z < 0)
-            {
-                Player->OnGround = true;
-                Move.z = CollisionBox.Max.z - PlayerBox.Min.z;
-            }
-            if (Move.z > 0) Move.z = CollisionBox.Min.z - PlayerBox.Max.z;
-            Player->Velocity.z = 0;
-        }
-        Player->Position.z += Move.z;
-    }
+    vec3 CheckMove = Player_CheckMove(Player, World, Move);
+    if (Abs(CheckMove.x) < Abs(Move.x)) Player->Velocity.x = 0;
+    if (Abs(CheckMove.y) < Abs(Move.y)) Player->Velocity.y = 0;
+    if (Abs(CheckMove.z) < Abs(Move.z)) Player->Velocity.z = 0;
+    if (CheckMove.z > Move.z) Player->OnGround = true;
+    Player->Position = Vec3_Add(Player->Position, CheckMove);
 }
 
 void Player_Input(player *Player, world *World, input Input, f32 DeltaTime)
@@ -124,64 +93,37 @@ void Player_Input(player *Player, world *World, input Input, f32 DeltaTime)
     // Move Direction
     vec3 Forward = Player_Forward(Player);
     vec3 Right = Player_Right(Player);
-    vec3 WishDir = { 0 };
+    Player->MoveDir = Vec3_Zero();
     if (Input.MoveForward)
-        WishDir = Vec3_Add(WishDir, Forward);
+        Player->MoveDir = Vec3_Add(Player->MoveDir, Forward);
     if (Input.MoveBack)
-        WishDir = Vec3_Sub(WishDir, Forward);
+        Player->MoveDir = Vec3_Sub(Player->MoveDir, Forward);
     if (Input.MoveRight)
-        WishDir = Vec3_Add(WishDir, Right);
+        Player->MoveDir = Vec3_Add(Player->MoveDir, Right);
     if (Input.MoveLeft)
-        WishDir = Vec3_Sub(WishDir, Right);
-    WishDir = Vec3_Normalize(WishDir);
-
-    if (Player->NoClip)
-    {
-        Player->Acceleration = Vec3_Zero();
-        Player->Velocity = Vec3_Mul(WishDir, Vec3_Set1(NO_CLIP_SPEED));
-        if (Input.Jump) Player->Velocity.z += NO_CLIP_SPEED;
-        if (Input.Crouch) Player->Velocity.z -= NO_CLIP_SPEED;
-    }
-    else
-    {
-        // Accelerate
-        Player->Acceleration = Vec3_Zero();
-        f32 WishSpeed = (Player->OnGround) ? GROUND_SPEED : AIR_SPEED;
-        f32 CurrentSpeed = Vec3_Dot(Player->Velocity, WishDir);
-        f32 AddSpeed = WishSpeed - CurrentSpeed;
-        if (AddSpeed > 0)
-        {
-            AddSpeed *= ACCELERATION;
-            Player->Acceleration = Vec3_Add(Player->Acceleration, Vec3_Mul(WishDir, Vec3_Set1(AddSpeed)));
-        }
-
-        // Friction
-        f32 Friction  = (Player->OnGround) ? GROUND_FRICTION : AIR_FRICTION;
-        Player->Acceleration = Vec3_Add(Player->Acceleration, Vec3_Mul(Player->Velocity, Vec3_Set1(-Friction)));
-        
-        // Gravity
-        Player->Acceleration.z -= GRAVITY;
-
-        // Jump
-        Player->Jump = Input.Jump;
-    }
+        Player->MoveDir = Vec3_Sub(Player->MoveDir, Right);
+    Player->MoveDir = Vec3_Normalize(Player->MoveDir);
+    Player->Jump = Input.Jump;
+    Player->Crouch = Input.Crouch;
 
     Player->Cooldown = Max(0.0f, Player->Cooldown - DeltaTime);
+
+    f32 Reach = 5.0f;
 
     if (Input.Punch && (Player->Cooldown == 0))
     {
         trace_result TraceResult;
-        if (World_TraceRay(World, Player->Position, Player_ViewDirection(Player), 5.0f, &TraceResult) < 5.0f)
+        if (World_TraceRay(World, Player->Position, Player_ViewDirection(Player), Reach, &TraceResult) < Reach)
         {
             World_SetBlock(World, TraceResult.BlockPosition, (block) { 0 });
         }
         Player->Cooldown = 0.125f;
     }
 
-    if (Input.Place && (Player->Cooldown == 0))
+    if (Input.Use && (Player->Cooldown == 0))
     {
         trace_result TraceResult;
-        if (World_TraceRay(World, Player->Position, Player_ViewDirection(Player), 5.0f, &TraceResult) < 5.0f)
+        if (World_TraceRay(World, Player->Position, Player_ViewDirection(Player), Reach, &TraceResult) < Reach)
         {
             block Block = (block){ .Id = BLOCK_ID_GRAS };
             vec3 PlacePosition = TraceResult.FreePosition;
@@ -201,18 +143,44 @@ void Player_Update(player *Player, world *World, f32 DeltaTime)
 {
     if (Player->NoClip)
     {
-        Player->Position = Vec3_Add(Player->Position, Vec3_Mul(Player->Velocity, Vec3_Set1(DeltaTime)));
+        Player->Acceleration = Vec3_Zero();
+        Player->Velocity = Vec3_Zero();
+        vec3 Move = Vec3_Mul(Player->MoveDir, Vec3_Set1(NO_CLIP_SPEED));
+        if (Player->Jump) Move.z += NO_CLIP_SPEED;
+        if (Player->Crouch) Move.z -= NO_CLIP_SPEED;
+        Player->Position = Vec3_Add(Player->Position, Vec3_Mul(Move, Vec3_Set1(DeltaTime)));
     }
     else
     {
-        // Jump
-        if (Player->Jump && Player->OnGround)
+        // Acceleration
+        Player->Acceleration = Vec3_Zero();
+        f32 WishSpeed = (Player->OnGround) ? GROUND_SPEED : AIR_SPEED;
+        f32 CurrentSpeed = Vec3_Dot(Player->Velocity, Player->MoveDir);
+        f32 AddSpeed = WishSpeed - CurrentSpeed;
+        if (AddSpeed > 0)
         {
-            Player->Jump = false;
-            if (Player->Velocity.z < JUMP_SPEED)
-                Player->Velocity.z = JUMP_SPEED;
+            AddSpeed *= ACCELERATION;
+            Player->Acceleration = Vec3_Mul(Player->MoveDir, Vec3_Set1(AddSpeed));
         }
-        Player->OnGround = false;
+
+        // Gravity
+        Player->Acceleration.z -= GRAVITY;
+
+        if (Player->OnGround)
+        {
+            // Friction
+            vec3 Friction = Vec3_Mul(Player->Velocity, Vec3_Set1(-GROUND_FRICTION));
+            Player->Acceleration = Vec3_Add(Player->Acceleration, Friction);
+            
+            // Jump
+            if (Player->Jump && Player->OnGround)
+            {
+                Player->Jump = false;
+                if (Player->Velocity.z < JUMP_SPEED)
+                    Player->Velocity.z = JUMP_SPEED;
+            }
+            Player->OnGround = false;
+        }
 
         // Move
         vec3 AddVelocity = Vec3_Mul(Player->Acceleration, Vec3_Set1(DeltaTime));
@@ -224,7 +192,11 @@ void Player_Update(player *Player, world *World, f32 DeltaTime)
 
 void Player_Draw(player *Player, world *World, camera *Camera, f32 DeltaTime)
 {
-    vec3 Position = Vec3_Add(Player->Position, Vec3_Mul(Player->Velocity, Vec3_Set1(DeltaTime)));
+    vec3 AddVelocity = Vec3_Mul(Player->Acceleration, Vec3_Set1(DeltaTime));
+    vec3 Velocity = Vec3_Add(Player->Velocity, AddVelocity);
+    vec3 AddPosition = Vec3_Mul(Velocity, Vec3_Set1(DeltaTime));
+    AddPosition = Player_CheckMove(Player, World, AddPosition);
+    vec3 Position = Vec3_Add(Player->Position, AddPosition);
 
     Camera_SetPosition(Camera, Position);
     Camera_SetRotation(Camera, Player->Yaw, Player->Pitch);

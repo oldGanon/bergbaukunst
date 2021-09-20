@@ -425,64 +425,49 @@ box World_BoxIntersection(world *World, box Box)
     return Intersection;
 }
 
-void Block_HighlightFace(bitmap Buffer, camera Camera, trace_result TraceResult)
+vec3 World_CheckMoveBox(world *World, box Box, vec3 Move)
 {
-    vec3 BlockPosition = Vec3_Floor(TraceResult.BlockPosition);
-
-    vec3 Corners[8] = {
-        Camera_WorldToScreen(Camera, Buffer, BlockPosition),
-        Camera_WorldToScreen(Camera, Buffer, Vec3_Add(BlockPosition, (vec3) { 1, 0, 0 })),
-        Camera_WorldToScreen(Camera, Buffer, Vec3_Add(BlockPosition, (vec3) { 0, 1, 0 })),
-        Camera_WorldToScreen(Camera, Buffer, Vec3_Add(BlockPosition, (vec3) { 1, 1, 0 })),
-        Camera_WorldToScreen(Camera, Buffer, Vec3_Add(BlockPosition, (vec3) { 0, 0, 1 })),
-        Camera_WorldToScreen(Camera, Buffer, Vec3_Add(BlockPosition, (vec3) { 1, 0, 1 })),
-        Camera_WorldToScreen(Camera, Buffer, Vec3_Add(BlockPosition, (vec3) { 0, 1, 1 })),
-        Camera_WorldToScreen(Camera, Buffer, Vec3_Add(BlockPosition, (vec3) { 1, 1, 1 })),
-    };
-
-    switch (TraceResult.BlockFace)
     {
-        case BLOCK_FACE_LEFT:
+        box MoveBox = Box;
+        if (Move.x < 0) { MoveBox.Max.x = MoveBox.Min.x; MoveBox.Min.x += Move.x;}
+        if (Move.x > 0) { MoveBox.Min.x = MoveBox.Max.x; MoveBox.Max.x += Move.x;}
+        box CollisionBox = World_BoxIntersection(World, MoveBox);
+        if (!Box_Empty(CollisionBox))
         {
-            Draw_Line(Buffer, COLOR_WHITE, Corners[0], Corners[2]);
-            Draw_Line(Buffer, COLOR_WHITE, Corners[2], Corners[6]);
-            Draw_Line(Buffer, COLOR_WHITE, Corners[6], Corners[4]);
-            Draw_Line(Buffer, COLOR_WHITE, Corners[4], Corners[0]);
-        } break;
-        case BLOCK_FACE_RIGHT:
-        {
-            Draw_Line(Buffer, COLOR_WHITE, Corners[1], Corners[3]);
-            Draw_Line(Buffer, COLOR_WHITE, Corners[3], Corners[7]);
-            Draw_Line(Buffer, COLOR_WHITE, Corners[7], Corners[5]);
-            Draw_Line(Buffer, COLOR_WHITE, Corners[5], Corners[1]);
-        } break;
-        case BLOCK_FACE_FRONT:
-        {
-            Draw_Line(Buffer, COLOR_WHITE, Corners[0], Corners[1]);
-            Draw_Line(Buffer, COLOR_WHITE, Corners[1], Corners[5]);
-            Draw_Line(Buffer, COLOR_WHITE, Corners[5], Corners[4]);
-            Draw_Line(Buffer, COLOR_WHITE, Corners[4], Corners[0]);
-        } break;
-        case BLOCK_FACE_BACK:
-        {
-            Draw_Line(Buffer, COLOR_WHITE, Corners[2], Corners[3]);
-            Draw_Line(Buffer, COLOR_WHITE, Corners[3], Corners[7]);
-            Draw_Line(Buffer, COLOR_WHITE, Corners[7], Corners[6]);
-            Draw_Line(Buffer, COLOR_WHITE, Corners[6], Corners[2]);
-        } break;
-        case BLOCK_FACE_BOTTOM:
-        {
-            Draw_Line(Buffer, COLOR_WHITE, Corners[0], Corners[1]);
-            Draw_Line(Buffer, COLOR_WHITE, Corners[1], Corners[3]);
-            Draw_Line(Buffer, COLOR_WHITE, Corners[3], Corners[2]);
-            Draw_Line(Buffer, COLOR_WHITE, Corners[2], Corners[0]);
-        } break;
-        case BLOCK_FACE_TOP:
-        {
-            Draw_Line(Buffer, COLOR_WHITE, Corners[4], Corners[5]);
-            Draw_Line(Buffer, COLOR_WHITE, Corners[5], Corners[7]);
-            Draw_Line(Buffer, COLOR_WHITE, Corners[7], Corners[6]);
-            Draw_Line(Buffer, COLOR_WHITE, Corners[6], Corners[4]);
-        } break;
+            if (Move.x < 0) Move.x = CollisionBox.Max.x - Box.Min.x;
+            if (Move.x > 0) Move.x = CollisionBox.Min.x - Box.Max.x;
+        }
+        Box.Min.x += Move.x;
+        Box.Max.x += Move.x;
     }
+
+    {
+        box MoveBox = Box;
+        if (Move.y < 0) { MoveBox.Max.y = MoveBox.Min.y; MoveBox.Min.y += Move.y; }
+        if (Move.y > 0) { MoveBox.Min.y = MoveBox.Max.y; MoveBox.Max.y += Move.y; }
+        box CollisionBox = World_BoxIntersection(World, MoveBox);
+        if (!Box_Empty(CollisionBox))
+        {
+            if (Move.y < 0) Move.y = CollisionBox.Max.y - Box.Min.y;
+            if (Move.y > 0) Move.y = CollisionBox.Min.y - Box.Max.y;
+        }
+        Box.Min.y += Move.y;
+        Box.Max.y += Move.y;
+    }
+
+    {
+        box MoveBox = Box;
+        if (Move.z < 0) { MoveBox.Max.z = MoveBox.Min.z; MoveBox.Min.z += Move.z; }
+        if (Move.z > 0) { MoveBox.Min.z = MoveBox.Max.z; MoveBox.Max.z += Move.z; }
+        box CollisionBox = World_BoxIntersection(World, MoveBox);
+        if (!Box_Empty(CollisionBox))
+        {
+            if (Move.z < 0) Move.z = CollisionBox.Max.z - Box.Min.z;
+            if (Move.z > 0) Move.z = CollisionBox.Min.z - Box.Max.z;
+        }
+        Box.Min.z += Move.z;
+        Box.Max.z += Move.z;
+    }
+
+    return Move;
 }

@@ -39,7 +39,7 @@ typedef size_t index;
 #define SCREEN_HEIGHT 360 // 1080
 #define SCREEN_SCALE 2
 #define BYTES_PER_PIXEL 1
-#define UPDATES_PER_SECOND 60
+#define CLIENT_UPDATES_PER_SECOND 100
 
 int _fltused = 0;
 
@@ -479,7 +479,7 @@ int WINAPI CALLBACK WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR 
     LARGE_INTEGER PerfCountFrequency;
     QueryPerformanceFrequency(&PerfCountFrequency);
     u64 TimePerSecond = PerfCountFrequency.QuadPart;
-    u64 TimePerUpdate = TimePerSecond / UPDATES_PER_SECOND;
+    u64 TimePerUpdate = TimePerSecond / CLIENT_UPDATES_PER_SECOND;
     u64 LastTime = Win32_GetTime();
     u64 LastInputTime = LastTime;
 
@@ -515,11 +515,11 @@ int WINAPI CALLBACK WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR 
                 } break;
 
                 case WM_LBUTTONDOWN: { Input.Punch = true; } break;
-                case WM_RBUTTONDOWN: { Input.Place = true; } break;
+                case WM_RBUTTONDOWN: { Input.Use = true; } break;
                 case WM_MBUTTONDOWN: break;
 
                 case WM_LBUTTONUP: { Input.Punch = false; } break;
-                case WM_RBUTTONUP: { Input.Place = false; } break;
+                case WM_RBUTTONUP: { Input.Use = false; } break;
                 case WM_MBUTTONUP: break;
 
                 case WM_SYSKEYDOWN:
@@ -553,8 +553,8 @@ int WINAPI CALLBACK WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR 
                             case VK_DOWN:  Input.LookDown = IsDown; break;
                             case VK_RIGHT: Input.LookRight = IsDown; break;
 
-                            case 'E': Input.Interact = IsDown; break;
                             case 'R': Input.NoClip = IsDown; break;
+
                             case VK_SPACE: Input.Jump = IsDown; break;
                             case VK_SHIFT: Input.Crouch = IsDown; break;
                         }

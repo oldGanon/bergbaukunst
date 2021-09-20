@@ -1,3 +1,4 @@
+
 typedef struct input
 {
     vec2 Look;
@@ -13,12 +14,12 @@ typedef struct input
     bool LookLeft;
     bool LookRight;
 
-    bool NoClip;
-    bool Interact;
+    bool Punch;
+    bool Use;
     bool Jump;
     bool Crouch;
-    bool Punch;
-    bool Place;
+    
+    bool NoClip;
 } input;
 
 #include "world.c"
@@ -89,7 +90,7 @@ void Game_Draw(game *Game, bitmap Buffer, f32 DeltaTime)
     trace_result TraceResult;
     if (World_TraceRay(&Game->World, Game->Camera.Position, Camera_Direction(Game->Camera), 5.0f, &TraceResult) < 5.0f)
     {
-        Block_HighlightFace(Buffer, Game->Camera, TraceResult);
+        Block_HighlightFace(Buffer, Game->Camera, TraceResult.BlockPosition, TraceResult.BlockFace);
     }
 
     ivec2 Center = (ivec2) { Buffer.Width / 2, Buffer.Height / 2 };
