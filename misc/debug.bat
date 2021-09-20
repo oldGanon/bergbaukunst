@@ -4,5 +4,5 @@ cd %~dp0
 cd ..
 
 pushd build
-devenv msvc.exe
+devenv bergbaukunst.exe
 popd build

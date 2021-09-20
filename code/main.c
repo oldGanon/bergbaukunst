@@ -80,21 +80,22 @@ __declspec(restrict) void * malloc(size_t);
 __declspec(restrict) void * realloc(void *, size_t);
 void free(void *);
 
-void Win32_LockMouse(bool Lock);
+#include "math.c"
+#include "hash.c"
+#include "rng.c"
+#include "noise.c"
+#include "server.c"
+
 struct bitmap Win32_LoadBitmap(const char*);
 void Win32_DeleteBitmap(struct bitmap);
 struct palette Win32_LoadPalette(const char *);
 void Win32_SetPalette(const struct palette *);
 
-#include "math.c"
-#include "hash.c"
-#include "rng.c"
-#include "noise.c"
-#include "geom.c"
 #include "audio.c"
+#include "geom.c"
 #include "draw.c"
 #include "camera.c"
-#include "game.c"
+#include "client.c"
 
 global bool GlobalFocus;
 global bool GlobalRunning;
@@ -433,8 +434,9 @@ LRESULT CALLBACK Win32_WindowCallback(HWND Window, UINT Message, WPARAM WParam, 
     return Result;
 }
 
-int WINAPI CALLBACK WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nShowCmd)
+int Win32_ClientMain(void)
 {
+    HANDLE hInstance = GetModuleHandle(0);
     const char *ClassName = GAME_NAME "Class";
     if(!RegisterClassA(&(WNDCLASSA) {
             .style         = CS_HREDRAW | CS_VREDRAW,
@@ -485,9 +487,8 @@ int WINAPI CALLBACK WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR 
 
     // GAME STATE
     input Input = { 0 };
-    game *Game = malloc(sizeof(game));
-    memset(Game, 0, sizeof(game));
-    Game_Init(Game);
+    client Client = { 0 };
+    Client_Init(&Client);
 
     // RAW INPUT
     Win32_LockMouse(true);
@@ -600,7 +601,7 @@ int WINAPI CALLBACK WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR 
             // INPUT
             u64 InputTimeElapsed = Win32_TimeSince(LastInputTime);
             LastInputTime += InputTimeElapsed;
-            Game_Input(Game, Input, (f32)InputTimeElapsed / TimePerSecond);
+            Client_Input(&Client, Input, (f32)InputTimeElapsed / TimePerSecond);
 
             // UPDATE
             u64 TimeElapsed = Win32_TimeSince(LastTime);
@@ -608,11 +609,11 @@ int WINAPI CALLBACK WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR 
             {
                 TimeElapsed -= TimePerUpdate;
                 LastTime += TimePerUpdate;
-                Game_Update(Game, Input, (f32)TimePerUpdate / TimePerSecond);
+                Client_Update(&Client, Input, (f32)TimePerUpdate / TimePerSecond);
             }
 
             // DRAW
-            Game_Draw(Game, GlobalBackbuffer, (f32)TimeElapsed / TimePerSecond);
+            Client_Draw(&Client, GlobalBackbuffer, (f32)TimeElapsed / TimePerSecond);
             
             // BLIT
             HDC DeviceContext = GetDC(GlobalWindow);
@@ -627,16 +628,41 @@ int WINAPI CALLBACK WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR 
         }
     }
 
-    free(Game);
-    
+    return 0;
+}
+
+int Win32_ServerMain(void)
+{
     return 0;
 }
 
 int WinStartUp(void)
 {    
-    LPWSTR CmdLine = GetCommandLineW();
-    int Result = WinMain(GetModuleHandle(0), 0, 0, 0);
-    return Result;
+    const LPSTR CmdLine = GetCommandLineA();
+
+    if (!"-client")
+    {
+        return Win32_ClientMain();
+    }
+    else if (CmdLine[0] == "-server"[0])
+    {
+        return Win32_ServerMain();
+    }
+    else
+    {
+        // STARTUPINFO StartupInfo = { 0 };
+        // PROCESS_INFORMATION ProcessInformation = { 0 };
+        // CreateProcessA("bergbaukunst.exe", "-server", 0, 0, FALSE, 0, 0, 0, &StartupInfo, &ProcessInformation);
+        // WaitForInputIdle(ProcessInformation.hProcess, INFINITE);
+        // CloseHandle(ProcessInformation.hThread);
+        
+        int ExitCode = Win32_ClientMain();
+
+        // TerminateProcess(ProcessInformation.hProcess, 0);
+        // WaitForSingleObject(ProcessInformation.hProcess, INFINITE);
+        
+        return ExitCode;
+    }
 }
 
 void WinMainCRTStartup(void)

@@ -35,11 +35,11 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
     </ClCompile>
-    <ClCompile Include="..\..\..\code\draw.c">
+    <ClCompile Include="..\..\..\code\client.c">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
     </ClCompile>
-    <ClCompile Include="..\..\..\code\game.c">
+    <ClCompile Include="..\..\..\code\draw.c">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
     </ClCompile>
@@ -149,12 +149,14 @@
     <IntDir>$(OutDir)</IntDir>
     <GenerateManifest>
     </GenerateManifest>
+    <TargetName>bergbaukunst</TargetName>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LinkIncremental>
     </LinkIncremental>
     <OutDir>$(SolutionDir)..\..\build\</OutDir>
     <IntDir>$(OutDir)</IntDir>
+    <TargetName>bergbaukunst</TargetName>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
@@ -236,7 +238,7 @@
       <AdditionalDependencies>kernel32.lib;user32.lib;gdi32.lib</AdditionalDependencies>
       <GenerateMapFile>true</GenerateMapFile>
       <AdditionalOptions />
-      <MapFileName>$(OutDir)$(TargetName).map</MapFileName>
+      <MapFileName>$(OutDir)$(ProjectName).map</MapFileName>
       <ManifestFile />
       <EnableUAC />
       <ProfileGuidedDatabase />
@@ -253,6 +255,7 @@
       <IncrementalLinkDatabaseFile />
       <LinkTimeCodeGenerationObjectFile />
       <OptimizeReferences>true</OptimizeReferences>
+      <ProgramDatabaseFile>$(OutDir)$(ProjectName).pdb</ProgramDatabaseFile>
     </Link>
     <BuildLog>
       <Path>
