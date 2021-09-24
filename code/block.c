@@ -43,6 +43,7 @@ const u8 Block_Opaque[256] = {
 
 typedef enum block_face
 {
+    BLOCK_FACE_NONE,
     BLOCK_FACE_LEFT,   // -x WEST
     BLOCK_FACE_RIGHT,  // +x EAST
     BLOCK_FACE_FRONT,  // -y SOUTH
@@ -51,7 +52,8 @@ typedef enum block_face
     BLOCK_FACE_TOP,    // -z DOWN
 } block_face;
 
-const vec3 BlockFace_Normal[6] = {
+const vec3 BlockFace_Normal[7] = {
+    [BLOCK_FACE_NONE]   = { 0, 0, 0 },
     [BLOCK_FACE_LEFT]   = {-1, 0, 0 },
     [BLOCK_FACE_RIGHT]  = {+1, 0, 0 },
     [BLOCK_FACE_FRONT]  = { 0,-1, 0 },

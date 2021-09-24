@@ -225,6 +225,23 @@ void Block_HighlightFace(bitmap Buffer, camera Camera, vec3 BlockPosition, u32 B
 
     switch (BlockFace)
     {
+        case BLOCK_FACE_NONE:
+        {
+            Draw_Line(Buffer, COLOR_WHITE, Corners[0], Corners[1]);
+            Draw_Line(Buffer, COLOR_WHITE, Corners[2], Corners[3]);
+            Draw_Line(Buffer, COLOR_WHITE, Corners[4], Corners[5]);
+            Draw_Line(Buffer, COLOR_WHITE, Corners[6], Corners[7]);
+
+            Draw_Line(Buffer, COLOR_WHITE, Corners[0], Corners[2]);
+            Draw_Line(Buffer, COLOR_WHITE, Corners[1], Corners[3]);
+            Draw_Line(Buffer, COLOR_WHITE, Corners[4], Corners[6]);
+            Draw_Line(Buffer, COLOR_WHITE, Corners[5], Corners[7]);
+
+            Draw_Line(Buffer, COLOR_WHITE, Corners[0], Corners[4]);
+            Draw_Line(Buffer, COLOR_WHITE, Corners[1], Corners[5]);
+            Draw_Line(Buffer, COLOR_WHITE, Corners[2], Corners[6]);
+            Draw_Line(Buffer, COLOR_WHITE, Corners[3], Corners[7]);
+        }break;
         case BLOCK_FACE_LEFT:
         {
             Draw_Line(Buffer, COLOR_WHITE, Corners[0], Corners[2]);
@@ -560,7 +577,7 @@ f32 View_TraceRay(view *View, vec3 RayOrigin, vec3 RayDirection, f32 RayLength, 
     if (RaySign.z > 0) tInit.z = (1 - tInit.z);
     vec3 tMax = Mul(tInit, tDelta);
 
-    block_face LastFace = 0;
+    block_face LastFace = BLOCK_FACE_NONE;
 
     for (;;)
     {

@@ -124,7 +124,7 @@ f32 World_TraceRay(world *World, vec3 RayOrigin, vec3 RayDirection, f32 RayLengt
     if (RaySign.z > 0) tInit.z = (1 - tInit.z);
     vec3 tMax = Mul(tInit, tDelta);
 
-    block_face LastFace = 0;
+    block_face LastFace = BLOCK_FACE_NONE;
 
     for (;;)
     {
