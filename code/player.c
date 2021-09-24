@@ -51,14 +51,14 @@ box Player_Box(player *Player)
     };
 }
 
-vec3 Player_CheckMove(player *Player, world *World, vec3 Move)
+vec3 Player_CheckMove(player *Player, view *View, vec3 Move)
 {
-    return World_CheckMoveBox(World, Player_Box(Player), Move);
+    return View_CheckMoveBox(View, Player_Box(Player), Move);
 }
 
-void Player_Move(player *Player, world *World, vec3 Move)
+void Player_Move(player *Player, view *View, vec3 Move)
 {
-    vec3 CheckMove = Player_CheckMove(Player, World, Move);
+    vec3 CheckMove = Player_CheckMove(Player, View, Move);
     if (Abs(CheckMove.x) < Abs(Move.x)) Player->Velocity.x = 0;
     if (Abs(CheckMove.y) < Abs(Move.y)) Player->Velocity.y = 0;
     if (Abs(CheckMove.z) < Abs(Move.z)) Player->Velocity.z = 0;
@@ -66,7 +66,7 @@ void Player_Move(player *Player, world *World, vec3 Move)
     Player->Position = Vec3_Add(Player->Position, CheckMove);
 }
 
-void Player_Input(player *Player, world *World, input Input, f32 DeltaTime)
+void Player_Input(player *Player, view *View, input Input, f32 DeltaTime)
 {
 #define KEY_SENSITIVITY 0.05f
 #define MOUSE_SENSITIVITY (1.0f / 3500.0f)
@@ -106,6 +106,8 @@ void Player_Input(player *Player, world *World, input Input, f32 DeltaTime)
     Player->Jump = Input.Jump;
     Player->Crouch = Input.Crouch;
 
+    // Server_PlayerState(Server, Player);
+
     Player->Cooldown = Max(0.0f, Player->Cooldown - DeltaTime);
 
     f32 Reach = 5.0f;
@@ -113,9 +115,13 @@ void Player_Input(player *Player, world *World, input Input, f32 DeltaTime)
     if (Input.Punch && (Player->Cooldown == 0))
     {
         trace_result TraceResult;
-        if (World_TraceRay(World, Player->Position, Player_ViewDirection(Player), Reach, &TraceResult) < Reach)
+        if (View_TraceRay(View, Player->Position, Player_ViewDirection(Player), Reach, &TraceResult) < Reach)
         {
-            World_SetBlock(World, TraceResult.BlockPosition, (block) { 0 });
+            block Block = (block){ .Id = BLOCK_ID_AIR };
+            vec3 PunchPosition = TraceResult.BlockPosition;
+
+            // Server_PlayerPunch(Server, PunchPosition);
+            View_SetBlock(View, PunchPosition, Block);
         }
         Player->Cooldown = 0.125f;
     }
@@ -123,15 +129,16 @@ void Player_Input(player *Player, world *World, input Input, f32 DeltaTime)
     if (Input.Use && (Player->Cooldown == 0))
     {
         trace_result TraceResult;
-        if (World_TraceRay(World, Player->Position, Player_ViewDirection(Player), Reach, &TraceResult) < Reach)
+        if (View_TraceRay(View, Player->Position, Player_ViewDirection(Player), Reach, &TraceResult) < Reach)
         {
             block Block = (block){ .Id = BLOCK_ID_GRAS };
-            vec3 PlacePosition = TraceResult.FreePosition;
+            vec3 UsePosition = TraceResult.FreePosition;
             box PlayerBox = Player_Box(Player);
 
-            if (!Block_BoxIntersect(Block, PlacePosition, PlayerBox))
+            if (!Block_BoxIntersect(Block, UsePosition, PlayerBox))
             {
-                World_SetBlock(World, PlacePosition, Block);
+                // Server_PlayerUse(Server, UsePosition);
+                View_SetBlock(View, UsePosition, Block);
             }
 
         }
@@ -139,7 +146,7 @@ void Player_Input(player *Player, world *World, input Input, f32 DeltaTime)
     }
 }
 
-void Player_Update(player *Player, world *World, f32 DeltaTime)
+void Player_Update(player *Player, view *View, f32 DeltaTime)
 {
     if (Player->NoClip)
     {
@@ -186,16 +193,16 @@ void Player_Update(player *Player, world *World, f32 DeltaTime)
         vec3 AddVelocity = Vec3_Mul(Player->Acceleration, Vec3_Set1(DeltaTime));
         Player->Velocity = Vec3_Add(Player->Velocity, AddVelocity);
         vec3 AddPosition = Vec3_Mul(Player->Velocity, Vec3_Set1(DeltaTime));
-        Player_Move(Player, World, AddPosition);
+        Player_Move(Player, View, AddPosition);
     }
 }
 
-void Player_Draw(player *Player, world *World, camera *Camera, f32 DeltaTime)
+void Player_Draw(player *Player, view *View, camera *Camera, f32 DeltaTime)
 {
     vec3 AddVelocity = Vec3_Mul(Player->Acceleration, Vec3_Set1(DeltaTime));
     vec3 Velocity = Vec3_Add(Player->Velocity, AddVelocity);
     vec3 AddPosition = Vec3_Mul(Velocity, Vec3_Set1(DeltaTime));
-    AddPosition = Player_CheckMove(Player, World, AddPosition);
+    AddPosition = Player_CheckMove(Player, View, AddPosition);
     vec3 Position = Vec3_Add(Player->Position, AddPosition);
 
     Camera_SetPosition(Camera, Position);

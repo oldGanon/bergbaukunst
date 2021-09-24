@@ -2,17 +2,12 @@
 inline ivec3 World_ToBlockPosition(ivec3 WorldPosition);
 inline ivec2 World_ToChunkPosition(ivec3 WorldPosition);
 
-typedef struct chunk chunk;
-void WorldGen_GenerateChunk(chunk *Chunk);
-
-#include "mesh.c"
 #include "block.c"
 #include "chunk.c"
 #include "chunkmap.c"
 #include "worldgen.c"
 
-#define LOADED_CHUNKS 32
-#define VIEW_DISTANCE 2
+#define LOADED_CHUNKS_DIST 16
 
 typedef struct entity
 {
@@ -23,8 +18,6 @@ typedef struct world
 {
     entity Entities[256];
     chunk_map ChunkMap;
-
-    u32 MeshGenerationBudget;
 } world;
 
 // typedef enum world_direction
@@ -54,224 +47,23 @@ void World_Init(world *World)
     WorldGen_Init();
 }
 
-void World_Update(world *World, const camera Camera)
+void World_Update(world *World, vec3 Player)
 {
-    World->MeshGenerationBudget = 1;
+    ivec2 CenterChunk = World_ToChunkPosition(Vec3_FloorToIVec3(Player));
+    ivec2 LoadedChunkDist = iVec2_Set1(LOADED_CHUNKS_DIST);
+    ivec2 MinPos = iVec2_Sub(CenterChunk, LoadedChunkDist);
+    ivec2 MaxPos = iVec2_Add(CenterChunk, LoadedChunkDist);
 
-    ivec2 HalfLoadedDim = iVec2_Set1(LOADED_CHUNKS >> 1);
-    ivec2 CenterChunk = World_ToChunkPosition(Vec3_FloorToIVec3(Camera.Position));
-    ivec2 MinPos = iVec2_Sub(CenterChunk, HalfLoadedDim);
-    ivec2 MaxPos = iVec2_Add(CenterChunk, HalfLoadedDim);
-
-    for (i32 x = MinPos.x; x <= MaxPos.x; x++)
+    for (i32 x = MinPos.x; x < MaxPos.x; x++)
+    for (i32 y = MinPos.y; y < MaxPos.y; y++)
     {
-        for (i32 y = MinPos.y; y <= MaxPos.y; y++)
-        {
-            chunk *Chunk = ChunkMap_GetChunk(&World->ChunkMap, x, y);
-            if (!Chunk) ChunkMap_AllocateChunk(&World->ChunkMap, x, y);
-        }
-    }
-}
+        ivec2 ChunkPos = (ivec2){ x, y };
+        chunk *Chunk = ChunkMap_GetChunk(&World->ChunkMap, ChunkPos);
+        if (Chunk) continue;
 
-
-
-typedef struct padded_chunk
-{
-    block Blocks[CHUNK_HEIGHT+2][CHUNK_WIDTH+2][CHUNK_WIDTH+2];
-} padded_chunk;
-
-void World_PaddedChunk(world *World, chunk *Chunk, padded_chunk *PaddedChunk)
-{
-    for (i32 y = 0; y < CHUNK_WIDTH+2; ++y)
-    for (i32 x = 0; x < CHUNK_WIDTH+2; ++x)
-    {
-        PaddedChunk->Blocks[0][y][x] = DEFAULT_HELL_BLOCK;
-        PaddedChunk->Blocks[CHUNK_HEIGHT+1][y][x] = DEFAULT_SKY_BLOCK;
-    }
-
-    for (i32 z = 0; z < CHUNK_HEIGHT; ++z)
-    for (i32 y = 0; y < CHUNK_WIDTH; ++y)
-    for (i32 x = 0; x < CHUNK_WIDTH; ++x)
-    {
-        PaddedChunk->Blocks[z+1][y+1][x+1] = Chunk->Blocks[z][y][x];
-    }
-
-    if (Chunk->Neighbors[0][0])
-    {
-        chunk *Chunk2 = ChunkMap_GetChunkById(&World->ChunkMap, Chunk->Neighbors[0][0]);
-        for (i32 z = 0; z < CHUNK_HEIGHT; ++z)
-        {
-            PaddedChunk->Blocks[z+1][0][0] = Chunk2->Blocks[z][CHUNK_WIDTH-1][CHUNK_WIDTH-1];
-        }
-    }
-
-    if (Chunk->Neighbors[0][2])
-    {
-        chunk *Chunk2 = ChunkMap_GetChunkById(&World->ChunkMap, Chunk->Neighbors[0][2]);
-        for (i32 z = 0; z < CHUNK_HEIGHT; ++z)
-        {
-            PaddedChunk->Blocks[z+1][0][CHUNK_WIDTH+1] = Chunk2->Blocks[z][CHUNK_WIDTH-1][0];
-        }
-    }
-
-    if (Chunk->Neighbors[2][0])
-    {
-        chunk *Chunk2 = ChunkMap_GetChunkById(&World->ChunkMap, Chunk->Neighbors[2][0]);
-        for (i32 z = 0; z < CHUNK_HEIGHT; ++z)
-        {
-            PaddedChunk->Blocks[z+1][CHUNK_WIDTH+1][0] = Chunk2->Blocks[z][0][CHUNK_WIDTH-1];
-        }
-    }
-
-    if (Chunk->Neighbors[2][2])
-    {
-        chunk *Chunk2 = ChunkMap_GetChunkById(&World->ChunkMap, Chunk->Neighbors[2][2]);
-        for (i32 z = 0; z < CHUNK_HEIGHT; ++z)
-        {
-            PaddedChunk->Blocks[z+1][CHUNK_WIDTH+1][CHUNK_WIDTH+1] = Chunk2->Blocks[z][0][0];
-        }
-    }
-
-    if (Chunk->Neighbors[0][1])
-    {
-        chunk *Chunk2 = ChunkMap_GetChunkById(&World->ChunkMap, Chunk->Neighbors[0][1]);
-        for (i32 z = 0; z < CHUNK_HEIGHT; ++z)
-        for (i32 x = 0; x < CHUNK_WIDTH; ++x)
-        {
-            PaddedChunk->Blocks[z+1][0][x+1] = Chunk2->Blocks[z][CHUNK_WIDTH-1][x];
-        }
-    }
-
-    if (Chunk->Neighbors[1][0])
-    {
-        chunk *Chunk2 = ChunkMap_GetChunkById(&World->ChunkMap, Chunk->Neighbors[1][0]);
-        for (i32 z = 0; z < CHUNK_HEIGHT; ++z)
-        for (i32 y = 0; y < CHUNK_WIDTH; ++y)
-        {
-            PaddedChunk->Blocks[z+1][y+1][0] = Chunk2->Blocks[z][y][CHUNK_WIDTH-1];
-        }
-    }
-
-    if (Chunk->Neighbors[2][1])
-    {
-        chunk *Chunk2 = ChunkMap_GetChunkById(&World->ChunkMap, Chunk->Neighbors[2][1]);
-        for (i32 z = 0; z < CHUNK_HEIGHT; ++z)
-        for (i32 x = 0; x < CHUNK_WIDTH; ++x)
-        {
-            PaddedChunk->Blocks[z+1][CHUNK_WIDTH+1][x+1] = Chunk2->Blocks[z][0][x];
-        }
-    }
-
-    if (Chunk->Neighbors[1][2])
-    {
-        chunk *Chunk2 = ChunkMap_GetChunkById(&World->ChunkMap, Chunk->Neighbors[1][2]);
-        for (i32 z = 0; z < CHUNK_HEIGHT; ++z)
-        for (i32 y = 0; y < CHUNK_WIDTH; ++y)
-        {
-            PaddedChunk->Blocks[z+1][y+1][CHUNK_WIDTH+1] = Chunk2->Blocks[z][y][0];
-        }
-    }
-}
-
-block_group PaddedChunk_GetBlockGroup(padded_chunk *Chunk, ivec3 WorldPosition)
-{
-    block_group BlockGroup;
-    for (i32 z = 0; z < 3; ++z)
-    for (i32 y = 0; y < 3; ++y)
-    for (i32 x = 0; x < 3; ++x)
-    {
-        ivec3 BlockPosition = (ivec3){ x, y, z };
-        BlockPosition = iVec3_Add(BlockPosition, WorldPosition);
-        BlockGroup.Blocks[z][y][x] = Chunk->Blocks[BlockPosition.z][BlockPosition.y][BlockPosition.x];
-    }
-    return BlockGroup;
-}
-
-void World_GenerateChunkMesh(world *World, chunk *Chunk)
-{
-    Mesh_Clear(&Chunk->Mesh);
-
-    padded_chunk PaddedChunk = { 0 };
-    World_PaddedChunk(World, Chunk, &PaddedChunk);
-
-    for (i32 z = 0; z < CHUNK_HEIGHT; ++z)
-    for (i32 y = 0; y < CHUNK_WIDTH; ++y)
-    for (i32 x = 0; x < CHUNK_WIDTH; ++x)
-    {
-        ivec3 iBlockPosition = (ivec3){ x, y, z };
-        block Block = Chunk_GetBlock(Chunk, iBlockPosition);
-        if (Block.Id == BLOCK_ID_AIR) continue;
-
-        block_group BlockGroup = PaddedChunk_GetBlockGroup(&PaddedChunk, iBlockPosition);
-
-        vec3 BlockPosition = iVec3_toVec3(iBlockPosition);
-        switch (Block.Id)
-        {
-            case BLOCK_ID_DIRT:
-            {
-                Block_AddQuadsToMesh(&Chunk->Mesh, BlockPosition, &BlockGroup, 2, 2, 2, 2, 2, 2);
-            } break;
-
-            case BLOCK_ID_GRAS:
-            {
-                Block_AddQuadsToMesh(&Chunk->Mesh, BlockPosition, &BlockGroup, 1, 1, 1, 1, 2, 0);
-            } break;
-
-            case BLOCK_ID_STONE:
-            {
-                Block_AddQuadsToMesh(&Chunk->Mesh, BlockPosition, &BlockGroup, 5, 5, 5, 5, 5, 5);
-            } break;
-
-            case BLOCK_ID_COBBLE:
-            {
-                Block_AddQuadsToMesh(&Chunk->Mesh, BlockPosition, &BlockGroup, 4, 4, 4, 4, 4, 4);
-            } break;
-
-            case BLOCK_ID_WOOD:
-            {
-                Block_AddQuadsToMesh(&Chunk->Mesh, BlockPosition, &BlockGroup, 7, 7, 7, 7, 15, 15);
-            } break;
-
-            case BLOCK_ID_LEAVES:
-            {
-                Block_AddQuadsToMesh(&Chunk->Mesh, BlockPosition, &BlockGroup, 3, 3, 3, 3, 3, 3);
-            } break;
-
-            case BLOCK_ID_SAND:
-            {
-                Block_AddQuadsToMesh(&Chunk->Mesh, BlockPosition, &BlockGroup, 6, 6, 6, 6, 6, 6);
-            } break;
-        }
-    }
-
-    Chunk->MeshDirty = false;
-}
-
-
-
-void World_DrawChunk(world *World, i32 x, i32 y, const bitmap Target, bitmap TerrainTexture, const camera Camera)
-{
-    chunk *Chunk = ChunkMap_GetChunk(&World->ChunkMap, x, y);
-    if (!Chunk) return;
-    if (Chunk->MeshDirty && World->MeshGenerationBudget)
-    {
-        --World->MeshGenerationBudget;
-        World_GenerateChunkMesh(World, Chunk);
-    }
-    Chunk_Draw(Camera, Target, TerrainTexture, Chunk);
-}
-
-void World_Draw(world *World, const bitmap Target, bitmap TerrainTexture, const camera Camera)
-{
-    ivec3 iWorldPosition = Vec3_FloorToIVec3(Camera.Position);
-    ivec2 Mid = World_ToChunkPosition(iWorldPosition);
-    ivec2 Min = iVec2_Sub(Mid, iVec2_Set1(VIEW_DISTANCE));
-    ivec2 Max = iVec2_Add(Mid, iVec2_Set1(VIEW_DISTANCE));
-
-    for (i32 y = Min.y; y <= Max.y; ++y)
-    for (i32 x = Min.x; x <= Max.x; ++x)
-    {
-        World_DrawChunk(World, x, y, Target, TerrainTexture, Camera);
+        Chunk = ChunkMap_AllocateChunk(&World->ChunkMap, ChunkPos);
+        WorldGen_GenerateChunk(Chunk);
+        Chunk_CalcSkyLight(Chunk);
     }
 }
 
@@ -288,6 +80,11 @@ inline ivec2 World_ToChunkPosition(ivec3 WorldPosition)
     return iVec2_ShiftRight(WorldPosition.xy, CHUNK_WIDTH_SHIFT);
 }
 
+chunk *World_GetChunk(const world *World, ivec2 ChunkPosition)
+{
+    return ChunkMap_GetChunk(&World->ChunkMap, ChunkPosition);
+}
+
 block World_GetBlock(const world *World, vec3 WorldPosition)
 {
     if (WorldPosition.z < 0)                return DEFAULT_SKY_BLOCK;
@@ -295,17 +92,9 @@ block World_GetBlock(const world *World, vec3 WorldPosition)
 
     ivec3 iWorldPosition = Vec3_FloorToIVec3(WorldPosition);
     ivec2 ChunkPosition = World_ToChunkPosition(iWorldPosition);
-    const chunk *Chunk = ChunkMap_GetChunk(&World->ChunkMap, ChunkPosition.x, ChunkPosition.y);
-    if (!Chunk) return (block){ 0 }; // maybe generate chunk instead?
+    const chunk *Chunk = ChunkMap_GetChunk(&World->ChunkMap, ChunkPosition);
+    if (!Chunk) return DEFAULT_BLOCK; // maybe generate chunk instead?
     return Chunk_GetBlock(Chunk, iWorldPosition);
-}
-
-void World_MarkChunkDirty(chunk_map *ChunkMap, u64 ChunkId)
-{
-    if (!ChunkId) return;
-    chunk *Chunk = ChunkMap_GetChunkById(ChunkMap, ChunkId);
-    if (!Chunk) return;
-    Chunk->MeshDirty = true;
 }
 
 void World_SetBlock(world *World, vec3 WorldPosition, block Block)
@@ -315,27 +104,9 @@ void World_SetBlock(world *World, vec3 WorldPosition, block Block)
 
     ivec3 iWorldPosition = Vec3_FloorToIVec3(WorldPosition);
     ivec2 ChunkPosition = World_ToChunkPosition(iWorldPosition);
-    chunk *Chunk = ChunkMap_GetChunk(&World->ChunkMap, ChunkPosition.x, ChunkPosition.y);
+    chunk *Chunk = ChunkMap_GetChunk(&World->ChunkMap, ChunkPosition);
     if (!Chunk) return; // maybe generate chunk instead?
     Chunk_SetBlock(Chunk, iWorldPosition, Block);
-
-    ivec3 BlockPosition = World_ToBlockPosition(iWorldPosition);
-    if ((BlockPosition.x == 0))
-        World_MarkChunkDirty(&World->ChunkMap, Chunk->Neighbors[1][0]);
-    if ((BlockPosition.y == 0))
-        World_MarkChunkDirty(&World->ChunkMap, Chunk->Neighbors[0][1]);
-    if ((BlockPosition.x == CHUNK_WIDTH - 1))
-        World_MarkChunkDirty(&World->ChunkMap, Chunk->Neighbors[1][2]);
-    if ((BlockPosition.y == CHUNK_WIDTH - 1))
-        World_MarkChunkDirty(&World->ChunkMap, Chunk->Neighbors[2][1]);
-    if ((BlockPosition.x == 0) && (BlockPosition.y == 0))
-        World_MarkChunkDirty(&World->ChunkMap, Chunk->Neighbors[0][0]);
-    if ((BlockPosition.x == 0) && (BlockPosition.y == CHUNK_WIDTH - 1))
-        World_MarkChunkDirty(&World->ChunkMap, Chunk->Neighbors[2][0]);
-    if ((BlockPosition.x == CHUNK_WIDTH - 1) && (BlockPosition.y == 0))
-        World_MarkChunkDirty(&World->ChunkMap, Chunk->Neighbors[0][2]);
-    if ((BlockPosition.x == CHUNK_WIDTH - 1) && (BlockPosition.y == CHUNK_WIDTH - 1))
-        World_MarkChunkDirty(&World->ChunkMap, Chunk->Neighbors[2][2]);
 }
 
 

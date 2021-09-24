@@ -9,10 +9,7 @@
 typedef struct chunk
 {
     bool Allocated;
-    i32 x, y;
-
-    bool MeshDirty;
-    quad_mesh Mesh;
+    ivec2 Position;
 
     u64 Neighbors[3][3];
 
@@ -59,76 +56,19 @@ void Chunk_SetBlock(chunk *Chunk, ivec3 WorldPosition, block Block)
 
     ivec3 BlockPosition = World_ToBlockPosition(WorldPosition);
     Chunk->Blocks[BlockPosition.z][BlockPosition.y][BlockPosition.x] = Block;
-    Chunk->MeshDirty = true;
 
     Chunk_CalcSkyLight(Chunk);
 }
 
-void Chunk_GenerateBlocks(chunk *Chunk)
-{
-#if 0
-    for (i32 zz = 0; zz < CHUNK_HEIGHT; zz++)
-    for (i32 yy = 0; yy < CHUNK_WIDTH; yy++)
-    for (i32 xx = 0; xx < CHUNK_WIDTH; xx++)
-    {
-        block* CurrentBlock = &Chunk->Blocks[zz][yy][xx];
-
-        if ((zz == 0) || 
-            (yy == 1 && xx == 2 && zz == 1) ||  
-            (yy == 2 && xx == 3 && zz == 1) ||
-            (yy == 9 && xx == 1 && zz == 1) ||
-            (yy == 8 && xx == 2 && zz == 1) ||
-            (yy == 8 && xx == 2 && zz == 6))
-        {
-            CurrentBlock->Id = BLOCK_ID_GRAS;
-        }
-        else if (yy == 5 && xx == 5 && zz <= 5)
-        {
-            CurrentBlock->Id = BLOCK_ID_WOOD;
-        }
-        else if (((yy >= 3) && (yy <= 7) && (xx >= 4) && (xx <= 6) && (zz >= 3) && (zz <= 5)) ||
-                 ((yy >= 4) && (yy <= 6) && (xx >= 3) && (xx <= 7) && (zz >= 3) && (zz <= 5)) ||
-                 ((yy == 5) && (xx >= 4) && (xx <= 6) && (zz == 6)) ||
-                 ((yy >= 4) && (yy <= 6) && (xx == 5) && (zz == 6)))
-        {
-            CurrentBlock->Id = BLOCK_ID_LEAVES;
-        }
-        else
-        {
-            CurrentBlock->Id = BLOCK_ID_AIR;
-        }
-    }
-#endif
-    WorldGen_GenerateChunk(Chunk);
-    Chunk_CalcSkyLight(Chunk);
-}
-
-void Chunk_Draw(const camera Camera, const bitmap Target, bitmap TerrainTexture, chunk *Chunk)
-{
-    vec3 ChunkDim = (vec3) { CHUNK_WIDTH, CHUNK_WIDTH, CHUNK_HEIGHT };
-    vec3 ChunkMin = Vec3_Mul(ChunkDim, (vec3) { (f32)Chunk->x, (f32)Chunk->y, 0 });
-    vec3 ChunkMax = Vec3_Add(ChunkDim, ChunkMin);
-    if (!Camera_BoxVisible(Camera, Target, ChunkMin, ChunkMax)) return;
-    Mesh_Draw(Target, Camera, TerrainTexture, ChunkMin, &Chunk->Mesh);
-}
-
-void Chunk_Create(chunk *Chunk, i32 x, i32 y)
+void Chunk_Create(chunk *Chunk, ivec2 Position)
 {
     Chunk->Allocated = true;
-    Chunk->x = x;
-    Chunk->y = y;
-
-    Chunk->MeshDirty = true;
-    Chunk->Mesh = Mesh_Create();
-
-    Chunk_GenerateBlocks(Chunk);
+    Chunk->Position = Position;
 }
 
-void Chunk_Delete(chunk *Chunk, i32 x, i32 y)
+void Chunk_Delete(chunk *Chunk, ivec2 Position)
 {
     Chunk->Allocated = false;
-    assert(Chunk->x == x);
-    assert(Chunk->y == y);
-
-    Mesh_Delete(&Chunk->Mesh);
+    assert(Chunk->Position.x == Position.x);
+    assert(Chunk->Position.y == Position.y);
 }

@@ -346,6 +346,7 @@ inline vec3 Vec3_Cross(vec3 A, vec3 B)
 /*************/
 #define LOAD_IVEC2(V) _mm_loadu_si64(V.E)
 #define STORE_IVEC2(V,M) _mm_storeu_si64(V.E,M)
+inline ivec2 iVec2_Zero(void) { ivec2 B; STORE_IVEC2(B, _mm_setzero_si128()); return B; }
 inline ivec2 iVec2_Set1(i32 A) { return (ivec2){ .x = A, .y = A }; }
 inline ivec2 iVec2_Add(ivec2 A, ivec2 B) { STORE_IVEC2(A, _mm_add_epi32(LOAD_IVEC2(A), LOAD_IVEC2(B))); return A; }
 inline ivec2 iVec2_Sub(ivec2 A, ivec2 B) { STORE_IVEC2(A, _mm_sub_epi32(LOAD_IVEC2(A), LOAD_IVEC2(B))); return A; }
@@ -373,6 +374,7 @@ inline ivec2 Vec2_FloorToIVec2(vec2 A) { ivec2 B; STORE_IVEC2(B, _mm_cvtps_epi32
 /*************/
 #define LOAD_IVEC3(V) _mm_loadu_si128((__m128i *)V.E)
 #define STORE_IVEC3(V,M) _mm_storeu_si128((__m128i *)V.E,M)
+inline ivec3 iVec3_Zero(void) { ivec3 B; STORE_IVEC3(B, _mm_setzero_si128()); return B; }
 inline ivec3 iVec3_Set1(i32 A) { return (ivec3){ .x = A, .y = A, .z = A}; }
 inline ivec3 iVec3_Add(ivec3 A, ivec3 B) { STORE_IVEC3(A, _mm_add_epi32(LOAD_IVEC3(A), LOAD_IVEC3(B))); return A; }
 inline ivec3 iVec3_Sub(ivec3 A, ivec3 B) { STORE_IVEC3(A, _mm_sub_epi32(LOAD_IVEC3(A), LOAD_IVEC3(B))); return A; }

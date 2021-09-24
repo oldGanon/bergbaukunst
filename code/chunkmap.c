@@ -10,11 +10,11 @@ typedef struct chunk_map
 
 chunk_map ChunkMap_Create(void);
 void ChunkMap_Delete(chunk_map *Map);
-chunk *ChunkMap_AllocateChunk(chunk_map *Map, i32 x, i32 y);
-void ChunkMap_DeleteChunk(chunk_map *Map, i32 x, i32 y);
+chunk *ChunkMap_AllocateChunk(chunk_map *Map, ivec2 Position);
+void ChunkMap_DeleteChunk(chunk_map *Map, ivec2 Position);
 chunk *ChunkMap_GetChunkById(const chunk_map *Map, u64 ChunkId);
-chunk *ChunkMap_GetChunk(const chunk_map *Map, i32 x, i32 y);
-u64 ChunkMap_GetChunkId(const chunk_map *Map, i32 x, i32 y);
+chunk *ChunkMap_GetChunk(const chunk_map *Map, ivec2 Position);
+u64 ChunkMap_GetChunkId(const chunk_map *Map, ivec2 Position);
 
 //
 //
@@ -29,9 +29,9 @@ typedef struct chunk_map_value
 
 #define CHUNK_MAP_MAXLOAD_PERCENT 90
 
-inline u64 ChunkMap_Coord(i32 x, i32 y)
+inline u64 ChunkMap_Coord(ivec2 Position)
 {
-    return ((u64)x << 32) | ((u64)y & 0xFFFFFFFFULL);
+    return ((u64)Position.x << 32) | ((u64)Position.y & 0xFFFFFFFFULL);
 }
 
 inline u64 ChunkMap_Hash(u64 Coord)
@@ -50,9 +50,9 @@ inline u64 ChunkMap_ProbeDist(const chunk_map *Map, u64 Pos)
     return (Pos - ChunkMap_HashIndex(Map, Map->Values[Pos].Hash)) & Map->Mask;
 }
 
-inline u64 ChunkMap_GetIndex(const chunk_map *Map, i32 x, i32 y)
+inline u64 ChunkMap_GetIndex(const chunk_map *Map, ivec2 Position)
 {
-    u64 Coord = ChunkMap_Coord(x, y);
+    u64 Coord = ChunkMap_Coord(Position);
     u64 Hash = ChunkMap_Hash(Coord);
 
     u64 Pos = ChunkMap_HashIndex(Map, Hash);
@@ -123,9 +123,9 @@ inline void ChunkMap_InsertValue(chunk_map *Map, chunk_map_value Value)
     }
 }
 
-inline void ChunkMap_InsertChunkId(chunk_map *Map, u64 ChunkId, i32 x, i32 z)
+inline void ChunkMap_InsertChunkId(chunk_map *Map, u64 ChunkId, ivec2 Position)
 {
-    u64 Coord = ChunkMap_Coord(x, z);
+    u64 Coord = ChunkMap_Coord(Position);
     u64 Hash = ChunkMap_Hash(Coord);
     ChunkMap_InsertValue(Map, (chunk_map_value){ ChunkId, Hash, Coord });
 }
@@ -157,13 +157,13 @@ inline void ChunkMap__ConnectChunk(chunk_map *Map, chunk *Chunk, u64 ChunkId)
     for (i32 y = -1; y <= 1; ++y)
     for (i32 x = -1; x <= 1; ++x)
     {
-        u64 NeighborId =  ChunkMap_GetChunkId(Map, Chunk->x + x, Chunk->y + y);
+        ivec2 NeighborPos = iVec2_Add(Chunk->Position, (ivec2) { x, y });
+        u64 NeighborId =  ChunkMap_GetChunkId(Map, NeighborPos);
         chunk *Neighbor = ChunkMap_GetChunkById(Map, NeighborId);
         if (Neighbor)
         {
             Chunk->Neighbors[1+y][1+x] = NeighborId;
             Neighbor->Neighbors[1-y][1-x] = ChunkId;
-            Neighbor->MeshDirty = true;
         }
     }
 }
@@ -210,9 +210,9 @@ void ChunkMap_Delete(chunk_map *Map)
 }
 
 
-chunk *ChunkMap_AllocateChunk(chunk_map *Map, i32 x, i32 y)
+chunk *ChunkMap_AllocateChunk(chunk_map *Map, ivec2 Position)
 {
-    assert(ChunkMap_GetIndex(Map, x, y) == SIZE_MAX);
+    assert(ChunkMap_GetIndex(Map, Position) == SIZE_MAX);
 
     ChunkMap_Grow(Map);
 
@@ -221,8 +221,8 @@ chunk *ChunkMap_AllocateChunk(chunk_map *Map, i32 x, i32 y)
         chunk *Chunk = Map->Chunks + i;
         if (!Chunk->Allocated)
         {
-            ChunkMap_InsertChunkId(Map, i, x, y);
-            Chunk_Create(Chunk, x, y);
+            ChunkMap_InsertChunkId(Map, i, Position);
+            Chunk_Create(Chunk, Position);
             ChunkMap__ConnectChunk(Map, Chunk, i);
             return Chunk;
         }
@@ -232,13 +232,13 @@ chunk *ChunkMap_AllocateChunk(chunk_map *Map, i32 x, i32 y)
     return 0;
 }
 
-void ChunkMap_DeleteChunk(chunk_map *Map, i32 x, i32 y)
+void ChunkMap_DeleteChunk(chunk_map *Map, ivec2 Position)
 {
-    u64 Index = ChunkMap_GetIndex(Map, x, y);
+    u64 Index = ChunkMap_GetIndex(Map, Position);
 
     chunk *Chunk = Map->Chunks + Map->Values[Index].ChunkId;
     ChunkMap__DisonnectChunk(Map, Chunk);
-    Chunk_Delete(Chunk, x, y);
+    Chunk_Delete(Chunk, Position);
 
     ChunkMap_RemoveIndex(Map, Index);
 }
@@ -249,16 +249,16 @@ chunk *ChunkMap_GetChunkById(const chunk_map *Map, u64 ChunkId)
     return Map->Chunks + ChunkId;
 }
 
-u64 ChunkMap_GetChunkId(const chunk_map *Map, i32 x, i32 y)
+u64 ChunkMap_GetChunkId(const chunk_map *Map, ivec2 Position)
 {
-    u64 Index = ChunkMap_GetIndex(Map, x, y);
+    u64 Index = ChunkMap_GetIndex(Map, Position);
     if (Index == SIZE_MAX) return 0;
     return Map->Values[Index].ChunkId;
 }
 
-chunk *ChunkMap_GetChunk(const chunk_map *Map, i32 x, i32 y)
+chunk *ChunkMap_GetChunk(const chunk_map *Map, ivec2 Position)
 {
-    u64 ChunkId = ChunkMap_GetChunkId(Map, x, y);
+    u64 ChunkId = ChunkMap_GetChunkId(Map, Position);
     if (!ChunkId) return 0;
     return ChunkMap_GetChunkById(Map, ChunkId);
 }

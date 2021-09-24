@@ -39,6 +39,7 @@ typedef size_t index;
 #define SCREEN_HEIGHT 360 // 1080
 #define SCREEN_SCALE 2
 #define BYTES_PER_PIXEL 1
+#define SERVER_UPDATES_PER_SECOND 20
 #define CLIENT_UPDATES_PER_SECOND 100
 
 int _fltused = 0;
@@ -84,6 +85,9 @@ void free(void *);
 #include "hash.c"
 #include "rng.c"
 #include "noise.c"
+#include "world.c"
+#include "message.c"
+#include "network.c"
 #include "server.c"
 
 struct bitmap Win32_LoadBitmap(const char*);
@@ -95,6 +99,8 @@ void Win32_SetPalette(const struct palette *);
 #include "geom.c"
 #include "draw.c"
 #include "camera.c"
+#include "mesh.c"
+#include "view.c"
 #include "client.c"
 
 global bool GlobalFocus;
@@ -487,8 +493,8 @@ int Win32_ClientMain(void)
 
     // GAME STATE
     input Input = { 0 };
-    client Client = { 0 };
-    Client_Init(&Client);
+    client *Client = malloc(sizeof(client));
+    Client_Init(Client);
 
     // RAW INPUT
     Win32_LockMouse(true);
@@ -601,7 +607,7 @@ int Win32_ClientMain(void)
             // INPUT
             u64 InputTimeElapsed = Win32_TimeSince(LastInputTime);
             LastInputTime += InputTimeElapsed;
-            Client_Input(&Client, Input, (f32)InputTimeElapsed / TimePerSecond);
+            Client_Input(Client, Input, (f32)InputTimeElapsed / TimePerSecond);
 
             // UPDATE
             u64 TimeElapsed = Win32_TimeSince(LastTime);
@@ -609,11 +615,11 @@ int Win32_ClientMain(void)
             {
                 TimeElapsed -= TimePerUpdate;
                 LastTime += TimePerUpdate;
-                Client_Update(&Client, Input, (f32)TimePerUpdate / TimePerSecond);
+                Client_Update(Client, Input, (f32)TimePerUpdate / TimePerSecond);
             }
 
             // DRAW
-            Client_Draw(&Client, GlobalBackbuffer, (f32)TimeElapsed / TimePerSecond);
+            Client_Draw(Client, GlobalBackbuffer, (f32)TimeElapsed / TimePerSecond);
             
             // BLIT
             HDC DeviceContext = GetDC(GlobalWindow);
@@ -628,12 +634,46 @@ int Win32_ClientMain(void)
         }
     }
 
+    free(Client);
+
     return 0;
 }
 
 int Win32_ServerMain(void)
 {
+    // TIMING
+    LARGE_INTEGER PerfCountFrequency;
+    QueryPerformanceFrequency(&PerfCountFrequency);
+    u64 TimePerSecond = PerfCountFrequency.QuadPart;
+    u64 TimePerUpdate = TimePerSecond / SERVER_UPDATES_PER_SECOND;
+    u64 LastTime = Win32_GetTime();
+    u64 LastInputTime = LastTime;
+
+    server Server = { 0 };
+    Server_Init(&Server);
+
+    while (GlobalRunning)
+    {
+        Server_Update(&Server);
+
+        // TIMING
+        u64 TimeElapsed = Win32_TimeSince(LastTime);
+        if (TimeElapsed < TimePerUpdate)
+        {
+            // Sleep((DWORD)(1000 * (Target - TimeElapsed) / PerfCountFrequency.QuadPart));
+            Sleep(1);
+            while (TimeElapsed < TimePerUpdate)
+                TimeElapsed = Win32_TimeSince(LastTime);
+        }
+        LastTime += TimeElapsed;
+    }
+
     return 0;
+}
+
+DWORD Win32_ServerMainThreadProc(void *Parameter)
+{
+    return Win32_ServerMain();
 }
 
 int WinStartUp(void)
@@ -650,17 +690,25 @@ int WinStartUp(void)
     }
     else
     {
+        GlobalRunning = true;
+        Network_Init();
+
         // STARTUPINFO StartupInfo = { 0 };
         // PROCESS_INFORMATION ProcessInformation = { 0 };
         // CreateProcessA("bergbaukunst.exe", "-server", 0, 0, FALSE, 0, 0, 0, &StartupInfo, &ProcessInformation);
         // WaitForInputIdle(ProcessInformation.hProcess, INFINITE);
         // CloseHandle(ProcessInformation.hThread);
         
+        DWORD ServerThreadID;
+        HANDLE ServerThrad = CreateThread(0, 0,  Win32_ServerMainThreadProc, 0, 0, &ServerThreadID);
+
         int ExitCode = Win32_ClientMain();
 
         // TerminateProcess(ProcessInformation.hProcess, 0);
         // WaitForSingleObject(ProcessInformation.hProcess, INFINITE);
         
+        Network_Destroy();
+
         return ExitCode;
     }
 }

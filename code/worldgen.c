@@ -88,8 +88,8 @@ void WorldGen_GenerateChunk(chunk *Chunk)
 	for (i32 yy = 0; yy < CHUNK_WIDTH; yy++)
     for (i32 xx = 0; xx < CHUNK_WIDTH; xx++)
     {
-        vec2 p = (vec2){ (f32)(Chunk->x * CHUNK_WIDTH + xx),
-                         (f32)(Chunk->y * CHUNK_WIDTH + yy) };
+        vec2 p = (vec2){ (f32)(Chunk->Position.x * CHUNK_WIDTH + xx),
+                         (f32)(Chunk->Position.y * CHUNK_WIDTH + yy) };
 #if 1
         u32 BiomeSize = 64;
 		vec2 BiomeSize2 = Vec2_Set1((f32)BiomeSize);

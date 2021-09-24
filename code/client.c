@@ -22,32 +22,40 @@ typedef struct input
     bool NoClip;
 } input;
 
-#include "world.c"
 #include "player.c"
 
 typedef struct client
 {
+    /* NETWORK */
+    network_client Client;
+
     /* RESOURCES */
     palette Palette;
     bitmap Terrain;
     bitmap Font;
 
+    /* STATE */
     camera Camera;
     player Player;
-    world World;
+    view View;
 } client;
 
 void Client_Init(client *Client)
 {
+    /* NETWORK */
+    while (!Network_Client(&Client->Client, "localhost", "4510"));
+
+    /* RESOURCES */
     Client->Terrain = Win32_LoadBitmap("TERRAIN");
     Client->Font = Win32_LoadBitmap("FONT");
     Client->Palette = Win32_LoadPalette("PALETTE");
     Win32_SetPalette(&Client->Palette);
 
+    /* STATE */
     Camera_SetPosition(&Client->Camera, (vec3){ 0 });
     Camera_SetRotation(&Client->Camera, 0.0f, 0.0f);
 
-    World_Init(&Client->World);
+    View_Init(&Client->View);
 
     Client->Player = (player){
         .Position = (vec3) { 3.0f, 10.0f, 70.0f },
@@ -57,23 +65,48 @@ void Client_Init(client *Client)
 
 void Client_Input(client *Client, const input Input, f32 DeltaTime)
 {
+    msg Message;
+    while (Network_ClientGetMessage(&Client->Client, &Message))
+    {
+        switch (Message.Header.Type)
+        {
+            case MSG_DISCONNECT: break;
+            case MSG_PLACE_BLOCK: break;
+            case MSG_BREAK_BLOCK: break;
+            case MSG_PLAYER_POSITION: break;
+            case MSG_VIEW_POSITION: break;
+            case MSG_CHUNK_DATA:
+            {
+                view_chunk *Chunk = View_GetChunk(&Client->View, Message.ChunkData.Position);
+                if (Chunk)
+                for (u32 z = 0; z < CHUNK_HEIGHT; ++z)
+                for (u32 y = 0; y < CHUNK_WIDTH; ++y)
+                for (u32 x = 0; x < CHUNK_WIDTH; ++x)
+                {
+                    Chunk->Chunk.Blocks[z][y][x].Id = Message.ChunkData.Blocks[z][y][x];
+                }
+                Chunk_CalcSkyLight(&Chunk->Chunk);
+                Chunk->MeshDirty = true;
+            } break;
+        }
+    }
+
     if (Input.NoClip) Client->Player.NoClip = !Client->Player.NoClip;
 
-    Player_Input(&Client->Player, &Client->World, Input, DeltaTime);
+    Player_Input(&Client->Player, &Client->View, Input, DeltaTime);
 }
 
 void Client_Update(client *Client, const input Input, f32 DeltaTime)
 {
-    Player_Update(&Client->Player, &Client->World, DeltaTime);
-    World_Update(&Client->World, Client->Camera);
+    Player_Update(&Client->Player, &Client->View, DeltaTime);
 }
 
 void Client_Draw(client *Client, bitmap Buffer, f32 DeltaTime)
 {
-    Player_Draw(&Client->Player, &Client->World, &Client->Camera, DeltaTime);
+    Player_Draw(&Client->Player, &Client->View, &Client->Camera, DeltaTime);
 
     Raserizer_Clear(COLOR_SKYBLUE);
-    World_Draw(&Client->World, Buffer, Client->Terrain, Client->Camera);
+    View_Draw(&Client->View, Buffer, Client->Terrain, Client->Camera);
     Raserizer_Blit(Buffer);
 
     Draw_String(Buffer, Client->Font, COLOR_WHITE, (ivec2){8,8}, "ver. 0.001a");
@@ -88,7 +121,7 @@ void Client_Draw(client *Client, bitmap Buffer, f32 DeltaTime)
     Draw_Line(Buffer, COLOR_WHITE, D, A);
 
     trace_result TraceResult;
-    if (World_TraceRay(&Client->World, Client->Camera.Position, Camera_Direction(Client->Camera), 5.0f, &TraceResult) < 5.0f)
+    if (View_TraceRay(&Client->View, Client->Camera.Position, Camera_Direction(Client->Camera), 5.0f, &TraceResult) < 5.0f)
     {
         Block_HighlightFace(Buffer, Client->Camera, TraceResult.BlockPosition, TraceResult.BlockFace);
     }
