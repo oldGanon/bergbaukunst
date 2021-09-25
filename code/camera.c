@@ -163,14 +163,11 @@ bool Camera_PointVisible(const camera Camera, const bitmap Screen, vec3 Position
     return true;
 }
 
-bool Camera_BoxVisible(const camera Camera, const bitmap Screen, vec3 P0, vec3 P1)
+bool Camera_BoxVisible(const camera Camera, const bitmap Screen, box Box)
 {
-    vec3 Min = Vec3_Min(P0, P1);
-    vec3 Max = Vec3_Max(P0, P1);
-
     vec3 Half = (vec3){ 0.5f, 0.5f, 0.5f };
-    vec3 HalfDim = Vec3_Mul(Vec3_Sub(Max, Min), Half);
-    vec3 Center = Vec3_Sub(Vec3_Add(Min, HalfDim), Camera.Position);
+    vec3 HalfDim = Vec3_Mul(Vec3_Sub(Box.Max, Box.Min), Half);
+    vec3 Center = Vec3_Sub(Vec3_Add(Box.Min, HalfDim), Camera.Position);
 
     f32 MinDim = 1.0f / Min(Screen.Width, Screen.Height);
     f32 X = Screen.Width * MinDim;

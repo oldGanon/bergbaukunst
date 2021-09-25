@@ -11,8 +11,6 @@ typedef struct chunk
     bool Allocated;
     ivec2 Position;
 
-    u64 Neighbors[3][3];
-
     block Blocks[CHUNK_HEIGHT][CHUNK_WIDTH][CHUNK_WIDTH];
 } chunk;
 
@@ -40,6 +38,17 @@ void Chunk_CalcSkyLight(chunk *Chunk)
     }
 }
 
+inline ivec3 World_ToBlockPosition(ivec3 WorldPosition)
+{
+    ivec3 Mask = (ivec3){ CHUNK_WIDTH_MASK, CHUNK_WIDTH_MASK, CHUNK_HEIGHT_MASK };
+    return iVec3_And(WorldPosition, Mask);
+}
+
+inline ivec2 World_ToChunkPosition(ivec3 WorldPosition)
+{
+    return iVec2_ShiftRight(WorldPosition.xy, CHUNK_WIDTH_SHIFT);
+}
+
 block Chunk_GetBlock(const chunk *Chunk, ivec3 WorldPosition)
 {
     if (WorldPosition.z < 0)                return DEFAULT_SKY_BLOCK;
@@ -60,15 +69,47 @@ void Chunk_SetBlock(chunk *Chunk, ivec3 WorldPosition, block Block)
     Chunk_CalcSkyLight(Chunk);
 }
 
-void Chunk_Create(chunk *Chunk, ivec2 Position)
+void Chunk_Init(chunk *Chunk, ivec2 Position)
 {
     Chunk->Allocated = true;
     Chunk->Position = Position;
+    memset(Chunk->Blocks, 0, sizeof(Chunk->Blocks));
 }
 
-void Chunk_Delete(chunk *Chunk, ivec2 Position)
+void Chunk_Clear(chunk *Chunk, ivec2 Position)
 {
     Chunk->Allocated = false;
     assert(Chunk->Position.x == Position.x);
     assert(Chunk->Position.y == Position.y);
+}
+
+box Chunk_Box(chunk *Chunk)
+{
+    vec3 ChunkDim = (vec3) { CHUNK_WIDTH, CHUNK_WIDTH, CHUNK_HEIGHT };
+    vec3 ChunkPos = (vec3) { .xy = iVec2_toVec2(Chunk->Position) };
+    vec3 ChunkMin = Vec3_Mul(ChunkDim, ChunkPos);
+    vec3 ChunkMax = Vec3_Add(ChunkDim, ChunkMin);
+    return (box){ .Min = ChunkMin, .Max = ChunkMax };
+}
+
+box Chunk_BoxIntersection(chunk *Chunk, const box Box)
+{
+    vec3 ChunkDim = (vec3) { CHUNK_WIDTH, CHUNK_WIDTH, CHUNK_HEIGHT };
+    vec3 ChunkOrigin = (vec3) { .xy = iVec2_toVec2(iVec2_ShiftLeft(Chunk->Position, CHUNK_WIDTH_SHIFT)) };
+
+    ivec3 Min = Vec3_FloorToIVec3(Max(Sub(Box.Min, ChunkOrigin), Vec3_Zero()));
+    ivec3 Max = Vec3_CeilToIVec3(Min(Sub(Box.Max, ChunkOrigin), ChunkDim));
+
+    box Intersection = BOX_EMPTY;
+
+    for (i32 z = Min.z; z < Max.z; ++z)
+    for (i32 y = Min.y; y < Max.y; ++y)
+    for (i32 x = Min.x; x < Max.x; ++x)
+    {
+        block Block = Chunk->Blocks[z][y][x];
+        vec3 BlockPosition = iVec3_toVec3((ivec3){ x, y, z });
+        Intersection = Box_Union(Intersection, Block_BoxIntersection(Block, BlockPosition, Box));
+    }
+
+    return Intersection;
 }

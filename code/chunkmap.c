@@ -152,37 +152,6 @@ inline void ChunkMap_Grow(chunk_map *Map)
     free(OldValues);
 }
 
-inline void ChunkMap__ConnectChunk(chunk_map *Map, chunk *Chunk, u64 ChunkId)
-{
-    for (i32 y = -1; y <= 1; ++y)
-    for (i32 x = -1; x <= 1; ++x)
-    {
-        ivec2 NeighborPos = iVec2_Add(Chunk->Position, (ivec2) { x, y });
-        u64 NeighborId =  ChunkMap_GetChunkId(Map, NeighborPos);
-        chunk *Neighbor = ChunkMap_GetChunkById(Map, NeighborId);
-        if (Neighbor)
-        {
-            Chunk->Neighbors[1+y][1+x] = NeighborId;
-            Neighbor->Neighbors[1-y][1-x] = ChunkId;
-        }
-    }
-}
-
-inline void ChunkMap__DisonnectChunk(chunk_map *Map, chunk *Chunk)
-{
-    for (i32 y = -1; y <= 1; ++y)
-    for (i32 x = -1; x <= 1; ++x)
-    {
-        u64 NeighborId = Chunk->Neighbors[1+y][1+x];
-        chunk *Neighbor = ChunkMap_GetChunkById(Map, NeighborId);
-        if (Neighbor)
-        {
-            Chunk->Neighbors[1+y][1+x] = 0;
-            Neighbor->Neighbors[1-y][1-x] = 0;
-        }
-    }
-}
-
 //
 //
 //
@@ -222,8 +191,7 @@ chunk *ChunkMap_AllocateChunk(chunk_map *Map, ivec2 Position)
         if (!Chunk->Allocated)
         {
             ChunkMap_InsertChunkId(Map, i, Position);
-            Chunk_Create(Chunk, Position);
-            ChunkMap__ConnectChunk(Map, Chunk, i);
+            Chunk_Init(Chunk, Position);
             return Chunk;
         }
     }
@@ -237,8 +205,7 @@ void ChunkMap_DeleteChunk(chunk_map *Map, ivec2 Position)
     u64 Index = ChunkMap_GetIndex(Map, Position);
 
     chunk *Chunk = Map->Chunks + Map->Values[Index].ChunkId;
-    ChunkMap__DisonnectChunk(Map, Chunk);
-    Chunk_Delete(Chunk, Position);
+    Chunk_Clear(Chunk, Position);
 
     ChunkMap_RemoveIndex(Map, Index);
 }

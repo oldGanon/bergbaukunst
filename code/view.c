@@ -11,7 +11,7 @@ typedef struct view_chunk
 typedef struct view
 {
 	ivec2 Position;
-	view_chunk Chunks[LOADED_CHUNKS_DIST<<1][LOADED_CHUNKS_DIST<<1];
+	view_chunk Chunks[LOADED_CHUNKS_DIM][LOADED_CHUNKS_DIM];
 } view;
 
 quad Block_FaceQuad(vec3 Position, vec3 Right, vec3 Up, vec2 UV, vec2 U, vec2 V, f32 *Shadow)
@@ -291,14 +291,13 @@ void Block_HighlightFace(bitmap Buffer, camera Camera, vec3 BlockPosition, u32 B
 
 view_chunk *View_GetChunk(view *View, ivec2 ChunkPosition)
 {
-    ivec2 Offset = iVec2_Sub(View->Position, iVec2_Set1(LOADED_CHUNKS_DIST));
-	ivec2 ViewPosition = iVec2_Sub(ChunkPosition, Offset);
-	if (ViewPosition.x < 0 ||
-		ViewPosition.y < 0 ||
-		ViewPosition.x >= (LOADED_CHUNKS_DIST << 1) ||
-		ViewPosition.y >= (LOADED_CHUNKS_DIST << 1))
+	if (ChunkPosition.x < (View->Position.x - LOADED_CHUNKS_DIST) ||
+		ChunkPosition.y < (View->Position.y - LOADED_CHUNKS_DIST) ||
+		ChunkPosition.x >= (View->Position.x + LOADED_CHUNKS_DIST) ||
+		ChunkPosition.y >= (View->Position.y + LOADED_CHUNKS_DIST))
 		return 0;
 
+    ivec2 ViewPosition = iVec2_And(ChunkPosition, iVec2_Set1(LOADED_CHUNKS_DIM_MASK));
 	return &View->Chunks[ViewPosition.y][ViewPosition.x];
 }
 
@@ -316,7 +315,7 @@ block View_GetBlock(view *View, vec3 WorldPosition)
     ivec3 iWorldPosition = Vec3_FloorToIVec3(WorldPosition);
     ivec2 ChunkPosition = World_ToChunkPosition(iWorldPosition);
     view_chunk *Chunk = View_GetChunk(View, ChunkPosition);
-    if (!Chunk) return DEFAULT_BLOCK; // maybe generate chunk instead?
+    if (!Chunk) return DEFAULT_BLOCK;
     return Chunk_GetBlock(&Chunk->Chunk, iWorldPosition);
 }
 
@@ -328,7 +327,7 @@ void View_SetBlock(view *View, vec3 WorldPosition, block Block)
     ivec3 iWorldPosition = Vec3_FloorToIVec3(WorldPosition);
     ivec2 ChunkPosition = World_ToChunkPosition(iWorldPosition);
     view_chunk *Chunk = View_GetChunk(View, ChunkPosition);
-    if (!Chunk) return; // maybe generate chunk instead?
+    if (!Chunk) return;
     Chunk_SetBlock(&Chunk->Chunk, iWorldPosition, Block);
 
     View_MarkChunkDirty(View, ChunkPosition);
@@ -529,11 +528,9 @@ void View_DrawChunk(view *View, ivec2 ChunkPosition, const bitmap Target, bitmap
         View_GenerateChunkMesh(View, ChunkPosition);
     }
 
-    vec3 ChunkDim = (vec3) { CHUNK_WIDTH, CHUNK_WIDTH, CHUNK_HEIGHT };
-    vec3 ChunkMin = Vec3_Mul(ChunkDim, (vec3) { (f32)ChunkPosition.x, (f32)ChunkPosition.y, 0 });
-    vec3 ChunkMax = Vec3_Add(ChunkDim, ChunkMin);
-    if (!Camera_BoxVisible(Camera, Target, ChunkMin, ChunkMax)) return;
-    Mesh_Draw(Target, Camera, TerrainTexture, ChunkMin, &Chunk->Mesh);
+    box ChunkBox = Chunk_Box(&Chunk->Chunk);
+    if (!Camera_BoxVisible(Camera, Target, ChunkBox)) return;
+    Mesh_Draw(Target, Camera, TerrainTexture, ChunkBox.Min, &Chunk->Mesh);
 }
 
 void View_Draw(view *View, const bitmap Target, bitmap TerrainTexture, const camera Camera)
@@ -546,152 +543,71 @@ void View_Draw(view *View, const bitmap Target, bitmap TerrainTexture, const cam
     for (i32 y = Min.y; y <= Max.y; ++y)
     for (i32 x = Min.x; x <= Max.x; ++x)
     {
-        ivec2 ChunkPos = (ivec2){x, y};
-        View_DrawChunk(View, ChunkPos, Target, TerrainTexture, Camera);
+        ivec2 ChunkPosition = (ivec2){ x, y };
+        View_DrawChunk(View, ChunkPosition, Target, TerrainTexture, Camera);
     }
 }
 
+void View_SetPosition(view *View, ivec2 Position)
+{
+    ivec2 Min = iVec2_Sub(Position, iVec2_Set1(DRAW_DISTANCE));
+    ivec2 Max = iVec2_Add(Position, iVec2_Set1(DRAW_DISTANCE));
 
+    for (i32 y = Min.y; y <= Max.y; ++y)
+    for (i32 x = Min.x; x <= Max.x; ++x)
+    {
+        ivec2 ChunkPosition = (ivec2){ x, y };
+        ivec2 ViewPosition = iVec2_And(ChunkPosition, iVec2_Set1(LOADED_CHUNKS_DIM_MASK));
+        view_chunk *Chunk = &View->Chunks[ViewPosition.y][ViewPosition.x];
+        if (Chunk->Chunk.Position.x == ChunkPosition.x ||
+            Chunk->Chunk.Position.y == ChunkPosition.y)
+            continue;
+        Chunk_Init(&Chunk->Chunk, ViewPosition);
+        Mesh_Clear(&Chunk->Mesh);
+    }
+}
+
+void View_SetChunk(view *View, const msg_chunk_data *ChunkData)
+{
+    ivec2 ChunkPosition = ChunkData->Position;
+    view_chunk *Chunk = View_GetChunk(View, ChunkPosition);
+    if (!Chunk) return;
+    for (u32 z = 0; z < CHUNK_HEIGHT; ++z)
+    for (u32 y = 0; y < CHUNK_WIDTH; ++y)
+    for (u32 x = 0; x < CHUNK_WIDTH; ++x)
+    {
+        Chunk->Chunk.Blocks[z][y][x].Id = ChunkData->Blocks[z][y][x];
+    }
+    Chunk->Chunk.Position = ChunkPosition;
+    Chunk_CalcSkyLight(&Chunk->Chunk);
+
+    for (i32 y = -1; y <= 1; ++y)
+    for (i32 x = -1; x <= 1; ++x)
+    {
+        ivec2 Offset = { x, y };
+        Chunk = View_GetChunk(View, iVec2_Add(ChunkPosition, Offset));
+        if (!Chunk) continue;
+        Chunk->MeshDirty = true;
+    }
+}
 
 void View_Init(view *View)
 {
-    for (i32 y = 0; y < (LOADED_CHUNKS_DIST << 1); ++y)
-    for (i32 x = 0; x < (LOADED_CHUNKS_DIST << 1); ++x)
+    View_SetPosition(View, (ivec2){ 0 });
+
+    for (i32 y = 0; y < LOADED_CHUNKS_DIM; ++y)
+    for (i32 x = 0; x < LOADED_CHUNKS_DIM; ++x)
     {
         View->Chunks[y][x].Mesh = Mesh_Create();
     }
 }
 
-
-
 f32 View_TraceRay(view *View, vec3 RayOrigin, vec3 RayDirection, f32 RayLength, trace_result *Result)
 {
-    vec3 RayPosition = RayOrigin;
-    vec3 RaySign = Sign(RayDirection);
-
-    f32 t = 0;
-    vec3 tDelta = Min(Inverse(Abs(RayDirection)), Vec3_Set1(0x100000));
-    vec3 tInit = Fract(RayPosition);
-    if (RaySign.x > 0) tInit.x = (1 - tInit.x);
-    if (RaySign.y > 0) tInit.y = (1 - tInit.y);
-    if (RaySign.z > 0) tInit.z = (1 - tInit.z);
-    vec3 tMax = Mul(tInit, tDelta);
-
-    block_face LastFace = BLOCK_FACE_NONE;
-
-    for (;;)
-    {
-        if (t > RayLength)
-            return RayLength;
-        if ((RaySign.z < 0) && (RayPosition.z < 0))
-            return INFINITY;
-        if ((RaySign.z > 0) && (RayPosition.z > CHUNK_HEIGHT - 1))
-            return INFINITY;
-
-        vec3 BlockPosition = Floor(RayPosition);
-        block Block = View_GetBlock(View, BlockPosition);
-        if (Block_TraceRay(Block, BlockPosition, RayOrigin, RayDirection) < RayLength)
-        {
-            vec3 FreePosition = Add(BlockPosition, BlockFace_Normal[LastFace]);
-            *Result = (trace_result) {
-                .Block = Block,
-                .BlockFace = LastFace,
-                .BlockPosition = BlockPosition,
-                .FreePosition = FreePosition,
-            };
-            return t;
-        }
-
-        if ((tMax.x <= tMax.y) && (tMax.x <= tMax.z))
-        {
-            t = tMax.x;
-            tMax.x += tDelta.x;
-            RayPosition.x += RaySign.x;
-            if(RaySign.x > 0) LastFace = BLOCK_FACE_LEFT;
-            else              LastFace = BLOCK_FACE_RIGHT;
-        }
-        else if ((tMax.y <= tMax.x) && (tMax.y <= tMax.z))
-        {
-            t = tMax.y;
-            tMax.y += tDelta.y;
-            RayPosition.y += RaySign.y;
-            if (RaySign.y > 0) LastFace = BLOCK_FACE_FRONT;
-            else               LastFace = BLOCK_FACE_BACK;
-        }
-        else if ((tMax.z <= tMax.x) && (tMax.z <= tMax.y))
-        {
-            t = tMax.z;
-            tMax.z += tDelta.z;
-            RayPosition.z += RaySign.z;
-            if (RaySign.z > 0) LastFace = BLOCK_FACE_BOTTOM;
-            else               LastFace = BLOCK_FACE_TOP;
-        }
-    }
-}
-
-box View_BoxIntersection(view *View, box Box)
-{
-    ivec3 Min = Vec3_FloorToIVec3(Box.Min);
-    ivec3 Max = Vec3_CeilToIVec3(Box.Max);
-
-    box Intersection = BOX_EMPTY;
-
-    for (i32 z = Min.z; z < Max.z; ++z)
-    for (i32 y = Min.y; y < Max.y; ++y)
-    for (i32 x = Min.x; x < Max.x; ++x)
-    {
-        ivec3 WorldPosition = { x, y, z };
-        vec3 BlockPosition = iVec3_toVec3(WorldPosition);
-        block Block = View_GetBlock(View, BlockPosition);
-        Intersection = Box_Union(Intersection, Block_BoxIntersection(Block, BlockPosition, Box));
-    }
-
-    return Intersection;
+    return Phys_TraceRay(View_GetBlock, View, RayOrigin, RayDirection, RayLength, Result);
 }
 
 vec3 View_CheckMoveBox(view *View, box Box, vec3 Move)
 {
-    {
-        box MoveBox = Box;
-        if (Move.x < 0) { MoveBox.Max.x = MoveBox.Min.x; MoveBox.Min.x += Move.x;}
-        if (Move.x > 0) { MoveBox.Min.x = MoveBox.Max.x; MoveBox.Max.x += Move.x;}
-        box CollisionBox = View_BoxIntersection(View, MoveBox);
-        if (!Box_Empty(CollisionBox))
-        {
-            if (Move.x < 0) Move.x = CollisionBox.Max.x - Box.Min.x;
-            if (Move.x > 0) Move.x = CollisionBox.Min.x - Box.Max.x;
-        }
-        Box.Min.x += Move.x;
-        Box.Max.x += Move.x;
-    }
-
-    {
-        box MoveBox = Box;
-        if (Move.y < 0) { MoveBox.Max.y = MoveBox.Min.y; MoveBox.Min.y += Move.y; }
-        if (Move.y > 0) { MoveBox.Min.y = MoveBox.Max.y; MoveBox.Max.y += Move.y; }
-        box CollisionBox = View_BoxIntersection(View, MoveBox);
-        if (!Box_Empty(CollisionBox))
-        {
-            if (Move.y < 0) Move.y = CollisionBox.Max.y - Box.Min.y;
-            if (Move.y > 0) Move.y = CollisionBox.Min.y - Box.Max.y;
-        }
-        Box.Min.y += Move.y;
-        Box.Max.y += Move.y;
-    }
-
-    {
-        box MoveBox = Box;
-        if (Move.z < 0) { MoveBox.Max.z = MoveBox.Min.z; MoveBox.Min.z += Move.z; }
-        if (Move.z > 0) { MoveBox.Min.z = MoveBox.Max.z; MoveBox.Max.z += Move.z; }
-        box CollisionBox = View_BoxIntersection(View, MoveBox);
-        if (!Box_Empty(CollisionBox))
-        {
-            if (Move.z < 0) Move.z = CollisionBox.Max.z - Box.Min.z;
-            if (Move.z > 0) Move.z = CollisionBox.Min.z - Box.Max.z;
-        }
-        Box.Min.z += Move.z;
-        Box.Max.z += Move.z;
-    }
-
-    return Move;
+    return Phys_CheckMoveBox(View_GetBlock, View, Box, Move);
 }

@@ -63,7 +63,7 @@ void Client_Init(client *Client)
     };
 }
 
-void Client_Input(client *Client, const input Input, f32 DeltaTime)
+void Client_ProcessMessages(client *Client)
 {
     msg Message;
     while (Network_ClientGetMessage(&Client->Client, &Message))
@@ -74,22 +74,15 @@ void Client_Input(client *Client, const input Input, f32 DeltaTime)
             case MSG_PLACE_BLOCK: break;
             case MSG_BREAK_BLOCK: break;
             case MSG_PLAYER_POSITION: break;
-            case MSG_VIEW_POSITION: break;
-            case MSG_CHUNK_DATA:
-            {
-                view_chunk *Chunk = View_GetChunk(&Client->View, Message.ChunkData.Position);
-                if (Chunk)
-                for (u32 z = 0; z < CHUNK_HEIGHT; ++z)
-                for (u32 y = 0; y < CHUNK_WIDTH; ++y)
-                for (u32 x = 0; x < CHUNK_WIDTH; ++x)
-                {
-                    Chunk->Chunk.Blocks[z][y][x].Id = Message.ChunkData.Blocks[z][y][x];
-                }
-                Chunk_CalcSkyLight(&Chunk->Chunk);
-                Chunk->MeshDirty = true;
-            } break;
+            case MSG_VIEW_POSITION: View_SetPosition(&Client->View, Message.ViewPosition.Position); break;
+            case MSG_CHUNK_DATA: View_SetChunk(&Client->View, &Message.ChunkData); break;
         }
     }
+}
+
+void Client_Input(client *Client, const input Input, f32 DeltaTime)
+{
+    Client_ProcessMessages(Client);
 
     if (Input.NoClip) Client->Player.NoClip = !Client->Player.NoClip;
 

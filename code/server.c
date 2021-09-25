@@ -44,6 +44,11 @@ void Server_SendChunks(server *Server, u32 ClientId, msg *Message)
     }
 }
 
+void Server_UpdateClientPosition(server_client *Client, vec3 Position)
+{
+    Client->Position = Position;
+}
+
 void Server_Update(server *Server)
 {
     msg Message;
@@ -59,17 +64,22 @@ void Server_Update(server *Server)
         Server_SendChunks(Server, NewClient, &Message);
     }
 
-    while (Network_ServerGetMessage(&Server->Server, 1, &Message))
+    for (u32 i = 1; i < 16; ++i)
     {
-        switch (Message.Header.Type)
+        server_client *Client = Server_GetClient(Server, i);
+        if (!Client) continue;
+
+        while (Network_ServerGetMessage(&Server->Server, i, &Message))
         {
-            case MSG_DISCONNECT: break;
-            case MSG_PLACE_BLOCK: break;
-            case MSG_BREAK_BLOCK: break;
-            case MSG_PLAYER_POSITION: break;
+            switch (Message.Header.Type)
+            {
+                case MSG_DISCONNECT: break;
+                case MSG_PLACE_BLOCK: break;
+                case MSG_BREAK_BLOCK: break;
+                case MSG_PLAYER_POSITION: Server_UpdateClientPosition(Client, Message.PlayerPosition.Position); break;
+            }
         }
     }
 
-    server_client *Client = Server_GetClient(Server, 1);
-    if (Client) World_Update(&Server->World, Client->Position);
+    World_Update(&Server->World, Vec3_Zero());
 }
