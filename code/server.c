@@ -2,6 +2,12 @@
 typedef struct server_client
 {
     vec3 Position;
+
+    // ViewPosition;
+    // ViewDistance;
+    // EntityID;
+    // LookYaw;
+    // LookPitch;
 } server_client;
 
 typedef struct server
@@ -10,6 +16,14 @@ typedef struct server
     server_client Clients[SERVER_MAX_CLIENTS];
     world World;
 } server;
+
+box Server_ClientPlayerBox(server_client *Client)
+{
+    return (box){
+        .Min = Vec3_Sub(Client->Position, (vec3){ 0.25f, 0.25f, 1.85f }),
+        .Max = Vec3_Add(Client->Position, (vec3){ 0.25f, 0.25f, 0.15f }),
+    };
+}
 
 void Server_Init(server *Server)
 {
@@ -44,9 +58,41 @@ void Server_SendChunks(server *Server, u32 ClientId, msg *Message)
     }
 }
 
-void Server_UpdateClientPosition(server_client *Client, vec3 Position)
+void Server_ClientUpdatePosition(server *Server, u32 ClientId, const msg_player_position *PlayerPosition)
 {
-    Client->Position = Position;
+    server_client *Client = Server_GetClient(Server, ClientId);
+    if (!Client) return;
+    Client->Position = PlayerPosition->Position;
+}
+
+void Server_ClientPlaceBlock(server *Server, u32 ClientId, const msg_place_block *PlaceBlock)
+{
+    server_client *Client = Server_GetClient(Server, ClientId);
+    if (!Client) return;
+    block Block = (block){ .Id = BLOCK_ID_GRAS };
+
+    box ClientPlayerBox = Server_ClientPlayerBox(Client);
+    if (!Block_BoxIntersect(Block, PlaceBlock->Position, ClientPlayerBox))
+    {
+        World_SetBlock(&Server->World, PlaceBlock->Position, Block);
+
+        msg Message;
+        Message_SetBlock(&Message, PlaceBlock->Position, Block);
+        Network_ServerSendMessage(&Server->Server, ClientId, &Message);
+    }
+
+}
+
+void Server_ClientBreakBlock(server *Server, u32 ClientId, const msg_break_block *BreakBlock)
+{
+    server_client *Client = Server_GetClient(Server, ClientId);
+    if (!Client) return;
+    block Block = (block){ .Id = BLOCK_ID_AIR };
+    World_SetBlock(&Server->World, BreakBlock->Position, Block);
+
+    msg Message;
+    Message_SetBlock(&Message, BreakBlock->Position, Block);
+    Network_ServerSendMessage(&Server->Server, ClientId, &Message);
 }
 
 void Server_Update(server *Server)
@@ -66,17 +112,15 @@ void Server_Update(server *Server)
 
     for (u32 i = 1; i < 16; ++i)
     {
-        server_client *Client = Server_GetClient(Server, i);
-        if (!Client) continue;
-
         while (Network_ServerGetMessage(&Server->Server, i, &Message))
         {
             switch (Message.Header.Type)
             {
                 case MSG_DISCONNECT: break;
-                case MSG_PLACE_BLOCK: break;
-                case MSG_BREAK_BLOCK: break;
-                case MSG_PLAYER_POSITION: Server_UpdateClientPosition(Client, Message.PlayerPosition.Position); break;
+                case MSG_PLAYER_POSITION: Server_ClientUpdatePosition(Server, i, &Message.PlayerPosition); break;
+                case MSG_PLACE_BLOCK:     Server_ClientPlaceBlock(Server, i, &Message.PlaceBlock); break;
+                case MSG_BREAK_BLOCK:     Server_ClientBreakBlock(Server, i, &Message.BreakBlock); break;
+                default: break;
             }
         }
     }

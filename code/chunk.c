@@ -107,7 +107,7 @@ box Chunk_BoxIntersection(chunk *Chunk, const box Box)
     for (i32 x = Min.x; x < Max.x; ++x)
     {
         block Block = Chunk->Blocks[z][y][x];
-        vec3 BlockPosition = iVec3_toVec3((ivec3){ x, y, z });
+        ivec3 BlockPosition = (ivec3){ x, y, z };
         Intersection = Box_Union(Intersection, Block_BoxIntersection(Block, BlockPosition, Box));
     }
 

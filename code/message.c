@@ -1,12 +1,18 @@
 
 enum msg_type
 {
+    /* UNIVERSAL MESSAGES */
     MSG_DISCONNECT,
-    MSG_PLACE_BLOCK,
-    MSG_BREAK_BLOCK,
     MSG_PLAYER_POSITION,
     MSG_VIEW_POSITION,
+    
+    /* SERVER MESSAGES */
     MSG_CHUNK_DATA,
+    MSG_SET_BLOCK,
+    
+    /* CLIENT MESSAGES */
+    MSG_PLACE_BLOCK,
+    MSG_BREAK_BLOCK,
 };
 
 typedef struct msg_header
@@ -15,10 +21,38 @@ typedef struct msg_header
     u32 Size;
 } msg_header;
 
+/* UNIVERSAL MESSAGES */
+
 typedef struct msg_disconnect
 {
     u8 Type;
 } msg_disconnect;
+
+typedef struct msg_player_position
+{
+    vec3 Position;
+} msg_player_position;
+
+typedef struct msg_view_position
+{
+    ivec2 Position;
+} msg_view_position;
+
+/* SERVER MESSAGES */
+
+typedef struct msg_chunk_data
+{
+    ivec2 Position;
+    u8 Blocks[CHUNK_HEIGHT][CHUNK_WIDTH][CHUNK_WIDTH];
+} msg_chunk_data;
+
+typedef struct msg_set_block
+{
+    ivec3 Position;
+    block Block;
+} msg_set_block;
+
+/* CLIENT MESSAGES */
 
 typedef struct msg_place_block
 {
@@ -32,21 +66,7 @@ typedef struct msg_break_block
     u32 BlockFace;
 } msg_break_block;
 
-typedef struct msg_player_position
-{
-    vec3 Position;
-} msg_player_position;
-
-typedef struct msg_view_position
-{
-    ivec2 Position;
-} msg_view_position;
-
-typedef struct msg_chunk_data
-{
-    ivec2 Position;
-    u8 Blocks[CHUNK_HEIGHT][CHUNK_WIDTH][CHUNK_WIDTH];
-} msg_chunk_data;
+/* */
 
 typedef struct msg
 {
@@ -55,11 +75,14 @@ typedef struct msg
     union
     {
         msg_disconnect Disconnect;
-        msg_place_block PlaceBlock;
-        msg_break_block BreakBlock;
         msg_player_position PlayerPosition;
         msg_view_position ViewPosition;
-        msg_chunk_data ChunkData;       
+        
+        msg_chunk_data ChunkData;
+        msg_set_block SetBlock;
+
+        msg_place_block PlaceBlock;
+        msg_break_block BreakBlock;
     };
 } msg;
 
@@ -77,29 +100,14 @@ u64 Message_GetSize(msg *Message)
     }
 }
 
+/* UNIVERSAL MESSAGES */
+
 void Message_Disconnect(msg *Message, u8 Type)
 {
     Message->Header.Type = MSG_DISCONNECT;
     Message->Header.Size = sizeof(msg_header) + sizeof(msg_disconnect);
     
     Message->Disconnect.Type = Type;
-}
-
-void Message_PlaceBlock(msg *Message, ivec3 Position, u32 BlockFace)
-{
-    Message->Header.Type = MSG_PLACE_BLOCK;
-    Message->Header.Size = sizeof(msg_header) + sizeof(msg_place_block);
-    
-    Message->PlaceBlock.Position = Position;
-    Message->PlaceBlock.BlockFace = BlockFace;
-}
-
-void Message_BreakBlock(msg *Message, ivec3 Position)
-{
-    Message->Header.Type = MSG_BREAK_BLOCK;
-    Message->Header.Size = sizeof(msg_header) + sizeof(msg_break_block);
-
-    Message->BreakBlock.Position = Position;
 }
 
 void Message_PlayerPosition(msg *Message, vec3 PlayerPosition)
@@ -118,6 +126,8 @@ void Message_ViewPosition(msg *Message, ivec2 ViewPosition)
     Message->ViewPosition.Position = ViewPosition;
 }
 
+/* SERVER MESSAGES */
+
 void Message_ChunkData(msg *Message, chunk *Chunk)
 {
     Message->Header.Type = MSG_CHUNK_DATA;
@@ -131,4 +141,32 @@ void Message_ChunkData(msg *Message, chunk *Chunk)
     {
         Message->ChunkData.Blocks[z][y][x] = Chunk->Blocks[z][y][x].Id;
     }
+}
+
+void Message_SetBlock(msg *Message, ivec3 Position, block Block)
+{
+    Message->Header.Type = MSG_SET_BLOCK;
+    Message->Header.Size = sizeof(msg_header) + sizeof(msg_set_block);
+    
+    Message->SetBlock.Position = Position;
+    Message->SetBlock.Block = Block;
+}
+
+/* CLIENT MESSAGES */
+
+void Message_PlaceBlock(msg *Message, ivec3 Position, u32 BlockFace)
+{
+    Message->Header.Type = MSG_PLACE_BLOCK;
+    Message->Header.Size = sizeof(msg_header) + sizeof(msg_place_block);
+    
+    Message->PlaceBlock.Position = Position;
+    Message->PlaceBlock.BlockFace = BlockFace;
+}
+
+void Message_BreakBlock(msg *Message, ivec3 Position)
+{
+    Message->Header.Type = MSG_BREAK_BLOCK;
+    Message->Header.Size = sizeof(msg_header) + sizeof(msg_break_block);
+
+    Message->BreakBlock.Position = Position;
 }

@@ -208,9 +208,9 @@ void Block_AddQuadsToMesh(quad_mesh *Mesh, vec3 Position, const block_group *Blo
     }
 }
 
-void Block_HighlightFace(bitmap Buffer, camera Camera, vec3 BlockPosition, u32 BlockFace)
+void Block_HighlightFace(bitmap Buffer, camera Camera, ivec3 iBlockPosition, u32 BlockFace)
 {
-    BlockPosition = Vec3_Floor(BlockPosition);
+    vec3 BlockPosition = iVec3_toVec3(iBlockPosition);
     
     vec3 Corners[8] = {
         Camera_WorldToScreen(Camera, Buffer, BlockPosition),
@@ -307,31 +307,29 @@ void View_MarkChunkDirty(view *View, ivec2 ChunkPosition)
     if (Chunk) Chunk->MeshDirty = true;
 }
 
-block View_GetBlock(view *View, vec3 WorldPosition)
+block View_GetBlock(view *View, ivec3 WorldPosition)
 {
     if (WorldPosition.z < 0)                return DEFAULT_SKY_BLOCK;
     if (WorldPosition.z > CHUNK_HEIGHT - 1) return DEFAULT_HELL_BLOCK;
 
-    ivec3 iWorldPosition = Vec3_FloorToIVec3(WorldPosition);
-    ivec2 ChunkPosition = World_ToChunkPosition(iWorldPosition);
+    ivec2 ChunkPosition = World_ToChunkPosition(WorldPosition);
     view_chunk *Chunk = View_GetChunk(View, ChunkPosition);
     if (!Chunk) return DEFAULT_BLOCK;
-    return Chunk_GetBlock(&Chunk->Chunk, iWorldPosition);
+    return Chunk_GetBlock(&Chunk->Chunk, WorldPosition);
 }
 
-void View_SetBlock(view *View, vec3 WorldPosition, block Block)
+void View_SetBlock(view *View, ivec3 WorldPosition, block Block)
 {
     if ((WorldPosition.z < 0) || (WorldPosition.z > CHUNK_HEIGHT - 1))
         return;
 
-    ivec3 iWorldPosition = Vec3_FloorToIVec3(WorldPosition);
-    ivec2 ChunkPosition = World_ToChunkPosition(iWorldPosition);
+    ivec2 ChunkPosition = World_ToChunkPosition(WorldPosition);
     view_chunk *Chunk = View_GetChunk(View, ChunkPosition);
     if (!Chunk) return;
-    Chunk_SetBlock(&Chunk->Chunk, iWorldPosition, Block);
+    Chunk_SetBlock(&Chunk->Chunk, WorldPosition, Block);
 
     View_MarkChunkDirty(View, ChunkPosition);
-    ivec3 BlockPosition = World_ToBlockPosition(iWorldPosition);
+    ivec3 BlockPosition = World_ToBlockPosition(WorldPosition);
     if ((BlockPosition.x == 0))
     	View_MarkChunkDirty(View, iVec2_Add(ChunkPosition, (ivec2){-1,0}));
     if ((BlockPosition.y == 0))

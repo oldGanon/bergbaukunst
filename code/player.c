@@ -1,22 +1,4 @@
 
-typedef struct player
-{
-    // physics
-    vec3 Position;
-    vec3 Velocity;
-    vec3 Acceleration;
-
-    // input
-    vec3 MoveDir;
-    bool Jump;
-    bool Crouch;
-
-    // state
-    bool OnGround;
-    f32 Cooldown;
-    f32 Yaw, Pitch;
-    bool NoClip;
-} player;
 
 vec3 Player_Forward(player *Player)
 {
@@ -66,7 +48,7 @@ void Player_Move(player *Player, view *View, vec3 Move)
     Player->Position = Vec3_Add(Player->Position, CheckMove);
 }
 
-void Player_Input(player *Player, view *View, input Input, f32 DeltaTime)
+void Player_Input(player *Player, client *Client, input Input, f32 DeltaTime)
 {
 #define KEY_SENSITIVITY 0.05f
 #define MOUSE_SENSITIVITY (1.0f / 3500.0f)
@@ -106,7 +88,11 @@ void Player_Input(player *Player, view *View, input Input, f32 DeltaTime)
     Player->Jump = Input.Jump;
     Player->Crouch = Input.Crouch;
 
-    // Server_PlayerState(Server, Player);
+    {
+        msg Message;
+        Message_PlayerPosition(&Message, Player->Position);
+        Network_ClientSendMessage(&Client->Client, &Message);
+    }
 
     Player->Cooldown = Max(0.0f, Player->Cooldown - DeltaTime);
 
@@ -115,13 +101,16 @@ void Player_Input(player *Player, view *View, input Input, f32 DeltaTime)
     if (Input.Punch && (Player->Cooldown == 0))
     {
         trace_result TraceResult;
-        if (View_TraceRay(View, Player->Position, Player_ViewDirection(Player), Reach, &TraceResult) < Reach)
+        if (View_TraceRay(&Client->View, Player->Position, Player_ViewDirection(Player), Reach, &TraceResult) < Reach)
         {
-            block Block = (block){ .Id = BLOCK_ID_AIR };
-            vec3 PunchPosition = TraceResult.BlockPosition;
+            ivec3 PunchPosition = TraceResult.BlockPosition;
 
-            // Server_PlayerPunch(Server, PunchPosition);
-            View_SetBlock(View, PunchPosition, Block);
+            msg Message;
+            Message_BreakBlock(&Message, PunchPosition);
+            Network_ClientSendMessage(&Client->Client, &Message);
+
+            // block Block = (block){ .Id = BLOCK_ID_AIR };
+            // View_SetBlock(&Client->View, PunchPosition, Block);
         }
         Player->Cooldown = 0.125f;
     }
@@ -129,18 +118,21 @@ void Player_Input(player *Player, view *View, input Input, f32 DeltaTime)
     if (Input.Use && (Player->Cooldown == 0))
     {
         trace_result TraceResult;
-        if (View_TraceRay(View, Player->Position, Player_ViewDirection(Player), Reach, &TraceResult) < Reach)
+        if (View_TraceRay(&Client->View, Player->Position, Player_ViewDirection(Player), Reach, &TraceResult) < Reach)
         {
-            block Block = (block){ .Id = BLOCK_ID_GRAS };
-            vec3 UsePosition = TraceResult.FreePosition;
-            box PlayerBox = Player_Box(Player);
+            u32 BlockFace = TraceResult.BlockFace;
+            ivec3 UsePosition = TraceResult.FreePosition;
 
-            if (!Block_BoxIntersect(Block, UsePosition, PlayerBox))
-            {
-                // Server_PlayerUse(Server, UsePosition);
-                View_SetBlock(View, UsePosition, Block);
-            }
+            msg Message;
+            Message_PlaceBlock(&Message, UsePosition, BlockFace);
+            Network_ClientSendMessage(&Client->Client, &Message);
 
+            // block Block = (block){ .Id = BLOCK_ID_GRAS };
+            // box PlayerBox = Player_Box(Player);
+            // if (!Block_BoxIntersect(Block, UsePosition, PlayerBox))
+            // {
+            //     View_SetBlock(&Client->View, UsePosition, Block);
+            // }
         }
         Player->Cooldown = 0.125f;
     }

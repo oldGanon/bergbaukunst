@@ -62,6 +62,16 @@ const vec3 BlockFace_Normal[7] = {
     [BLOCK_FACE_TOP]    = { 0, 0,+1 },
 };
 
+const ivec3 iBlockFace_Normal[7] = {
+    [BLOCK_FACE_NONE]   = { 0, 0, 0 },
+    [BLOCK_FACE_LEFT]   = {-1, 0, 0 },
+    [BLOCK_FACE_RIGHT]  = {+1, 0, 0 },
+    [BLOCK_FACE_FRONT]  = { 0,-1, 0 },
+    [BLOCK_FACE_BACK]   = { 0,+1, 0 },
+    [BLOCK_FACE_BOTTOM] = { 0, 0,-1 },
+    [BLOCK_FACE_TOP]    = { 0, 0,+1 },
+};
+
 typedef struct box
 {
     vec3 Min, Max;
@@ -83,7 +93,7 @@ f32 Box_TraceRay(vec3 RayOrigin, vec3 RayDirection, box Box)
     return tmin;
 }
 
-f32 Block_TraceRay(block Block, vec3 BlockPosition, vec3 RayOrigin, vec3 RayDirection)
+f32 Block_TraceRay(block Block, ivec3 BlockPosition, vec3 RayOrigin, vec3 RayDirection)
 {
     if (!Block_Solid[Block.Id])
         return INFINITY;
@@ -94,9 +104,11 @@ f32 Block_TraceRay(block Block, vec3 BlockPosition, vec3 RayOrigin, vec3 RayDire
 
         default:
         {
-            box BlockBox = {
-                .Min = BlockPosition,
-                .Max = Add(BlockPosition, Vec3_Set1(1))
+            vec3 Min = iVec3_toVec3(BlockPosition);
+            vec3 Max = Add(Min, Vec3_Set1(1));
+            box BlockBox = { 
+                .Min = Min,
+                .Max = Max
             };
             return Box_TraceRay(RayOrigin, RayDirection, BlockBox);
         } break;
@@ -134,7 +146,7 @@ bool Box_Intersect(box A, box B)
     return true;
 }
 
-bool Block_BoxIntersect(block Block, vec3 BlockPosition, box Box)
+bool Block_BoxIntersect(block Block, ivec3 BlockPosition, box Box)
 {
     if (!Block_Solid[Block.Id])
         return INFINITY;
@@ -145,9 +157,11 @@ bool Block_BoxIntersect(block Block, vec3 BlockPosition, box Box)
 
         default:
         {
-            box BlockBox = {
-                .Min = BlockPosition,
-                .Max = Add(BlockPosition, Vec3_Set1(1))
+            vec3 Min = iVec3_toVec3(BlockPosition);
+            vec3 Max = Add(Min, Vec3_Set1(1));
+            box BlockBox = { 
+                .Min = Min,
+                .Max = Max
             };
             return Box_Intersect(BlockBox, Box);
         } break;
@@ -171,7 +185,7 @@ box Box_Intersection(box A, box B)
     };
 }
 
-box Block_BoxIntersection(block Block, vec3 BlockPosition, box Box)
+box Block_BoxIntersection(block Block, ivec3 BlockPosition, box Box)
 {
     if (!Block_Solid[Block.Id])
         return BOX_EMPTY;
@@ -182,9 +196,11 @@ box Block_BoxIntersection(block Block, vec3 BlockPosition, box Box)
 
         default:
         {
-            box BlockBox = {
-                .Min = BlockPosition,
-                .Max = Add(BlockPosition, Vec3_Set1(1))
+            vec3 Min = iVec3_toVec3(BlockPosition);
+            vec3 Max = Add(Min, Vec3_Set1(1));
+            box BlockBox = { 
+                .Min = Min,
+                .Max = Max
             };
             return Box_Intersection(BlockBox, Box);
         } break;

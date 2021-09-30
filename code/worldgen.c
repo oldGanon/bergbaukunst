@@ -143,19 +143,11 @@ void WorldGen_GenerateChunk(chunk *Chunk)
 			case BIOME_MOUNTAIN: Surface = WorldGen_MountainNoise(p); break;
         }
 
-        f32 BorderSurface;
-        switch (BaseBorderBiome)
+        if (BaseBiome != BaseBorderBiome)
         {
-        	default:             BorderSurface = -1; break;
-			case BIOME_OCEAN: 	 BorderSurface = WorldGen_OceanNoise(p); break;
-			case BIOME_PLAIN: 	 BorderSurface = WorldGen_PlainNoise(p); break;
-			case BIOME_FOREST: 	 BorderSurface = WorldGen_ForestNoise(p); break;
-			case BIOME_DESERT: 	 BorderSurface = WorldGen_DesertNoise(p); break;
-			case BIOME_MOUNTAIN: BorderSurface = WorldGen_MountainNoise(p); break;
+	        f32 Blend = Clamp(VoronoiBase.BorderDist * 8, 0.0f, 1.0f);
+	        Surface = Lerp(64.0f, Surface, Blend);        	
         }
-
-        f32 Blend = Clamp(VoronoiBase.BorderDist * 4+ 0.5f, 0.5f, 1.0f);
-        Surface = Lerp(BorderSurface, Surface, Blend);
 
         i32 iSurface = F32_FloorToI32(Surface);
         for (i32 zz = iSurface; zz >= 0; --zz)

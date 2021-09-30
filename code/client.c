@@ -22,7 +22,24 @@ typedef struct input
     bool NoClip;
 } input;
 
-#include "player.c"
+typedef struct player
+{
+    // physics
+    vec3 Position;
+    vec3 Velocity;
+    vec3 Acceleration;
+
+    // input
+    vec3 MoveDir;
+    bool Jump;
+    bool Crouch;
+
+    // state
+    bool OnGround;
+    f32 Cooldown;
+    f32 Yaw, Pitch;
+    bool NoClip;
+} player;
 
 typedef struct client
 {
@@ -39,6 +56,8 @@ typedef struct client
     player Player;
     view View;
 } client;
+
+#include "player.c"
 
 void Client_Init(client *Client)
 {
@@ -71,11 +90,11 @@ void Client_ProcessMessages(client *Client)
         switch (Message.Header.Type)
         {
             case MSG_DISCONNECT: break;
-            case MSG_PLACE_BLOCK: break;
-            case MSG_BREAK_BLOCK: break;
             case MSG_PLAYER_POSITION: break;
             case MSG_VIEW_POSITION: View_SetPosition(&Client->View, Message.ViewPosition.Position); break;
             case MSG_CHUNK_DATA: View_SetChunk(&Client->View, &Message.ChunkData); break;
+            case MSG_SET_BLOCK: View_SetBlock(&Client->View, Message.SetBlock.Position, Message.SetBlock.Block); break;
+            default: break;
         }
     }
 }
@@ -86,7 +105,7 @@ void Client_Input(client *Client, const input Input, f32 DeltaTime)
 
     if (Input.NoClip) Client->Player.NoClip = !Client->Player.NoClip;
 
-    Player_Input(&Client->Player, &Client->View, Input, DeltaTime);
+    Player_Input(&Client->Player, Client, Input, DeltaTime);
 }
 
 void Client_Update(client *Client, const input Input, f32 DeltaTime)
@@ -104,10 +123,10 @@ void Client_Draw(client *Client, bitmap Buffer, f32 DeltaTime)
 
     Draw_String(Buffer, Client->Font, COLOR_WHITE, (ivec2){8,8}, "ver. 0.001a");
 
-    vec3 A = Camera_WorldToScreen(Client->Camera, Buffer, (vec3) { 0, 0,1});
-    vec3 B = Camera_WorldToScreen(Client->Camera, Buffer, (vec3) {16, 0,1});
-    vec3 C = Camera_WorldToScreen(Client->Camera, Buffer, (vec3) {16,16,1});
-    vec3 D = Camera_WorldToScreen(Client->Camera, Buffer, (vec3) { 0,16,1});
+    vec3 A = Camera_WorldToScreen(Client->Camera, Buffer, (vec3) {  0, 0, 1 });
+    vec3 B = Camera_WorldToScreen(Client->Camera, Buffer, (vec3) { 16, 0, 1 });
+    vec3 C = Camera_WorldToScreen(Client->Camera, Buffer, (vec3) { 16,16, 1 });
+    vec3 D = Camera_WorldToScreen(Client->Camera, Buffer, (vec3) {  0,16, 1 });
     Draw_Line(Buffer, COLOR_WHITE, A, B);
     Draw_Line(Buffer, COLOR_WHITE, B, C);
     Draw_Line(Buffer, COLOR_WHITE, C, D);

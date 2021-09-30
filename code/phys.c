@@ -4,11 +4,11 @@ typedef struct trace_result
     block Block;
     block_face BlockFace;
 
-    vec3 BlockPosition;
-    vec3 FreePosition;
+    ivec3 BlockPosition;
+    ivec3 FreePosition;
 } trace_result;
 
-typedef block get_block_func(void *Data, vec3 Position);
+typedef block get_block_func(void *Data, ivec3 Position);
 
 f32 Phys_TraceRay(get_block_func *GetBlock, void *Data, vec3 RayOrigin, vec3 RayDirection, f32 RayLength, trace_result *Result)
 {
@@ -34,11 +34,11 @@ f32 Phys_TraceRay(get_block_func *GetBlock, void *Data, vec3 RayOrigin, vec3 Ray
         if ((RaySign.z > 0) && (RayPosition.z > CHUNK_HEIGHT - 1))
             return INFINITY;
 
-        vec3 BlockPosition = Floor(RayPosition);
+        ivec3 BlockPosition = Vec3_FloorToIVec3(RayPosition);
         block Block = GetBlock(Data, BlockPosition);
         if (Block_TraceRay(Block, BlockPosition, RayOrigin, RayDirection) < RayLength)
         {
-            vec3 FreePosition = Add(BlockPosition, BlockFace_Normal[LastFace]);
+            ivec3 FreePosition = Add(BlockPosition, iBlockFace_Normal[LastFace]);
             *Result = (trace_result) {
                 .Block = Block,
                 .BlockFace = LastFace,
@@ -87,8 +87,7 @@ box Phys_BoxIntersection(get_block_func *GetBlock, void *Data, box Box)
     for (i32 y = Min.y; y < Max.y; ++y)
     for (i32 x = Min.x; x < Max.x; ++x)
     {
-        ivec3 WorldPosition = { x, y, z };
-        vec3 BlockPosition = iVec3_toVec3(WorldPosition);
+        ivec3 BlockPosition = { x, y, z };
         block Block = GetBlock(Data, BlockPosition);
         Intersection = Box_Union(Intersection, Block_BoxIntersection(Block, BlockPosition, Box));
     }

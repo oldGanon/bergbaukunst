@@ -65,28 +65,26 @@ chunk *World_GetChunk(const world *World, ivec2 ChunkPosition)
     return ChunkMap_GetChunk(&World->ChunkMap, ChunkPosition);
 }
 
-block World_GetBlock(const world *World, vec3 WorldPosition)
+block World_GetBlock(const world *World, ivec3 WorldPosition)
 {
     if (WorldPosition.z < 0)                return DEFAULT_SKY_BLOCK;
     if (WorldPosition.z > CHUNK_HEIGHT - 1) return DEFAULT_HELL_BLOCK;
 
-    ivec3 iWorldPosition = Vec3_FloorToIVec3(WorldPosition);
-    ivec2 ChunkPosition = World_ToChunkPosition(iWorldPosition);
+    ivec2 ChunkPosition = World_ToChunkPosition(WorldPosition);
     const chunk *Chunk = World_GetChunk(World, ChunkPosition);
     if (!Chunk) return DEFAULT_BLOCK; // maybe generate chunk instead?
-    return Chunk_GetBlock(Chunk, iWorldPosition);
+    return Chunk_GetBlock(Chunk, WorldPosition);
 }
 
-void World_SetBlock(world *World, vec3 WorldPosition, block Block)
+void World_SetBlock(world *World, ivec3 WorldPosition, block Block)
 {
     if ((WorldPosition.z < 0) || (WorldPosition.z > CHUNK_HEIGHT - 1))
         return;
 
-    ivec3 iWorldPosition = Vec3_FloorToIVec3(WorldPosition);
-    ivec2 ChunkPosition = World_ToChunkPosition(iWorldPosition);
+    ivec2 ChunkPosition = World_ToChunkPosition(WorldPosition);
     chunk *Chunk = World_GetChunk(World, ChunkPosition);
     if (!Chunk) return; // maybe generate chunk instead?
-    Chunk_SetBlock(Chunk, iWorldPosition, Block);
+    Chunk_SetBlock(Chunk, WorldPosition, Block);
 }
 
 
