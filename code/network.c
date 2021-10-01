@@ -10,12 +10,27 @@ typedef struct network_server
     SOCKET Sockets[NETWORK_SERVER_SOCKET_COUNT];
 } network_server;
 
+void Network_ServerSendMessage(network_server *Server, u32 ClientId, msg *Message);
+bool Network_ServerGetMessage(network_server *Server, u32 ClientId, msg *Message);
+u32 Network_ServerAcceptClient(network_server *Server);
+void Network_ServerShutdown(network_server *Server);
+bool Network_ServerInit(network_server *Server, const char *Port);
+
 typedef struct network_client
 {
     SOCKET Server;
 } network_client;
 
-void Network_DisconnectMessage(int Error, msg *Message)
+void Network_ClientSendMessage(network_client *Client, msg *Message);
+bool Network_ClientGetMessage(network_client *Client, msg *Message);
+void Network_ClientDisconnect(network_client *Client);
+bool Network_ClientInit(network_client *Client, const char *Domain, const char *Port);
+
+/******************/
+/* IMPLEMENTATION */
+/******************/
+
+inline void Network_DisconnectMessage(int Error, msg *Message)
 {
     switch (Error)
     {
@@ -29,7 +44,7 @@ void Network_DisconnectMessage(int Error, msg *Message)
     }
 }
 
-bool Network_GetMessage(SOCKET Socket, msg *Message)
+inline bool Network_GetMessage(SOCKET Socket, msg *Message)
 {
     DWORD Flags = MSG_PEEK;
     DWORD BytesReceived = 0;
@@ -77,7 +92,7 @@ bool Network_GetMessage(SOCKET Socket, msg *Message)
     return true;
 }
 
-void Network_SendMessage(SOCKET Socket, msg *Message)
+inline void Network_SendMessage(SOCKET Socket, msg *Message)
 {
     DWORD Flags = 0;
     DWORD BytesSent = 0;
@@ -93,7 +108,7 @@ void Network_SendMessage(SOCKET Socket, msg *Message)
 
 
 
-bool Network_ServerClientConnected(network_server *Server, u32 ClientId)
+inline bool Network_ServerClientConnected(network_server *Server, u32 ClientId)
 {
     if ((ClientId == 0) || (ClientId > SERVER_MAX_CLIENTS))
         return false;
@@ -208,13 +223,6 @@ bool Network_ServerInit(network_server *Server, const char *Port)
 
 
 
-void Network_ClientDisconnect(network_client *Client)
-{
-    shutdown(Client->Server, SD_BOTH);
-    closesocket(Client->Server);
-    Client->Server = INVALID_SOCKET;
-}
-
 void Network_ClientSendMessage(network_client *Client, msg *Message)
 {
     Network_SendMessage(Client->Server, Message);
@@ -229,6 +237,13 @@ bool Network_ClientGetMessage(network_client *Client, msg *Message)
         Network_ClientDisconnect(Client);
 
     return true;
+}
+
+void Network_ClientDisconnect(network_client *Client)
+{
+    shutdown(Client->Server, SD_BOTH);
+    closesocket(Client->Server);
+    Client->Server = INVALID_SOCKET;
 }
 
 bool Network_ClientInit(network_client *Client, const char *Domain, const char *Port)

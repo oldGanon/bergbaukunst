@@ -11,6 +11,12 @@ typedef struct entity
     vec3 Position;
 } entity;
 
+box Entity_Box(entity *Entity);
+
+/******************/
+/* IMPLEMENTATION */
+/******************/
+
 box Entity_Box(entity *Entity)
 {
     switch (Entity->Type)
@@ -21,9 +27,11 @@ box Entity_Box(entity *Entity)
                 .Max = Vec3_Add(Entity->Position, (vec3){ 0.25f, 0.25f, 0.15f }),
             };
 
-        default: return BOX_EMPTY;
+        default: return Box_Empty();
     }
 }
+
+/*---------------------------------------------------------------------------*/
 
 typedef struct entity_manager
 {
@@ -31,6 +39,16 @@ typedef struct entity_manager
     u32 Capacity;
     u32 Count;
 } entity_manager;
+
+u32 Entity_Spawn(entity_manager *Manager, entity Entity);
+void Entity_Destroy(entity_manager *Manager, u32 EntityId);
+entity *EntityManager_GetEntity(entity_manager *Manager, u32 EntityId);
+entity_manager EntityManager_Create(void);
+void EntityManager_Destroy(entity_manager *Manager);
+
+/******************/
+/* IMPLEMENTATION */
+/******************/
 
 u32 Entity_Spawn(entity_manager *Manager, entity Entity)
 {

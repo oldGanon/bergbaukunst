@@ -59,6 +59,15 @@ void Bitmap_SetPixel(bitmap Bitmap, color Color, i32 X, i32 Y);
 void Bitmap_Clear(bitmap Bitmap, color Color);
 void Draw_Bitmap(bitmap Target, const bitmap Bitmap, i32 X, i32 Y);
 
+// Rasterizer
+void Raserizer_Rasterize(void);
+void Raserizer_Clear(color Color);
+void Raserizer_Flush(void);
+void Raserizer_SetTexture(bitmap Texture);
+void Raserizer_Blit(bitmap Target);
+void Raserizer_DrawTriangle(vertex A, vertex B, vertex C);
+void Raserizer_DrawQuad(vertex A, vertex B, vertex C, vertex D);
+
 // Point
 void Draw_PointStruct(bitmap, color, point);
 void Draw_PointIVec2(bitmap, color, ivec2);
@@ -869,7 +878,7 @@ void Draw_QuadTexturedVerts(bitmap Target, bitmap Texture, vertex A, vertex B, v
 //
 //
 
-#define TRIANGLE_BATCH_SIZE 65536
+#define TRIANGLE_BATCH_SIZE 8
 typedef struct rasterizer
 {
     bitmap Texture;

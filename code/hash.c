@@ -1,4 +1,21 @@
 
+inline u32 Hash_U32(u32 x);
+inline u32 Hash_U32Inverse(u32 x);
+inline u32 Hash_U32Seeded(u64 Seed, u32 x);
+inline u64 Hash_U64(u64 x);
+inline u64 Hash_U64Inverse(u64 x);
+inline u64 Hash_U64Seeded(u64 Seed, u64 x);
+inline u64 Hash_IVec2(ivec2 v);
+inline u64 Hash_IVec2Seeded(u64 Seed, ivec2 v);
+inline u64 Hash_Bytes(const void *Data, size Length);
+inline f32 Hash_toF32(u64 Hash);
+inline f64 Hash_toF64(u64 Hash);
+inline vec2 Hash_toVec2(u64 Hash);
+
+/******************/
+/* IMPLEMENTATION */
+/******************/
+
 inline u32 Hash_U32(u32 x)
 {
     x ^= x >> 16;

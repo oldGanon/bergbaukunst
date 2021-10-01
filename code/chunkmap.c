@@ -16,9 +16,9 @@ chunk *ChunkMap_GetChunkById(const chunk_map *Map, u64 ChunkId);
 chunk *ChunkMap_GetChunk(const chunk_map *Map, ivec2 Position);
 u64 ChunkMap_GetChunkId(const chunk_map *Map, ivec2 Position);
 
-//
-//
-//
+/******************/
+/* IMPLEMENTATION */
+/******************/
 
 typedef struct chunk_map_value
 {

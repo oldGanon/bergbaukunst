@@ -1,6 +1,17 @@
 
 typedef struct rng { u64 State[4]; } rng;
 
+inline u64 Rng_U64(rng *RNG);
+inline f32 Rng_F32(rng *RNG);
+inline f64 Rng_F64(rng *RNG);
+inline vec2 Rng_Vec2(rng *RNG);
+rng Rng_Init(u64 Seed);
+rng Rng_Jump(rng Old);
+
+/******************/
+/* IMPLEMENTATION */
+/******************/
+
 u64 Rng_U64(rng *RNG)
 {
     // xoshiro256**

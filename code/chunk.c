@@ -14,9 +14,32 @@ typedef struct chunk
     block Blocks[CHUNK_HEIGHT][CHUNK_WIDTH][CHUNK_WIDTH];
 } chunk;
 
+void Chunk_Init(chunk *Chunk, ivec2 Position);
+void Chunk_Clear(chunk *Chunk, ivec2 Position);
+block Chunk_GetBlock(const chunk *Chunk, ivec3 WorldPosition);
+void Chunk_SetBlock(chunk *Chunk, ivec3 WorldPosition, block Block);
+void Chunk_CalcSkyLight(chunk *Chunk);
+box Chunk_Box(chunk *Chunk);
+box Chunk_BoxIntersection(chunk *Chunk, const box Box);
+
 #define DEFAULT_BLOCK (block){ .Id = BLOCK_ID_AIR, .Shadow = 0x0 }
 #define DEFAULT_SKY_BLOCK (block){ .Id = BLOCK_ID_AIR, .Shadow = 0x0 }
 #define DEFAULT_HELL_BLOCK (block){ .Id = BLOCK_ID_AIR, .Shadow = 0xF }
+
+/******************/
+/* IMPLEMENTATION */
+/******************/
+
+inline ivec3 World_ToBlockPosition(ivec3 WorldPosition)
+{
+    ivec3 Mask = (ivec3){ CHUNK_WIDTH_MASK, CHUNK_WIDTH_MASK, CHUNK_HEIGHT_MASK };
+    return iVec3_And(WorldPosition, Mask);
+}
+
+inline ivec2 World_ToChunkPosition(ivec3 WorldPosition)
+{
+    return iVec2_ShiftRight(WorldPosition.xy, CHUNK_WIDTH_SHIFT);
+}
 
 void Chunk_CalcSkyLight(chunk *Chunk)
 {
@@ -36,17 +59,6 @@ void Chunk_CalcSkyLight(chunk *Chunk)
             }
         }
     }
-}
-
-inline ivec3 World_ToBlockPosition(ivec3 WorldPosition)
-{
-    ivec3 Mask = (ivec3){ CHUNK_WIDTH_MASK, CHUNK_WIDTH_MASK, CHUNK_HEIGHT_MASK };
-    return iVec3_And(WorldPosition, Mask);
-}
-
-inline ivec2 World_ToChunkPosition(ivec3 WorldPosition)
-{
-    return iVec2_ShiftRight(WorldPosition.xy, CHUNK_WIDTH_SHIFT);
 }
 
 block Chunk_GetBlock(const chunk *Chunk, ivec3 WorldPosition)
@@ -100,7 +112,7 @@ box Chunk_BoxIntersection(chunk *Chunk, const box Box)
     ivec3 Min = Vec3_FloorToIVec3(Max(Sub(Box.Min, ChunkOrigin), Vec3_Zero()));
     ivec3 Max = Vec3_CeilToIVec3(Min(Sub(Box.Max, ChunkOrigin), ChunkDim));
 
-    box Intersection = BOX_EMPTY;
+    box Intersection = Box_Empty();
 
     for (i32 z = Min.z; z < Max.z; ++z)
     for (i32 y = Min.y; y < Max.y; ++y)

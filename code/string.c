@@ -8,6 +8,15 @@ typedef struct string
 #define STR(s) {s,sizeof(s)-1}
 #define STRING(s) (string)STR(s)
 
+string String_FromCString(const char *CString);
+bool String_Equal(string A, string B);
+string String_Trim(string String);
+string String_ExtractToken(string *String);
+
+/******************/
+/* IMPLEMENTATION */
+/******************/
+
 string String_FromCString(const char *CString)
 {
     u64 Length = 0;

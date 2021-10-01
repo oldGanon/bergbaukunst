@@ -7,6 +7,28 @@ typedef struct camera
     f32 SinPitch, CosPitch;
 } camera;
 
+void Camera_SetPosition(camera *Camera, vec3 Position);
+void Camera_SetRotation(camera *Camera, f32 Yaw, f32 Pitch);
+vec3 Camera_Direction(const camera Camera);
+vec3 Camera_Forward(const camera Camera);
+vec3 Camera_Right(const camera Camera);
+vec3 Camera_ToScreen(const bitmap Screen, vec3 Position);
+vec3 Camera_FromScreen(const bitmap Screen, vec3 Position);
+vec3 Camera_FromWorldDir(const camera Camera, vec3 Direction);
+vec3 Camera_ToWorldDir(const camera Camera, vec3 Direction);
+vec3 Camera_FromWorld(const camera Camera, vec3 Position);
+vec3 Camera_ToWorld(const camera Camera, vec3 Position);
+vec3 Camera_WorldToScreen(const camera Camera, const bitmap Screen, vec3 Position);
+vec3 Camera_ScreenToWorld(const camera Camera, const bitmap Screen, vec3 Position);
+f32 Camera_CalcZ(const camera Camera, vec3 Position);
+f32 Camera_CalcDist(const camera Camera, vec3 Position);
+bool Camera_PointVisible(const camera Camera, const bitmap Screen, vec3 Position);
+bool Camera_BoxVisible(const camera Camera, const bitmap Screen, box Box);
+
+/******************/
+/* IMPLEMENTATION */
+/******************/
+
 void Camera_SetPosition(camera *Camera, vec3 Position)
 {
     Camera->Position = Position;

@@ -81,7 +81,7 @@ box Phys_BoxIntersection(get_block_func *GetBlock, void *Data, box Box)
     ivec3 Min = Vec3_FloorToIVec3(Box.Min);
     ivec3 Max = Vec3_CeilToIVec3(Box.Max);
 
-    box Intersection = BOX_EMPTY;
+    box Intersection = Box_Empty();
 
     for (i32 z = Min.z; z < Max.z; ++z)
     for (i32 y = Min.y; y < Max.y; ++y)
@@ -102,7 +102,7 @@ vec3 Phys_CheckMoveBox(get_block_func *GetBlock, void *Data, box Box, vec3 Move)
         if (Move.x < 0) { MoveBox.Max.x = MoveBox.Min.x; MoveBox.Min.x += Move.x;}
         if (Move.x > 0) { MoveBox.Min.x = MoveBox.Max.x; MoveBox.Max.x += Move.x;}
         box CollisionBox = Phys_BoxIntersection(GetBlock, Data, MoveBox);
-        if (!Box_Empty(CollisionBox))
+        if (!Box_IsEmpty(CollisionBox))
         {
             if (Move.x < 0) Move.x = CollisionBox.Max.x - Box.Min.x;
             if (Move.x > 0) Move.x = CollisionBox.Min.x - Box.Max.x;
@@ -116,7 +116,7 @@ vec3 Phys_CheckMoveBox(get_block_func *GetBlock, void *Data, box Box, vec3 Move)
         if (Move.y < 0) { MoveBox.Max.y = MoveBox.Min.y; MoveBox.Min.y += Move.y; }
         if (Move.y > 0) { MoveBox.Min.y = MoveBox.Max.y; MoveBox.Max.y += Move.y; }
         box CollisionBox = Phys_BoxIntersection(GetBlock, Data, MoveBox);
-        if (!Box_Empty(CollisionBox))
+        if (!Box_IsEmpty(CollisionBox))
         {
             if (Move.y < 0) Move.y = CollisionBox.Max.y - Box.Min.y;
             if (Move.y > 0) Move.y = CollisionBox.Min.y - Box.Max.y;
@@ -130,7 +130,7 @@ vec3 Phys_CheckMoveBox(get_block_func *GetBlock, void *Data, box Box, vec3 Move)
         if (Move.z < 0) { MoveBox.Max.z = MoveBox.Min.z; MoveBox.Min.z += Move.z; }
         if (Move.z > 0) { MoveBox.Min.z = MoveBox.Max.z; MoveBox.Max.z += Move.z; }
         box CollisionBox = Phys_BoxIntersection(GetBlock, Data, MoveBox);
-        if (!Box_Empty(CollisionBox))
+        if (!Box_IsEmpty(CollisionBox))
         {
             if (Move.z < 0) Move.z = CollisionBox.Max.z - Box.Min.z;
             if (Move.z > 0) Move.z = CollisionBox.Min.z - Box.Max.z;

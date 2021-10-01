@@ -86,6 +86,7 @@ void free(void *);
 #include "hash.c"
 #include "rng.c"
 #include "noise.c"
+#include "box.c"
 #include "block.c"
 #include "chunk.c"
 #include "entity.c"
@@ -687,7 +688,7 @@ int WinStartUp(void)
     Network_Init();
 
     string CmdLine = String_FromCString(GetCommandLineA());
-    string Executable = String_ExtractToken(&CmdLine);
+    /* string Executable = */ String_ExtractToken(&CmdLine);
     string Option = String_ExtractToken(&CmdLine);
 
     if (String_Equal(Option, STRING("-client")))
