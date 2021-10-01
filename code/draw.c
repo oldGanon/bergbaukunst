@@ -156,7 +156,7 @@ bitmap Bitmap_Create(u32 Width, u32 Height)
     };
 }
 
-void Bitmap_Delete(bitmap Bitmap)
+void Bitmap_Destroy(bitmap Bitmap)
 {
     if (Bitmap.Flags & BITMAP_ONHEAP)
         free(Bitmap.Pixels);

@@ -1,6 +1,6 @@
 @echo off
 
-set NAME=bergbaukunst
+set NAME=bbk
 set NOCRT=-nodefaultlib kernel32.lib
 
 set DebugFlags=-Od -MTd -Z7

@@ -62,7 +62,7 @@ typedef struct client
 void Client_Init(client *Client)
 {
     /* NETWORK */
-    while (!Network_Client(&Client->Client, "localhost", "4510"));
+    while (!Network_ClientInit(&Client->Client, "localhost", "4510"));
 
     /* RESOURCES */
     Client->Terrain = Win32_LoadBitmap("TERRAIN");

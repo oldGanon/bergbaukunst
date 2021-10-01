@@ -9,15 +9,10 @@
 #define LOADED_CHUNKS_DIST (1 << LOADED_CHUNKS_DIST_SHIFT)
 #define LOADED_CHUNKS_DIST_MASK (LOADED_CHUNKS_DIST - 1)
 
-typedef struct entity
-{
-    f32 x, y, z;
-} entity;
-
 typedef struct world
 {
-    entity Entities[256];
     chunk_map ChunkMap;
+    entity_manager EntityManager;
 } world;
 
 // typedef enum world_direction
@@ -30,11 +25,10 @@ typedef struct world
 //     DOWN,  // -z
 // } world_direction;
 
-
-
 void World_Init(world *World)
 {
     World->ChunkMap = ChunkMap_Create();
+    World->EntityManager = EntityManager_Create();
     WorldGen_Init();
 }
 
@@ -86,6 +80,17 @@ void World_SetBlock(world *World, ivec3 WorldPosition, block Block)
     if (!Chunk) return; // maybe generate chunk instead?
     Chunk_SetBlock(Chunk, WorldPosition, Block);
 }
+
+
+
+u32 World_SpawnPlayer(world *World, vec3 Position)
+{
+    return Entity_Spawn(&World->EntityManager, (entity) {
+        .Type = ENTITY_PLAYER,
+        .Position = Position,
+    });
+}
+
 
 
 f32 World_TraceRay(world *World, vec3 RayOrigin, vec3 RayDirection, f32 RayLength, trace_result *Result)

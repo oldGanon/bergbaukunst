@@ -161,7 +161,7 @@ void Network_ServerShutdown(network_server *Server)
     }
 }
 
-bool Network_Server(network_server *Server, const char *Port)
+bool Network_ServerInit(network_server *Server, const char *Port)
 {
     for (u32 i = 0; i < NETWORK_SERVER_SOCKET_COUNT; ++i)
         Server->Sockets[i] = INVALID_SOCKET;
@@ -231,7 +231,7 @@ bool Network_ClientGetMessage(network_client *Client, msg *Message)
     return true;
 }
 
-bool Network_Client(network_client *Client, const char *Domain, const char *Port)
+bool Network_ClientInit(network_client *Client, const char *Domain, const char *Port)
 {
     Client->Server = INVALID_SOCKET;
 

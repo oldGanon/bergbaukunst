@@ -13,7 +13,7 @@ typedef struct quad_mesh
 } quad_mesh;
 
 quad_mesh Mesh_Create(void);
-void Mesh_Delete(quad_mesh *);
+void Mesh_Destroy(quad_mesh *);
 void Mesh_Clear(quad_mesh *);
 void Mesh_AddQuad(quad_mesh *, quad);
 void Mesh_Sort(quad_mesh *, const camera, vec3);
@@ -39,7 +39,7 @@ quad_mesh Mesh_Create(void)
     };
 }
 
-void Mesh_Delete(quad_mesh *Mesh)
+void Mesh_Destroy(quad_mesh *Mesh)
 {
     free(Mesh->Quads);
     *Mesh = (quad_mesh){ 0 };

@@ -81,20 +81,21 @@ __declspec(restrict) void * malloc(size_t);
 __declspec(restrict) void * realloc(void *, size_t);
 void free(void *);
 
+#include "string.c"
 #include "math.c"
 #include "hash.c"
 #include "rng.c"
 #include "noise.c"
 #include "block.c"
 #include "chunk.c"
+#include "entity.c"
 #include "phys.c"
-#include "world.c"
 #include "message.c"
 #include "network.c"
 #include "server.c"
 
 struct bitmap Win32_LoadBitmap(const char*);
-void Win32_DeleteBitmap(struct bitmap);
+void Win32_DestroyBitmap(struct bitmap);
 struct palette Win32_LoadPalette(const char *);
 void Win32_SetPalette(const struct palette *);
 
@@ -680,21 +681,29 @@ DWORD Win32_ServerMainThreadProc(void *Parameter)
 }
 
 int WinStartUp(void)
-{    
-    const LPSTR CmdLine = GetCommandLineA();
+{
+    int ExitCode = 0;
+    GlobalRunning = true;
+    Network_Init();
 
-    if (!"-client")
+    string CmdLine = String_FromCString(GetCommandLineA());
+    string Executable = String_ExtractToken(&CmdLine);
+    string Option = String_ExtractToken(&CmdLine);
+
+    if (String_Equal(Option, STRING("-client")))
     {
-        return Win32_ClientMain();
+        // string Ip = String_ExtractToken(&CmdLine);
+        // string Port = String_ExtractToken(&CmdLine);
+        ExitCode = Win32_ClientMain();
     }
-    else if (CmdLine[0] == "-server"[0])
+    else if (String_Equal(Option, STRING("-server")))
     {
-        return Win32_ServerMain();
+        // string Port = String_ExtractToken(&CmdLine);
+        ExitCode = Win32_ServerMain();
     }
     else
     {
         GlobalRunning = true;
-        Network_Init();
 
         // STARTUPINFO StartupInfo = { 0 };
         // PROCESS_INFORMATION ProcessInformation = { 0 };
@@ -705,15 +714,14 @@ int WinStartUp(void)
         DWORD ServerThreadID;
         HANDLE ServerThrad = CreateThread(0, 0,  Win32_ServerMainThreadProc, 0, 0, &ServerThreadID);
 
-        int ExitCode = Win32_ClientMain();
+        ExitCode = Win32_ClientMain();
 
         // TerminateProcess(ProcessInformation.hProcess, 0);
         // WaitForSingleObject(ProcessInformation.hProcess, INFINITE);
-        
-        Network_Destroy();
-
-        return ExitCode;
     }
+
+    Network_Destroy();
+    return ExitCode;
 }
 
 void WinMainCRTStartup(void)

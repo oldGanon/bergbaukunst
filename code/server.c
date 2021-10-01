@@ -1,11 +1,12 @@
 
+#include "world.c"
+
 typedef struct server_client
 {
-    vec3 Position;
+    u32 EntityId;
 
     // ViewPosition;
     // ViewDistance;
-    // EntityID;
     // LookYaw;
     // LookPitch;
 } server_client;
@@ -17,17 +18,9 @@ typedef struct server
     world World;
 } server;
 
-box Server_ClientPlayerBox(server_client *Client)
-{
-    return (box){
-        .Min = Vec3_Sub(Client->Position, (vec3){ 0.25f, 0.25f, 1.85f }),
-        .Max = Vec3_Add(Client->Position, (vec3){ 0.25f, 0.25f, 0.15f }),
-    };
-}
-
 void Server_Init(server *Server)
 {
-    Network_Server(&Server->Server, "4510");
+    Network_ServerInit(&Server->Server, "4510");
 
     World_Init(&Server->World);
 }
@@ -43,7 +36,9 @@ void Server_SendChunks(server *Server, u32 ClientId, msg *Message)
 {
     server_client *Client = Server_GetClient(Server, ClientId);
 
-    ivec2 CenterChunk = World_ToChunkPosition(Vec3_FloorToIVec3(Client->Position));
+    entity *Player = EntityManager_GetEntity(&Server->World.EntityManager, Client->EntityId);
+
+    ivec2 CenterChunk = World_ToChunkPosition(Vec3_FloorToIVec3(Player->Position));
     ivec2 LoadedChunkDist = iVec2_Set1(LOADED_CHUNKS_DIST);
     ivec2 MinPos = iVec2_Sub(CenterChunk, LoadedChunkDist);
     ivec2 MaxPos = iVec2_Add(CenterChunk, LoadedChunkDist);
@@ -62,16 +57,23 @@ void Server_ClientUpdatePosition(server *Server, u32 ClientId, const msg_player_
 {
     server_client *Client = Server_GetClient(Server, ClientId);
     if (!Client) return;
-    Client->Position = PlayerPosition->Position;
+
+    entity *Player = EntityManager_GetEntity(&Server->World.EntityManager, Client->EntityId);
+    if (!Player) return;
+
+    Player->Position = PlayerPosition->Position;
 }
 
 void Server_ClientPlaceBlock(server *Server, u32 ClientId, const msg_place_block *PlaceBlock)
 {
     server_client *Client = Server_GetClient(Server, ClientId);
     if (!Client) return;
-    block Block = (block){ .Id = BLOCK_ID_GRAS };
 
-    box ClientPlayerBox = Server_ClientPlayerBox(Client);
+    entity *Player = EntityManager_GetEntity(&Server->World.EntityManager, Client->EntityId);
+    if (!Player) return;
+
+    block Block = (block){ .Id = BLOCK_ID_GRAS };
+    box ClientPlayerBox = Entity_Box(Player);
     if (!Block_BoxIntersect(Block, PlaceBlock->Position, ClientPlayerBox))
     {
         World_SetBlock(&Server->World, PlaceBlock->Position, Block);
@@ -87,6 +89,7 @@ void Server_ClientBreakBlock(server *Server, u32 ClientId, const msg_break_block
 {
     server_client *Client = Server_GetClient(Server, ClientId);
     if (!Client) return;
+
     block Block = (block){ .Id = BLOCK_ID_AIR };
     World_SetBlock(&Server->World, BreakBlock->Position, Block);
 
@@ -102,9 +105,16 @@ void Server_Update(server *Server)
     u32 NewClient = Network_ServerAcceptClient(&Server->Server);
     if (NewClient)
     {
-        Message_PlayerPosition(&Message, (vec3){ 0 });
+        server_client *Client = Server_GetClient(Server, NewClient);
+
+        vec3 PlayerSpawnPosition = (vec3){ 0 };
+        Client->EntityId = World_SpawnPlayer(&Server->World, PlayerSpawnPosition);
+
+        Message_PlayerPosition(&Message, PlayerSpawnPosition);
         Network_ServerSendMessage(&Server->Server, NewClient, &Message);
-        Message_ViewPosition(&Message, (ivec2){ 0 });
+
+        ivec2 ViewPosition = World_ToChunkPosition(Vec3_FloorToIVec3(PlayerSpawnPosition));
+        Message_ViewPosition(&Message, ViewPosition);
         Network_ServerSendMessage(&Server->Server, NewClient, &Message);
 
         Server_SendChunks(Server, NewClient, &Message);

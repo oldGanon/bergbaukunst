@@ -9,9 +9,9 @@ typedef struct chunk_map
 } chunk_map;
 
 chunk_map ChunkMap_Create(void);
-void ChunkMap_Delete(chunk_map *Map);
+void ChunkMap_Destroy(chunk_map *Map);
 chunk *ChunkMap_AllocateChunk(chunk_map *Map, ivec2 Position);
-void ChunkMap_DeleteChunk(chunk_map *Map, ivec2 Position);
+void ChunkMap_DestroyChunk(chunk_map *Map, ivec2 Position);
 chunk *ChunkMap_GetChunkById(const chunk_map *Map, u64 ChunkId);
 chunk *ChunkMap_GetChunk(const chunk_map *Map, ivec2 Position);
 u64 ChunkMap_GetChunkId(const chunk_map *Map, ivec2 Position);
@@ -172,7 +172,7 @@ chunk_map ChunkMap_Create(void)
     return Map;
 }
 
-void ChunkMap_Delete(chunk_map *Map)
+void ChunkMap_Destroy(chunk_map *Map)
 {
     free(Map->Chunks);
     free(Map->Values);
@@ -200,7 +200,7 @@ chunk *ChunkMap_AllocateChunk(chunk_map *Map, ivec2 Position)
     return 0;
 }
 
-void ChunkMap_DeleteChunk(chunk_map *Map, ivec2 Position)
+void ChunkMap_DestroyChunk(chunk_map *Map, ivec2 Position)
 {
     u64 Index = ChunkMap_GetIndex(Map, Position);
 
