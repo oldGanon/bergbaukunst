@@ -89,7 +89,7 @@ void Client_ProcessMessages(client *Client)
     {
         switch (Message.Header.Type)
         {
-            case MSG_DISCONNECT: break;
+            case MSG_DISCONNECT: GlobalRunning = false; return;
             case MSG_PLAYER_STATE: break;
 
             case MSG_VIEW_POSITION: View_SetPosition(&Client->View, Message.ViewPosition.Position); break;

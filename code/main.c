@@ -100,6 +100,8 @@ void Win32_DestroyBitmap(struct bitmap);
 struct palette Win32_LoadPalette(const char *);
 void Win32_SetPalette(const struct palette *);
 
+global bool GlobalRunning;
+
 #include "audio.c"
 #include "geom.c"
 #include "draw.c"
@@ -109,7 +111,6 @@ void Win32_SetPalette(const struct palette *);
 #include "client.c"
 
 global bool GlobalFocus;
-global bool GlobalRunning;
 global bitmap GlobalBackbuffer;
 
 #define _AMD64_

@@ -5,9 +5,17 @@
 #define SERVER_MAX_CLIENTS 16
 #define NETWORK_SERVER_SOCKET_COUNT (SERVER_MAX_CLIENTS + 1)
 
+typedef struct network_socket
+{
+    SOCKET Handle;
+
+    u32 Bytes;
+    u8 Buffer[sizeof(msg)];
+} network_socket;
+
 typedef struct network_server
 {
-    SOCKET Sockets[NETWORK_SERVER_SOCKET_COUNT];
+    network_socket Sockets[NETWORK_SERVER_SOCKET_COUNT];
 } network_server;
 
 void Network_ServerSendMessage(network_server *Server, u32 ClientId, msg *Message);
@@ -18,7 +26,7 @@ bool Network_ServerInit(network_server *Server, const char *Port);
 
 typedef struct network_client
 {
-    SOCKET Server;
+    network_socket Server;
 } network_client;
 
 void Network_ClientSendMessage(network_client *Client, msg *Message);
@@ -44,12 +52,31 @@ inline void Network_DisconnectMessage(int Error, msg *Message)
     }
 }
 
-inline bool Network_GetMessage(SOCKET Socket, msg *Message)
+inline bool Network_ExtractMessageFromBuffer(network_socket *Socket, msg *Message)
 {
-    DWORD Flags = MSG_PEEK;
+    if (Socket->Bytes < sizeof(msg_header))
+        return false;
+
+    msg_header *Header = (msg_header *)Socket->Buffer;
+    if (Socket->Bytes < Header->Size)
+        return false;
+
+    Socket->Bytes -= Header->Size;
+    memcpy(Message, Socket->Buffer, Header->Size);
+    memcpy(Socket->Buffer, Socket->Buffer + Header->Size, Socket->Bytes);
+    return true;
+}
+
+inline bool Network_GetMessage(network_socket *Socket, msg *Message)
+{
+    if (Network_ExtractMessageFromBuffer(Socket, Message))
+        return true;
+
+    DWORD Flags = 0;
     DWORD BytesReceived = 0;
-    WSABUF Buffer = { sizeof(msg_header), (CHAR *)&Message->Header };
-    int Error = WSARecv(Socket, &Buffer, 1, &BytesReceived, &Flags, 0, 0);
+    WSABUF Buffer = { sizeof(msg) - Socket->Bytes, ((CHAR *)&Socket->Buffer) + Socket->Bytes };
+    int Error = WSARecv(Socket->Handle, &Buffer, 1, &BytesReceived, &Flags, 0, 0);
+    Socket->Bytes += BytesReceived;
     if (Error == SOCKET_ERROR)
     {
         Error = WSAGetLastError();
@@ -62,44 +89,24 @@ inline bool Network_GetMessage(SOCKET Socket, msg *Message)
 
     if (BytesReceived == 0)
     {
-        Network_DisconnectMessage(Error, Message);
+        Network_DisconnectMessage(0, Message);
         return true;
     }
 
-    if (BytesReceived < sizeof(msg_header))
-        return false;
-
-    if (Message->Header.Size > sizeof(msg))
-    {
-        Network_DisconnectMessage(Error, Message);
+    if (Network_ExtractMessageFromBuffer(Socket, Message))
         return true;
-    }
 
-    Flags = 0;
-    BytesReceived = 0;
-    Buffer = (WSABUF){ Message->Header.Size, (CHAR *)Message };
-    Error = WSARecv(Socket, &Buffer, 1, &BytesReceived, &Flags, 0, 0);
-    if (Error == SOCKET_ERROR)
-    {
-        Error = WSAGetLastError();
-        if (Error == WSAEWOULDBLOCK)
-            return false;
-
-        Network_DisconnectMessage(Error, Message);
-        return true;
-    }
-
-    return true;
+    return false;
 }
 
-inline void Network_SendMessage(SOCKET Socket, msg *Message)
+inline void Network_SendMessage(network_socket *Socket, msg *Message)
 {
     DWORD Flags = 0;
     DWORD BytesSent = 0;
     WSABUF Buffer = (WSABUF){ Message->Header.Size, (CHAR *)Message };
     for (;;)
     {
-        int Error = WSASend(Socket, &Buffer, 1, &BytesSent, Flags, 0, 0);
+        int Error = WSASend(Socket->Handle, &Buffer, 1, &BytesSent, Flags, 0, 0);
         if (Error != SOCKET_ERROR) break;
         Error = WSAGetLastError();
         if (Error != WSAEWOULDBLOCK) break;
@@ -113,20 +120,20 @@ inline bool Network_ServerClientConnected(network_server *Server, u32 ClientId)
     if ((ClientId == 0) || (ClientId > SERVER_MAX_CLIENTS))
         return false;
 
-    return (Server->Sockets[ClientId] != INVALID_SOCKET);
+    return (Server->Sockets[ClientId].Handle != INVALID_SOCKET);
 }
 
 void Network_ServerBroadcastMessage(network_server *Server, msg *Message)
 {
     for (u32 i = 1; i <= SERVER_MAX_CLIENTS; ++i)
         if (Network_ServerClientConnected(Server, i))
-            Network_SendMessage(Server->Sockets[i], Message);
+            Network_SendMessage(&Server->Sockets[i], Message);
 }
 
 void Network_ServerSendMessage(network_server *Server, u32 ClientId, msg *Message)
 {
     if (Network_ServerClientConnected(Server, ClientId))
-        Network_SendMessage(Server->Sockets[ClientId], Message);
+        Network_SendMessage(&Server->Sockets[ClientId], Message);
 }
 
 bool Network_ServerGetMessage(network_server *Server, u32 ClientId, msg *Message)
@@ -134,13 +141,14 @@ bool Network_ServerGetMessage(network_server *Server, u32 ClientId, msg *Message
     if (!Network_ServerClientConnected(Server, ClientId))
         return false;
 
-    if(!Network_GetMessage(Server->Sockets[ClientId], Message))
+    if(!Network_GetMessage(&Server->Sockets[ClientId], Message))
         return false;
 
     if (Message->Header.Type == MSG_DISCONNECT)
     {
-        closesocket(Server->Sockets[ClientId]);
-        Server->Sockets[ClientId] = INVALID_SOCKET;
+        shutdown(Server->Sockets[ClientId].Handle, SD_BOTH);
+        closesocket(Server->Sockets[ClientId].Handle);
+        Server->Sockets[ClientId].Handle = INVALID_SOCKET;
     }
 
     return true;
@@ -149,7 +157,7 @@ bool Network_ServerGetMessage(network_server *Server, u32 ClientId, msg *Message
 u32 Network_ServerFreeClientSlot(network_server *Server)
 {
     for (u32 i = 1; i < SERVER_MAX_CLIENTS; ++i)
-        if (Server->Sockets[i] == INVALID_SOCKET)
+        if (Server->Sockets[i].Handle == INVALID_SOCKET)
             return i;
     return 0;
 }
@@ -161,16 +169,16 @@ u32 Network_ServerAcceptClient(network_server *Server)
 
     struct sockaddr ClientAddr;
     int ClientAddrSize = sizeof(ClientAddr);
-    Server->Sockets[FreeClientId] = WSAAccept(Server->Sockets[0], &ClientAddr, &ClientAddrSize, 0, 0);
-    if (Server->Sockets[FreeClientId] == INVALID_SOCKET)
+    Server->Sockets[FreeClientId].Handle = WSAAccept(Server->Sockets[0].Handle, &ClientAddr, &ClientAddrSize, 0, 0);
+    if (Server->Sockets[FreeClientId].Handle == INVALID_SOCKET)
         return 0;
 
     u_long NotBlocking = 1;
-    int Error = ioctlsocket(Server->Sockets[FreeClientId], FIONBIO, &NotBlocking);
+    int Error = ioctlsocket(Server->Sockets[FreeClientId].Handle, FIONBIO, &NotBlocking);
     if (Error == SOCKET_ERROR)
     {
-        closesocket(Server->Sockets[FreeClientId]);
-        Server->Sockets[FreeClientId] = INVALID_SOCKET;
+        closesocket(Server->Sockets[FreeClientId].Handle);
+        Server->Sockets[FreeClientId].Handle = INVALID_SOCKET;
         return 0;
     }
 
@@ -181,11 +189,11 @@ void Network_ServerShutdown(network_server *Server)
 {
     for (u32 i = 0; i < NETWORK_SERVER_SOCKET_COUNT; ++i)
     {
-        if (Server->Sockets[i] != INVALID_SOCKET)
+        if (Server->Sockets[i].Handle != INVALID_SOCKET)
         {
-            shutdown(Server->Sockets[i], SD_BOTH);
-            closesocket(Server->Sockets[i]);
-            Server->Sockets[i] = INVALID_SOCKET;
+            shutdown(Server->Sockets[i].Handle, SD_BOTH);
+            closesocket(Server->Sockets[i].Handle);
+            Server->Sockets[i].Handle = INVALID_SOCKET;
         }
     }
 }
@@ -193,7 +201,7 @@ void Network_ServerShutdown(network_server *Server)
 bool Network_ServerInit(network_server *Server, const char *Port)
 {
     for (u32 i = 0; i < NETWORK_SERVER_SOCKET_COUNT; ++i)
-        Server->Sockets[i] = INVALID_SOCKET;
+        Server->Sockets[i].Handle = INVALID_SOCKET;
 
     struct addrinfo *Addr = 0;
     struct addrinfo Hints = { 0 };
@@ -207,17 +215,17 @@ bool Network_ServerInit(network_server *Server, const char *Port)
 
     for (struct addrinfo *AddrPtr = Addr; AddrPtr != NULL; AddrPtr = AddrPtr->ai_next)
     {
-        Server->Sockets[0] = WSASocketW(AddrPtr->ai_family, AddrPtr->ai_socktype, AddrPtr->ai_protocol, 0, 0, WSA_FLAG_OVERLAPPED);
-        if (Server->Sockets[0] == INVALID_SOCKET) continue;
+        Server->Sockets[0].Handle = WSASocketW(AddrPtr->ai_family, AddrPtr->ai_socktype, AddrPtr->ai_protocol, 0, 0, WSA_FLAG_OVERLAPPED);
+        if (Server->Sockets[0].Handle == INVALID_SOCKET) continue;
 
-        int Error = bind(Server->Sockets[0], AddrPtr->ai_addr, (int)AddrPtr->ai_addrlen);
+        int Error = bind(Server->Sockets[0].Handle, AddrPtr->ai_addr, (int)AddrPtr->ai_addrlen);
         if (Error != SOCKET_ERROR)
         {
-            Error = listen(Server->Sockets[0], SERVER_MAX_CLIENTS);
+            Error = listen(Server->Sockets[0].Handle, SERVER_MAX_CLIENTS);
             if (Error != SOCKET_ERROR)
             {
                 u_long NotBlocking = 1;
-                Error = ioctlsocket(Server->Sockets[0], FIONBIO, &NotBlocking);
+                Error = ioctlsocket(Server->Sockets[0].Handle, FIONBIO, &NotBlocking);
                 if (Error != SOCKET_ERROR)
                 {
                     break;
@@ -225,12 +233,12 @@ bool Network_ServerInit(network_server *Server, const char *Port)
             }
         }
 
-        closesocket(Server->Sockets[0]);
-        Server->Sockets[0] = INVALID_SOCKET;
+        closesocket(Server->Sockets[0].Handle);
+        Server->Sockets[0].Handle = INVALID_SOCKET;
     }
     freeaddrinfo(Addr);
 
-    if (Server->Sockets[0] == INVALID_SOCKET)
+    if (Server->Sockets[0].Handle == INVALID_SOCKET)
         return false;
     return true;
 }
@@ -239,12 +247,12 @@ bool Network_ServerInit(network_server *Server, const char *Port)
 
 void Network_ClientSendMessage(network_client *Client, msg *Message)
 {
-    Network_SendMessage(Client->Server, Message);
+    Network_SendMessage(&Client->Server, Message);
 }
 
 bool Network_ClientGetMessage(network_client *Client, msg *Message)
 {
-    if(!Network_GetMessage(Client->Server, Message))
+    if(!Network_GetMessage(&Client->Server, Message))
         return false;
 
     if (Message->Header.Type == MSG_DISCONNECT)
@@ -255,14 +263,14 @@ bool Network_ClientGetMessage(network_client *Client, msg *Message)
 
 void Network_ClientDisconnect(network_client *Client)
 {
-    shutdown(Client->Server, SD_BOTH);
-    closesocket(Client->Server);
-    Client->Server = INVALID_SOCKET;
+    shutdown(Client->Server.Handle, SD_BOTH);
+    closesocket(Client->Server.Handle);
+    Client->Server.Handle = INVALID_SOCKET;
 }
 
 bool Network_ClientInit(network_client *Client, const char *Domain, const char *Port)
 {
-    Client->Server = INVALID_SOCKET;
+    Client->Server = (network_socket){ .Handle = INVALID_SOCKET };
 
     struct addrinfo *Addr = 0;
     struct addrinfo Hints = { 0 };
@@ -276,26 +284,26 @@ bool Network_ClientInit(network_client *Client, const char *Domain, const char *
 
     for (struct addrinfo *AddrPtr = Addr; AddrPtr != NULL; AddrPtr = AddrPtr->ai_next)
     {
-        Client->Server = WSASocketW(AddrPtr->ai_family, AddrPtr->ai_socktype, AddrPtr->ai_protocol, 0, 0, WSA_FLAG_OVERLAPPED);
-        if (Client->Server == INVALID_SOCKET) continue;
+        Client->Server.Handle = WSASocketW(AddrPtr->ai_family, AddrPtr->ai_socktype, AddrPtr->ai_protocol, 0, 0, WSA_FLAG_OVERLAPPED);
+        if (Client->Server.Handle == INVALID_SOCKET) continue;
 
-        int Error = WSAConnect(Client->Server, AddrPtr->ai_addr, (int)AddrPtr->ai_addrlen, 0, 0, 0, 0);
+        int Error = WSAConnect(Client->Server.Handle, AddrPtr->ai_addr, (int)AddrPtr->ai_addrlen, 0, 0, 0, 0);
         if (Error != SOCKET_ERROR)
         {
             u_long NotBlocking = 1;
-            Error = ioctlsocket(Client->Server, FIONBIO, &NotBlocking);
+            Error = ioctlsocket(Client->Server.Handle, FIONBIO, &NotBlocking);
             if (Error != SOCKET_ERROR)
             {
                 break;
             }
         }
 
-        closesocket(Client->Server);
-        Client->Server = INVALID_SOCKET;
+        closesocket(Client->Server.Handle);
+        Client->Server.Handle = INVALID_SOCKET;
     }
     freeaddrinfo(Addr);
 
-    if (Client->Server == INVALID_SOCKET)
+    if (Client->Server.Handle == INVALID_SOCKET)
         return false;
     return true;
 }
