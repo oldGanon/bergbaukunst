@@ -3,13 +3,14 @@ enum msg_type
 {
     /* UNIVERSAL MESSAGES */
     MSG_DISCONNECT,
-    MSG_PLAYER_POSITION,
-    MSG_VIEW_POSITION,
+    MSG_PLAYER_STATE,
     
     /* SERVER MESSAGES */
+    MSG_VIEW_POSITION,
     MSG_CHUNK_DATA,
     MSG_SET_BLOCK,
-    
+    MSG_SET_ENTITY,
+
     /* CLIENT MESSAGES */
     MSG_PLACE_BLOCK,
     MSG_BREAK_BLOCK,
@@ -28,17 +29,17 @@ typedef struct msg_disconnect
     u8 Type;
 } msg_disconnect;
 
-typedef struct msg_player_position
+typedef struct msg_player_state
 {
     vec3 Position;
-} msg_player_position;
+} msg_player_state;
+
+/* SERVER MESSAGES */
 
 typedef struct msg_view_position
 {
     ivec2 Position;
 } msg_view_position;
-
-/* SERVER MESSAGES */
 
 typedef struct msg_chunk_data
 {
@@ -51,6 +52,12 @@ typedef struct msg_set_block
     ivec3 Position;
     block Block;
 } msg_set_block;
+
+typedef struct msg_set_entity
+{
+    u32 Id;
+    entity Entity;
+} msg_set_entity;
 
 /* CLIENT MESSAGES */
 
@@ -75,11 +82,12 @@ typedef struct msg
     union
     {
         msg_disconnect Disconnect;
-        msg_player_position PlayerPosition;
-        msg_view_position ViewPosition;
+        msg_player_state PlayerState;
         
+        msg_view_position ViewPosition;
         msg_chunk_data ChunkData;
         msg_set_block SetBlock;
+        msg_set_entity SetEntity;
 
         msg_place_block PlaceBlock;
         msg_break_block BreakBlock;
@@ -90,12 +98,14 @@ u64 Message_GetSize(msg *Message)
 {
     switch (Message->Header.Type)
     {
-        case MSG_DISCONNECT:      return sizeof(msg_header) + sizeof(msg_disconnect);
-        case MSG_PLACE_BLOCK:     return sizeof(msg_header) + sizeof(msg_place_block);
-        case MSG_BREAK_BLOCK:     return sizeof(msg_header) + sizeof(msg_break_block);
-        case MSG_PLAYER_POSITION: return sizeof(msg_header) + sizeof(msg_player_position);
-        case MSG_VIEW_POSITION:   return sizeof(msg_header) + sizeof(msg_view_position);
-        case MSG_CHUNK_DATA:      return sizeof(msg_header) + sizeof(msg_chunk_data);
+        case MSG_DISCONNECT:    return sizeof(msg_header) + sizeof(msg_disconnect);
+        case MSG_PLAYER_STATE:  return sizeof(msg_header) + sizeof(msg_player_state);
+        case MSG_VIEW_POSITION: return sizeof(msg_header) + sizeof(msg_view_position);
+        case MSG_CHUNK_DATA:    return sizeof(msg_header) + sizeof(msg_chunk_data);
+        case MSG_SET_BLOCK:     return sizeof(msg_header) + sizeof(msg_set_block);
+        case MSG_SET_ENTITY:    return sizeof(msg_header) + sizeof(msg_set_entity);
+        case MSG_PLACE_BLOCK:   return sizeof(msg_header) + sizeof(msg_place_block);
+        case MSG_BREAK_BLOCK:   return sizeof(msg_header) + sizeof(msg_break_block);
         default: return 0;
     }
 }
@@ -110,13 +120,15 @@ void Message_Disconnect(msg *Message, u8 Type)
     Message->Disconnect.Type = Type;
 }
 
-void Message_PlayerPosition(msg *Message, vec3 PlayerPosition)
+void Message_PlayerState(msg *Message, vec3 PlayerPosition)
 {
-    Message->Header.Type = MSG_PLAYER_POSITION;
-    Message->Header.Size = sizeof(msg_header) + sizeof(msg_player_position);
+    Message->Header.Type = MSG_PLAYER_STATE;
+    Message->Header.Size = sizeof(msg_header) + sizeof(msg_player_state);
 
-    Message->PlayerPosition.Position = PlayerPosition;
+    Message->PlayerState.Position = PlayerPosition;
 }
+
+/* SERVER MESSAGES */
 
 void Message_ViewPosition(msg *Message, ivec2 ViewPosition)
 {
@@ -125,8 +137,6 @@ void Message_ViewPosition(msg *Message, ivec2 ViewPosition)
 
     Message->ViewPosition.Position = ViewPosition;
 }
-
-/* SERVER MESSAGES */
 
 void Message_ChunkData(msg *Message, chunk *Chunk)
 {
@@ -150,6 +160,15 @@ void Message_SetBlock(msg *Message, ivec3 Position, block Block)
     
     Message->SetBlock.Position = Position;
     Message->SetBlock.Block = Block;
+}
+
+void Message_SetEntity(msg *Message, u32 Id, entity *Entity)
+{
+    Message->Header.Type = MSG_SET_ENTITY;
+    Message->Header.Size = sizeof(msg_header) + sizeof(msg_set_entity);
+ 
+    Message->SetEntity.Id = Id;
+    Message->SetEntity.Entity = *Entity;
 }
 
 /* CLIENT MESSAGES */

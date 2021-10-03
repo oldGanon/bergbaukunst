@@ -90,7 +90,7 @@ void Player_Input(player *Player, client *Client, input Input, f32 DeltaTime)
 
     {
         msg Message;
-        Message_PlayerPosition(&Message, Player->Position);
+        Message_PlayerState(&Message, Player->Position);
         Network_ClientSendMessage(&Client->Client, &Message);
     }
 

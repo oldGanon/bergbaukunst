@@ -116,6 +116,13 @@ inline bool Network_ServerClientConnected(network_server *Server, u32 ClientId)
     return (Server->Sockets[ClientId] != INVALID_SOCKET);
 }
 
+void Network_ServerBroadcastMessage(network_server *Server, msg *Message)
+{
+    for (u32 i = 1; i <= SERVER_MAX_CLIENTS; ++i)
+        if (Network_ServerClientConnected(Server, i))
+            Network_SendMessage(Server->Sockets[i], Message);
+}
+
 void Network_ServerSendMessage(network_server *Server, u32 ClientId, msg *Message)
 {
     if (Network_ServerClientConnected(Server, ClientId))
@@ -139,11 +146,18 @@ bool Network_ServerGetMessage(network_server *Server, u32 ClientId, msg *Message
     return true;
 }
 
+u32 Network_ServerFreeClientSlot(network_server *Server)
+{
+    for (u32 i = 1; i < SERVER_MAX_CLIENTS; ++i)
+        if (Server->Sockets[i] == INVALID_SOCKET)
+            return i;
+    return 0;
+}
+
 u32 Network_ServerAcceptClient(network_server *Server)
 {
-    u32 FreeClientId = 1;
-    if (Server->Sockets[FreeClientId] != INVALID_SOCKET)
-        return 0;
+    u32 FreeClientId = Network_ServerFreeClientSlot(Server);
+    if (!FreeClientId) return 0;
 
     struct sockaddr ClientAddr;
     int ClientAddrSize = sizeof(ClientAddr);

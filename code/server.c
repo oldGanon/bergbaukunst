@@ -32,28 +32,63 @@ server_client *Server_GetClient(server *Server, u32 ClientId)
     return Server->Clients + ClientId - 1;
 }
 
-void Server_SendChunks(server *Server, u32 ClientId, msg *Message)
+void Server_BroadcastMessage(server *Server, msg *Message)
+{
+    Network_ServerBroadcastMessage(&Server->Server, Message);
+}
+
+void Server_SendChunkMessage(server *Server, ivec2 ChunkPosition, msg *Message)
+{
+    for (u32 i = 1; i < SERVER_MAX_CLIENTS; ++i)
+    {
+        Network_ServerSendMessage(&Server->Server, i, Message);
+    }
+}
+
+void Server_ClientConnect(server *Server, u32 ClientId)
 {
     server_client *Client = Server_GetClient(Server, ClientId);
+    if (!Client) return;
 
+    vec3 PlayerSpawnPosition = (vec3){ 0 };
+    ivec2 SpawnChunk = World_ToChunkPosition(Vec3_FloorToIVec3(PlayerSpawnPosition));
+    Client->EntityId = World_SpawnPlayer(&Server->World, PlayerSpawnPosition);
     entity *Player = EntityManager_GetEntity(&Server->World.EntityManager, Client->EntityId);
 
-    ivec2 CenterChunk = World_ToChunkPosition(Vec3_FloorToIVec3(Player->Position));
-    ivec2 LoadedChunkDist = iVec2_Set1(LOADED_CHUNKS_DIST);
-    ivec2 MinPos = iVec2_Sub(CenterChunk, LoadedChunkDist);
-    ivec2 MaxPos = iVec2_Add(CenterChunk, LoadedChunkDist);
+    msg Message;
 
+    // set client player position
+    Message_PlayerState(&Message, PlayerSpawnPosition);
+    Network_ServerSendMessage(&Server->Server, ClientId, &Message);
+
+    // set client view position
+    Message_ViewPosition(&Message, SpawnChunk);
+    Network_ServerSendMessage(&Server->Server, ClientId, &Message);
+
+    // send chunk data
+    ivec2 LoadedChunkDist = iVec2_Set1(LOADED_CHUNKS_DIST);
+    ivec2 MinPos = iVec2_Sub(SpawnChunk, LoadedChunkDist);
+    ivec2 MaxPos = iVec2_Add(SpawnChunk, LoadedChunkDist);
     for (i32 x = MinPos.x; x < MaxPos.x; x++)
     for (i32 y = MinPos.y; y < MaxPos.y; y++)
     {
         ivec2 ChunkPos = (ivec2){ x, y };
         chunk *Chunk = World_GetChunk(&Server->World, ChunkPos);
-        Message_ChunkData(Message, Chunk);
-        Network_ServerSendMessage(&Server->Server, ClientId, Message);
+        Message_ChunkData(&Message, Chunk);
+        Network_ServerSendMessage(&Server->Server, ClientId, &Message);
     }
 }
 
-void Server_ClientUpdatePosition(server *Server, u32 ClientId, const msg_player_position *PlayerPosition)
+void Server_SetBlock(server *Server, ivec3 Position, block Block)
+{
+    World_SetBlock(&Server->World, Position, Block);
+
+    msg Message;
+    Message_SetBlock(&Message, Position, Block);
+    Server_SendChunkMessage(Server, World_ToChunkPosition(Position), &Message);
+}
+
+void Server_ClientDisconnect(server *Server, u32 ClientId, const msg_disconnect *Disconnect)
 {
     server_client *Client = Server_GetClient(Server, ClientId);
     if (!Client) return;
@@ -61,7 +96,28 @@ void Server_ClientUpdatePosition(server *Server, u32 ClientId, const msg_player_
     entity *Player = EntityManager_GetEntity(&Server->World.EntityManager, Client->EntityId);
     if (!Player) return;
 
-    Player->Position = PlayerPosition->Position;
+    ivec2 Chunk = World_ToChunkPosition(Vec3_FloorToIVec3(Player->Position));
+    *Player = (entity){ 0 };
+
+    msg Message;
+    Message_SetEntity(&Message, Client->EntityId, Player);
+    Server_SendChunkMessage(Server, Chunk, &Message);
+}
+
+void Server_ClientUpdatePlayerState(server *Server, u32 ClientId, const msg_player_state *PlayerState)
+{
+    server_client *Client = Server_GetClient(Server, ClientId);
+    if (!Client) return;
+
+    entity *Player = EntityManager_GetEntity(&Server->World.EntityManager, Client->EntityId);
+    if (!Player) return;
+
+    ivec2 Chunk = World_ToChunkPosition(Vec3_FloorToIVec3(Player->Position));
+    Player->Position = PlayerState->Position;
+
+    msg Message;
+    Message_SetEntity(&Message, Client->EntityId, Player);
+    Server_SendChunkMessage(Server, Chunk, &Message);
 }
 
 void Server_ClientPlaceBlock(server *Server, u32 ClientId, const msg_place_block *PlaceBlock)
@@ -75,14 +131,7 @@ void Server_ClientPlaceBlock(server *Server, u32 ClientId, const msg_place_block
     block Block = (block){ .Id = BLOCK_ID_GRAS };
     box ClientPlayerBox = Entity_Box(Player);
     if (!Block_BoxIntersect(Block, PlaceBlock->Position, ClientPlayerBox))
-    {
-        World_SetBlock(&Server->World, PlaceBlock->Position, Block);
-
-        msg Message;
-        Message_SetBlock(&Message, PlaceBlock->Position, Block);
-        Network_ServerSendMessage(&Server->Server, ClientId, &Message);
-    }
-
+        Server_SetBlock(Server, PlaceBlock->Position, Block);
 }
 
 void Server_ClientBreakBlock(server *Server, u32 ClientId, const msg_break_block *BreakBlock)
@@ -91,45 +140,26 @@ void Server_ClientBreakBlock(server *Server, u32 ClientId, const msg_break_block
     if (!Client) return;
 
     block Block = (block){ .Id = BLOCK_ID_AIR };
-    World_SetBlock(&Server->World, BreakBlock->Position, Block);
-
-    msg Message;
-    Message_SetBlock(&Message, BreakBlock->Position, Block);
-    Network_ServerSendMessage(&Server->Server, ClientId, &Message);
+    Server_SetBlock(Server, BreakBlock->Position, Block);
 }
 
 void Server_Update(server *Server)
 {
-    msg Message;
-
     u32 NewClient = Network_ServerAcceptClient(&Server->Server);
-    if (NewClient)
-    {
-        server_client *Client = Server_GetClient(Server, NewClient);
+    if (NewClient) Server_ClientConnect(Server, NewClient);
 
-        vec3 PlayerSpawnPosition = (vec3){ 0 };
-        Client->EntityId = World_SpawnPlayer(&Server->World, PlayerSpawnPosition);
-
-        Message_PlayerPosition(&Message, PlayerSpawnPosition);
-        Network_ServerSendMessage(&Server->Server, NewClient, &Message);
-
-        ivec2 ViewPosition = World_ToChunkPosition(Vec3_FloorToIVec3(PlayerSpawnPosition));
-        Message_ViewPosition(&Message, ViewPosition);
-        Network_ServerSendMessage(&Server->Server, NewClient, &Message);
-
-        Server_SendChunks(Server, NewClient, &Message);
-    }
-
-    for (u32 i = 1; i < 16; ++i)
+    msg Message;
+    for (u32 i = 1; i < SERVER_MAX_CLIENTS; ++i)
     {
         while (Network_ServerGetMessage(&Server->Server, i, &Message))
         {
             switch (Message.Header.Type)
             {
-                case MSG_DISCONNECT: break;
-                case MSG_PLAYER_POSITION: Server_ClientUpdatePosition(Server, i, &Message.PlayerPosition); break;
-                case MSG_PLACE_BLOCK:     Server_ClientPlaceBlock(Server, i, &Message.PlaceBlock); break;
-                case MSG_BREAK_BLOCK:     Server_ClientBreakBlock(Server, i, &Message.BreakBlock); break;
+                case MSG_DISCONNECT:   Server_ClientDisconnect(Server, i, &Message.Disconnect); break;
+                case MSG_PLAYER_STATE: Server_ClientUpdatePlayerState(Server, i, &Message.PlayerState); break;
+
+                case MSG_PLACE_BLOCK:  Server_ClientPlaceBlock(Server, i, &Message.PlaceBlock); break;
+                case MSG_BREAK_BLOCK:  Server_ClientBreakBlock(Server, i, &Message.BreakBlock); break;
                 default: break;
             }
         }

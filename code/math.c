@@ -259,6 +259,7 @@ inline vec3 Vec3_Ceil(vec3 A)  { STORE_VEC3(A, (_mm_ceil_ps(LOAD_VEC3(A)))); ret
 inline vec3 Vec3_Floor(vec3 A) { STORE_VEC3(A, (_mm_floor_ps(LOAD_VEC3(A)))); return A; }
 inline vec3 Vec3_Sqrt(vec3 A) { STORE_VEC3(A, _mm_sqrt_ps(LOAD_VEC3(A))); return A; }
 inline vec3 Vec3_Lerp(vec3 A, vec3 B, f32 t) { STORE_VEC3(A, _mm_add_ps(_mm_mul_ps(_mm_set1_ps(1.0f-t),LOAD_VEC3(A)),_mm_mul_ps(_mm_set1_ps(t),LOAD_VEC3(B)))); return A; }
+inline vec3 Vec3_Lerp3(vec3 A, vec3 B, vec3 t) { __m128 T = LOAD_VEC3(t); STORE_VEC3(A, _mm_add_ps(_mm_mul_ps(_mm_sub_ps(_mm_set1_ps(1.0f),T),LOAD_VEC3(A)),_mm_mul_ps(T,LOAD_VEC3(B)))); return A; }
 inline vec3 Vec3_Fract(vec3 A) { __m128 m = LOAD_VEC3(A); STORE_VEC3(A, _mm_sub_ps(m, _mm_floor_ps(m))); return A; }
 inline vec3 Vec3_Inverse(vec3 A) { STORE_VEC3(A, _mm_div_ps(_mm_set1_ps(1), LOAD_VEC3(A))); return A; }
 

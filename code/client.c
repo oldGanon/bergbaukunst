@@ -59,10 +59,10 @@ typedef struct client
 
 #include "player.c"
 
-void Client_Init(client *Client)
+void Client_Init(client *Client, const char *Ip)
 {
     /* NETWORK */
-    while (!Network_ClientInit(&Client->Client, "localhost", "4510"));
+    while (!Network_ClientInit(&Client->Client, Ip, "4510"));
 
     /* RESOURCES */
     Client->Terrain = Win32_LoadBitmap("TERRAIN");
@@ -90,10 +90,12 @@ void Client_ProcessMessages(client *Client)
         switch (Message.Header.Type)
         {
             case MSG_DISCONNECT: break;
-            case MSG_PLAYER_POSITION: break;
+            case MSG_PLAYER_STATE: break;
+
             case MSG_VIEW_POSITION: View_SetPosition(&Client->View, Message.ViewPosition.Position); break;
-            case MSG_CHUNK_DATA: View_SetChunk(&Client->View, &Message.ChunkData); break;
-            case MSG_SET_BLOCK: View_SetBlock(&Client->View, Message.SetBlock.Position, Message.SetBlock.Block); break;
+            case MSG_CHUNK_DATA:    View_SetChunk(&Client->View, &Message.ChunkData); break;
+            case MSG_SET_BLOCK:     View_SetBlock(&Client->View, Message.SetBlock.Position, Message.SetBlock.Block); break;
+            case MSG_SET_ENTITY:    View_SetEntity(&Client->View, &Message.SetEntity); break;
             default: break;
         }
     }
@@ -113,34 +115,35 @@ void Client_Update(client *Client, const input Input, f32 DeltaTime)
     Player_Update(&Client->Player, &Client->View, DeltaTime);
 }
 
-void Client_Draw(client *Client, bitmap Buffer, f32 DeltaTime)
+void Client_Draw(client *Client, bitmap Target, f32 DeltaTime)
 {
-    Player_Draw(&Client->Player, &Client->View, &Client->Camera, DeltaTime);
-
     Raserizer_Clear(COLOR_SKYBLUE);
-    View_Draw(&Client->View, Buffer, Client->Terrain, Client->Camera);
-    Raserizer_Blit(Buffer);
+    Player_Draw(&Client->Player, &Client->View, &Client->Camera, DeltaTime);
+    View_Draw(&Client->View, Target, Client->Terrain, Client->Camera);
+    Raserizer_Blit(Target);
 
-    Draw_String(Buffer, Client->Font, COLOR_WHITE, (ivec2){8,8}, "ver. 0.001a");
+    View_DrawEntityBoxes(&Client->View, Target, Client->Camera);
 
-    vec3 A = Camera_WorldToScreen(Client->Camera, Buffer, (vec3) {  0, 0, 1 });
-    vec3 B = Camera_WorldToScreen(Client->Camera, Buffer, (vec3) { 16, 0, 1 });
-    vec3 C = Camera_WorldToScreen(Client->Camera, Buffer, (vec3) { 16,16, 1 });
-    vec3 D = Camera_WorldToScreen(Client->Camera, Buffer, (vec3) {  0,16, 1 });
-    Draw_Line(Buffer, COLOR_WHITE, A, B);
-    Draw_Line(Buffer, COLOR_WHITE, B, C);
-    Draw_Line(Buffer, COLOR_WHITE, C, D);
-    Draw_Line(Buffer, COLOR_WHITE, D, A);
+    Draw_String(Target, Client->Font, COLOR_WHITE, (ivec2){8,8}, "ver. 0.001a");
+
+    vec3 A = Camera_WorldToScreen(Client->Camera, Target, (vec3) {  0, 0, 1 });
+    vec3 B = Camera_WorldToScreen(Client->Camera, Target, (vec3) { 16, 0, 1 });
+    vec3 C = Camera_WorldToScreen(Client->Camera, Target, (vec3) { 16,16, 1 });
+    vec3 D = Camera_WorldToScreen(Client->Camera, Target, (vec3) {  0,16, 1 });
+    Draw_Line(Target, COLOR_WHITE, A, B);
+    Draw_Line(Target, COLOR_WHITE, B, C);
+    Draw_Line(Target, COLOR_WHITE, C, D);
+    Draw_Line(Target, COLOR_WHITE, D, A);
 
     trace_result TraceResult;
     if (View_TraceRay(&Client->View, Client->Camera.Position, Camera_Direction(Client->Camera), 5.0f, &TraceResult) < 5.0f)
     {
-        Block_HighlightFace(Buffer, Client->Camera, TraceResult.BlockPosition, TraceResult.BlockFace);
+        Block_HighlightFace(Target, Client->Camera, TraceResult.BlockPosition, TraceResult.BlockFace);
     }
 
-    ivec2 Center = (ivec2) { Buffer.Width / 2, Buffer.Height / 2 };
-    Draw_RectIVec2(Buffer, COLOR_WHITE, iVec2_Add(Center, (ivec2){-1,-5 }), (ivec2){ 2, 4 });
-    Draw_RectIVec2(Buffer, COLOR_WHITE, iVec2_Add(Center, (ivec2){-1, 1 }), (ivec2){ 2, 4 });
-    Draw_RectIVec2(Buffer, COLOR_WHITE, iVec2_Add(Center, (ivec2){-5,-1 }), (ivec2){ 4, 2 });
-    Draw_RectIVec2(Buffer, COLOR_WHITE, iVec2_Add(Center, (ivec2){ 1,-1 }), (ivec2){ 4, 2 });
+    ivec2 Center = (ivec2) { Target.Width / 2, Target.Height / 2 };
+    Draw_RectIVec2(Target, COLOR_WHITE, iVec2_Add(Center, (ivec2){-1,-5 }), (ivec2){ 2, 4 });
+    Draw_RectIVec2(Target, COLOR_WHITE, iVec2_Add(Center, (ivec2){-1, 1 }), (ivec2){ 2, 4 });
+    Draw_RectIVec2(Target, COLOR_WHITE, iVec2_Add(Center, (ivec2){-5,-1 }), (ivec2){ 4, 2 });
+    Draw_RectIVec2(Target, COLOR_WHITE, iVec2_Add(Center, (ivec2){ 1,-1 }), (ivec2){ 4, 2 });
 }

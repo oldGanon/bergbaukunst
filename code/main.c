@@ -445,7 +445,7 @@ LRESULT CALLBACK Win32_WindowCallback(HWND Window, UINT Message, WPARAM WParam, 
     return Result;
 }
 
-int Win32_ClientMain(void)
+int Win32_ClientMain(const char *Ip)
 {
     HANDLE hInstance = GetModuleHandle(0);
     const char *ClassName = GAME_NAME "Class";
@@ -499,7 +499,7 @@ int Win32_ClientMain(void)
     // GAME STATE
     input Input = { 0 };
     client *Client = malloc(sizeof(client));
-    Client_Init(Client);
+    Client_Init(Client, Ip);
 
     // RAW INPUT
     Win32_LockMouse(true);
@@ -607,7 +607,7 @@ int Win32_ClientMain(void)
             }
         }
 
-        if (GlobalFocus)
+        // if (GlobalFocus)
         {
             // INPUT
             u64 InputTimeElapsed = Win32_TimeSince(LastInputTime);
@@ -695,7 +695,7 @@ int WinStartUp(void)
     {
         // string Ip = String_ExtractToken(&CmdLine);
         // string Port = String_ExtractToken(&CmdLine);
-        ExitCode = Win32_ClientMain();
+        ExitCode = Win32_ClientMain(CmdLine.Data);
     }
     else if (String_Equal(Option, STRING("-server")))
     {
@@ -715,7 +715,7 @@ int WinStartUp(void)
         DWORD ServerThreadID;
         HANDLE ServerThrad = CreateThread(0, 0,  Win32_ServerMainThreadProc, 0, 0, &ServerThreadID);
 
-        ExitCode = Win32_ClientMain();
+        ExitCode = Win32_ClientMain("localhost");
 
         // TerminateProcess(ProcessInformation.hProcess, 0);
         // WaitForSingleObject(ProcessInformation.hProcess, INFINITE);

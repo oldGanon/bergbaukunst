@@ -8,10 +8,19 @@ typedef struct view_chunk
 	bool MeshDirty;
 } view_chunk;
 
+typedef struct view_entity_map
+{
+    u32 Count;
+    u32 Capacity;
+    entity *Entities;
+} view_entity_map;
+
 typedef struct view
 {
 	ivec2 Position;
 	view_chunk Chunks[LOADED_CHUNKS_DIM][LOADED_CHUNKS_DIM];
+
+    view_entity_map EntityMap;
 } view;
 
 quad Block_FaceQuad(vec3 Position, vec3 Right, vec3 Up, vec2 UV, vec2 U, vec2 V, f32 *Shadow)
@@ -206,6 +215,35 @@ void Block_AddQuadsToMesh(quad_mesh *Mesh, vec3 Position, const block_group *Blo
     {
         Mesh_AddQuad(Mesh, Block_TopFace(Position, Top, BlockGroup));
     }
+}
+
+void View_DrawLineBox(bitmap Target, camera Camera, box Box)
+{
+    vec3 Corners[8] = {
+        Camera_WorldToScreen(Camera, Target, Box.Min),
+        Camera_WorldToScreen(Camera, Target, Vec3_Lerp3(Box.Min, Box.Max, (vec3) { 1, 0, 0 })),
+        Camera_WorldToScreen(Camera, Target, Vec3_Lerp3(Box.Min, Box.Max, (vec3) { 0, 1, 0 })),
+        Camera_WorldToScreen(Camera, Target, Vec3_Lerp3(Box.Min, Box.Max, (vec3) { 1, 1, 0 })),
+        Camera_WorldToScreen(Camera, Target, Vec3_Lerp3(Box.Min, Box.Max, (vec3) { 0, 0, 1 })),
+        Camera_WorldToScreen(Camera, Target, Vec3_Lerp3(Box.Min, Box.Max, (vec3) { 1, 0, 1 })),
+        Camera_WorldToScreen(Camera, Target, Vec3_Lerp3(Box.Min, Box.Max, (vec3) { 0, 1, 1 })),
+        Camera_WorldToScreen(Camera, Target, Box.Max),
+    };
+
+    Draw_Line(Target, COLOR_WHITE, Corners[0], Corners[1]);
+    Draw_Line(Target, COLOR_WHITE, Corners[2], Corners[3]);
+    Draw_Line(Target, COLOR_WHITE, Corners[4], Corners[5]);
+    Draw_Line(Target, COLOR_WHITE, Corners[6], Corners[7]);
+
+    Draw_Line(Target, COLOR_WHITE, Corners[0], Corners[2]);
+    Draw_Line(Target, COLOR_WHITE, Corners[1], Corners[3]);
+    Draw_Line(Target, COLOR_WHITE, Corners[4], Corners[6]);
+    Draw_Line(Target, COLOR_WHITE, Corners[5], Corners[7]);
+
+    Draw_Line(Target, COLOR_WHITE, Corners[0], Corners[4]);
+    Draw_Line(Target, COLOR_WHITE, Corners[1], Corners[5]);
+    Draw_Line(Target, COLOR_WHITE, Corners[2], Corners[6]);
+    Draw_Line(Target, COLOR_WHITE, Corners[3], Corners[7]);
 }
 
 void Block_HighlightFace(bitmap Buffer, camera Camera, ivec3 iBlockPosition, u32 BlockFace)
@@ -533,6 +571,7 @@ void View_DrawChunk(view *View, ivec2 ChunkPosition, const bitmap Target, bitmap
 
 void View_Draw(view *View, const bitmap Target, bitmap TerrainTexture, const camera Camera)
 {
+    // draw chunks
     ivec3 iWorldPosition = Vec3_FloorToIVec3(Camera.Position);
     ivec2 Mid = World_ToChunkPosition(iWorldPosition);
     ivec2 Min = iVec2_Sub(Mid, iVec2_Set1(DRAW_DISTANCE));
@@ -543,6 +582,17 @@ void View_Draw(view *View, const bitmap Target, bitmap TerrainTexture, const cam
     {
         ivec2 ChunkPosition = (ivec2){ x, y };
         View_DrawChunk(View, ChunkPosition, Target, TerrainTexture, Camera);
+    }
+}
+
+void View_DrawEntityBoxes(view *View, const bitmap Target, const camera Camera)
+{
+    for (u32 i = 0; i < View->EntityMap.Capacity; ++i)
+    {
+        entity *Entity = &View->EntityMap.Entities[i];
+        if (Entity->Type == ENTITY_NONE) continue;
+        box EntityBox = Entity_Box(Entity);
+        View_DrawLineBox(Target, Camera, EntityBox);
     }
 }
 
@@ -589,6 +639,17 @@ void View_SetChunk(view *View, const msg_chunk_data *ChunkData)
     }
 }
 
+void View_SetEntity(view *View, const msg_set_entity *SetEntity)
+{
+    while (SetEntity->Id >= View->EntityMap.Capacity)
+    {
+        View->EntityMap.Capacity <<= 1;
+        View->EntityMap.Entities = realloc(View->EntityMap.Entities, View->EntityMap.Capacity * sizeof(entity));
+    }
+
+    View->EntityMap.Entities[SetEntity->Id] = SetEntity->Entity;
+}
+
 void View_Init(view *View)
 {
     View_SetPosition(View, (ivec2){ 0 });
@@ -598,6 +659,10 @@ void View_Init(view *View)
     {
         View->Chunks[y][x].Mesh = Mesh_Create();
     }
+
+    View->EntityMap.Count = 0;
+    View->EntityMap.Capacity = 256;
+    View->EntityMap.Entities = malloc(View->EntityMap.Capacity * sizeof(entity));
 }
 
 f32 View_TraceRay(view *View, vec3 RayOrigin, vec3 RayDirection, f32 RayLength, trace_result *Result)
