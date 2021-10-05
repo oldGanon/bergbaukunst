@@ -153,6 +153,26 @@ vec3 Camera_ScreenToWorld(const camera Camera, const bitmap Screen, vec3 Positio
     return Camera_ToWorld(Camera, Camera_FromScreen(Screen, Position));
 }
 
+mat4 Camera_WorldToScreenMatrix(const camera Camera, const bitmap Screen)
+{
+    mat4 Transform = Mat4_Translation(Camera.Position);
+    Transform = Mat4_Mul(Mat4_RotYaw(Camera.Yaw), Transform);
+    Transform = Mat4_Mul(Mat4_RotPitch(Camera.Pitch), Transform);
+
+    f32 HalfWidth = Screen.Width * 0.5f;
+    f32 HalfHeight = Screen.Height * 0.5f;
+    f32 MinDim = Min(HalfWidth, HalfHeight);
+    mat4 ScreenMat = (mat4){{
+        { MinDim, 0, 0, 0 },
+        { 0, 0, 1, 0 },
+        { 0, MinDim, 0, 0 },
+        { HalfWidth, HalfHeight, 0, 1 },
+    }};
+    Transform = Mat4_Mul(ScreenMat, Transform);
+
+    return Transform;
+}
+
 f32 Camera_CalcZ(const camera Camera, vec3 Position)
 {
     Position = Vec3_Sub(Position, Camera.Position);

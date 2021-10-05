@@ -878,16 +878,20 @@ void Draw_QuadTexturedVerts(bitmap Target, bitmap Texture, vertex A, vertex B, v
 //
 //
 
-#define TRIANGLE_BATCH_SIZE 8
+#define TRIANGLE_BATCHES 1
+#define VERTICES_PER_BATCH (8 * TRIANGLE_BATCHES * 3)
 typedef struct rasterizer
 {
     bitmap Texture;
+    mat4 Transform;
 
     u8 ColorBuffer[SCREEN_WIDTH * SCREEN_HEIGHT];
     f32 DepthBuffer[SCREEN_WIDTH * SCREEN_HEIGHT];
 
     u32 TriangleCount;
-    vertex Triangles[TRIANGLE_BATCH_SIZE * 3];
+    vertex Triangles[VERTICES_PER_BATCH];
+
+
 } rasterizer;
 
 global rasterizer GlobalRasterizer;
@@ -938,11 +942,11 @@ void Raserizer_Rasterize(void)
                       15.0f/16.0f, 7.0f/16.0f,13.0f/16.0f, 5.0f/16.0f),
     };
 
-    u32 BatchCount = ((TriangleCount - 1) >> 3) + 1;
-    for (u32 Batch = 0; Batch < BatchCount; ++Batch)
+    u32 PackCount = ((TriangleCount - 1) >> 3) + 1;
+    for (u32 Pack = 0; Pack < PackCount; ++Pack)
     {
-        vertex *Trianglebatch = Triangles + Batch * 8 * 3;
-        u32 BatchTriangleCount = MIN(8, TriangleCount - Batch * 8);
+        vertex *TrianglePack = Triangles + Pack * VERTICES_PER_BATCH;
+        u32 PackTriangleCount = MIN(8, TriangleCount - Pack * 8);
 
         __m256 X[3], Y[3], Z[3], U[3], V[3], S[3];
 
@@ -951,14 +955,14 @@ void Raserizer_Rasterize(void)
             __m256 Tmp[8];
             __m256 TTmp[8];
 
-            Tmp[0] = _mm256_loadu_ps((const float *)&Trianglebatch[vertex*8+0]);
-            Tmp[1] = _mm256_loadu_ps((const float *)&Trianglebatch[vertex*8+1]);
-            Tmp[2] = _mm256_loadu_ps((const float *)&Trianglebatch[vertex*8+2]);
-            Tmp[3] = _mm256_loadu_ps((const float *)&Trianglebatch[vertex*8+3]);
-            Tmp[4] = _mm256_loadu_ps((const float *)&Trianglebatch[vertex*8+4]);
-            Tmp[5] = _mm256_loadu_ps((const float *)&Trianglebatch[vertex*8+5]);
-            Tmp[6] = _mm256_loadu_ps((const float *)&Trianglebatch[vertex*8+6]);
-            Tmp[7] = _mm256_loadu_ps((const float *)&Trianglebatch[vertex*8+7]);
+            Tmp[0] = _mm256_loadu_ps((const float *)&TrianglePack[vertex*8+0]);
+            Tmp[1] = _mm256_loadu_ps((const float *)&TrianglePack[vertex*8+1]);
+            Tmp[2] = _mm256_loadu_ps((const float *)&TrianglePack[vertex*8+2]);
+            Tmp[3] = _mm256_loadu_ps((const float *)&TrianglePack[vertex*8+3]);
+            Tmp[4] = _mm256_loadu_ps((const float *)&TrianglePack[vertex*8+4]);
+            Tmp[5] = _mm256_loadu_ps((const float *)&TrianglePack[vertex*8+5]);
+            Tmp[6] = _mm256_loadu_ps((const float *)&TrianglePack[vertex*8+6]);
+            Tmp[7] = _mm256_loadu_ps((const float *)&TrianglePack[vertex*8+7]);
 
             TTmp[0] = _mm256_unpacklo_ps(Tmp[0], Tmp[1]);
             TTmp[1] = _mm256_unpackhi_ps(Tmp[0], Tmp[1]);
@@ -1025,7 +1029,7 @@ void Raserizer_Rasterize(void)
         __m256 MaxX = _mm256_min_ps(_mm256_ceil_ps(_mm256_max_ps(_mm256_max_ps(X[0], X[1]), X[2])), ClipMaxX);
         __m256 MaxY = _mm256_min_ps(_mm256_ceil_ps(_mm256_max_ps(_mm256_max_ps(Y[0], Y[1]), Y[2])), ClipMaxY);
 
-        for (u32 Tri = 0; Tri < BatchTriangleCount; ++Tri)
+        for (u32 Tri = 0; Tri < PackTriangleCount; ++Tri)
         {
             __m256i Tri8 = _mm256_broadcastd_epi32(_mm_loadu_si32(&Tri));
             __m256 Z8[3] = { _mm256_permutevar8x32_ps(Z[0], Tri8),
@@ -1191,17 +1195,18 @@ void Raserizer_Flush(void)
 void Raserizer_SetTexture(bitmap Texture)
 {
     Raserizer_Flush();
+
     GlobalRasterizer.Texture = Texture;
 }
 
 void Raserizer_Blit(bitmap Target)
 {
-    if (Target.Width != SCREEN_WIDTH) return;
-    if (Target.Height != SCREEN_HEIGHT) return;
-
     Raserizer_Flush();
-    for (u32 y = 0; y < Target.Height; ++y)
-    for (u32 x = 0; x < Target.Width; ++x)
+
+    u32 Width = Min(Target.Width, SCREEN_WIDTH);
+    u32 Height = Min(Target.Height, SCREEN_HEIGHT);
+    for (u32 y = 0; y < Height; ++y)
+    for (u32 x = 0; x < Width; ++x)
         Target.Pixels[y * Target.Pitch + x].Value = GlobalRasterizer.ColorBuffer[y * SCREEN_WIDTH + x];
 }
 
@@ -1223,7 +1228,7 @@ void Raserizer_DrawTriangle(vertex A, vertex B, vertex C)
         GlobalRasterizer.Triangles[Batch * 24 + Triangle +  0] = V[0];
         GlobalRasterizer.Triangles[Batch * 24 + Triangle +  8] = V[1];
         GlobalRasterizer.Triangles[Batch * 24 + Triangle + 16] = V[2];
-        if (++GlobalRasterizer.TriangleCount >= TRIANGLE_BATCH_SIZE)
+        if (++GlobalRasterizer.TriangleCount >= TRIANGLE_BATCHES * 8)
             Raserizer_Flush();
     }
 }

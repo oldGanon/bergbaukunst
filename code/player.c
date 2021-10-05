@@ -65,7 +65,7 @@ void Player_Input(player *Player, client *Client, input Input, f32 DeltaTime)
     // Look Input
     if (Input.LookUp)    Player->Pitch += KEY_SENSITIVITY;
     if (Input.LookDown)  Player->Pitch -= KEY_SENSITIVITY;
-    if (Input.LookRight) Player->Yaw   += KEY_SENSITIVITY;    
+    if (Input.LookRight) Player->Yaw   += KEY_SENSITIVITY;
     if (Input.LookLeft)  Player->Yaw   -= KEY_SENSITIVITY;
     Player->Yaw   += Input.Look.x * MOUSE_SENSITIVITY;
     Player->Pitch += Input.Look.y * MOUSE_SENSITIVITY;

@@ -4,13 +4,14 @@
 
 typedef union
 {
+    f32 E[2];
     struct { f32 x, y; };
     struct { f32 u, v; };
-    f32 E[2];
 } vec2;
 
 typedef union
 {
+    f32 E[4];
     struct
     {
         f32 x;
@@ -20,30 +21,35 @@ typedef union
             vec2 yz;
         };
     };
-    struct { vec2 xy; };
-    
-    struct
-    {
-        f32 r;
-        union
-        {
-            struct { f32 g, b; };
-            vec2 gb;
-        };
-    };
-    struct { vec2 rg; };
-    f32 E[4];
+    struct { vec2 xy; };    
 } vec3;
 
 typedef union
 {
+    f32 E[4];
+    struct
+    {
+        f32 x;
+        union
+        {
+            struct { f32 y, z, w; };
+            vec2 yz;
+        };
+    };
+    struct { vec2 xy; vec2 zw; };
+    struct { vec3 xyz; };    
+} vec4;
+
+typedef union
+{
+    i32 E[2];
     struct { i32 x, y; };
     struct { i32 u, v; };
-    i32 E[2];
 } ivec2;
 
 typedef union
 {
+    i32 E[4];
     struct
     {
         i32 x;
@@ -54,17 +60,6 @@ typedef union
         };
     };
     struct { ivec2 xy; };
-    struct
-    {
-        i32 r;
-        union
-        {
-            struct { i32 g, b; };
-            ivec2 gb;
-        };
-    };
-    struct { ivec2 rg; };
-    i32 E[4];
 } ivec3;
 
 #define MATH_PI 3.14159265358979323846f
@@ -342,6 +337,18 @@ inline vec3 Vec3_Cross(vec3 A, vec3 B)
     return A;
 }
 
+/************/
+/*   Vec4   */
+/************/
+#define LOAD_VEC4(V) _mm_loadu_ps(V.E)
+#define STORE_VEC4(V,M) _mm_storeu_ps(V.E,M)
+inline vec4 Vec4_Zero(void) { vec4 B; STORE_VEC4(B, _mm_setzero_ps()); return B; }
+inline vec4 Vec4_Set1(f32 A) { vec4 B; STORE_VEC4(B, _mm_set1_ps(A)); return B; }
+inline vec4 Vec4_Add(vec4 A, vec4 B) { STORE_VEC4(A, _mm_add_ps(LOAD_VEC4(A), LOAD_VEC4(B))); return A; }
+inline vec4 Vec4_Sub(vec4 A, vec4 B) { STORE_VEC4(A, _mm_sub_ps(LOAD_VEC4(A), LOAD_VEC4(B))); return A; }
+inline vec4 Vec4_Mul(vec4 A, vec4 B) { STORE_VEC4(A, _mm_mul_ps(LOAD_VEC4(A), LOAD_VEC4(B))); return A; }
+inline vec4 Vec4_Div(vec4 A, vec4 B) { STORE_VEC4(A, _mm_div_ps(LOAD_VEC4(A), LOAD_VEC4(B))); return A; }
+
 /*************/
 /*   iVec2   */
 /*************/
@@ -559,3 +566,192 @@ inline ivec3 Vec3_FloorToIVec3(vec3 A) { ivec3 B; STORE_IVEC3(B, _mm_cvtps_epi32
     vec2: Vec2_Modulo, \
     vec3: Vec3_Modulo \
 )(A,B)
+
+/************/
+/*   Mat3   */
+/************/
+typedef struct mat3
+{
+    vec3 Columns[3];
+} mat3;
+
+mat3 Mat3_Id(void)
+{
+    return (mat3){{
+        { 1, 0, 0 },
+        { 0, 1, 0 },
+        { 0, 0, 1 },
+    }};    
+}
+
+mat3 Mat3_RotYaw(f32 Yaw)
+{
+    f32 S = Sin(Yaw);
+    f32 C = Cos(Yaw);
+    return (mat3){{
+        { C, S, 0 },
+        {-S, C, 0 },
+        { 0, 0, 1 },
+    }};
+}
+
+mat3 Mat3_RotPitch(f32 Pitch)
+{
+    f32 S = Sin(Pitch);
+    f32 C = Cos(Pitch);
+    return (mat3){{
+        { 1, 0, 0 },
+        { 0, C,-S },
+        { 0, S, C },
+    }};
+}
+
+vec3 Mat3_MulVec3(mat3 M, vec3 V)
+{
+    __m128 C = LOAD_VEC3(V);
+    __m128 C0 = _mm_mul_ps(_mm_loadu_ps(M.Columns[0].E), _mm_shuffle_ps(C, C, _MM_SHUFFLE(0,0,0,0)));
+    __m128 C1 = _mm_mul_ps(_mm_loadu_ps(M.Columns[1].E), _mm_shuffle_ps(C, C, _MM_SHUFFLE(1,1,1,1)));
+    __m128 C2 = _mm_mul_ps(_mm_loadu_ps(M.Columns[2].E), _mm_shuffle_ps(C, C, _MM_SHUFFLE(2,2,2,2)));
+    STORE_VEC3(V, _mm_add_ps(_mm_add_ps(C0, C1), C2));
+    return V;
+}
+
+mat3 Mat3_Transpose(mat3 M)
+{
+    __m128 C0 = LOAD_VEC3(M.Columns[0]);
+    __m128 C1 = LOAD_VEC3(M.Columns[1]);
+    __m128 C2 = LOAD_VEC3(M.Columns[2]);
+    __m128 C3 = _mm_setzero_ps();
+
+    __m128 T0 = _mm_unpacklo_ps(C0, C1);
+    __m128 T1 = _mm_unpackhi_ps(C0, C1);
+    __m128 T2 = _mm_unpacklo_ps(C2, C3);
+    __m128 T3 = _mm_unpackhi_ps(C2, C3);
+
+    C0 = _mm_movelh_ps(T0, T2);
+    C1 = _mm_movehl_ps(T2, T0);
+    C2 = _mm_movelh_ps(T1, T3);
+
+    STORE_VEC3(M.Columns[0], C0);
+    STORE_VEC3(M.Columns[1], C1);
+    STORE_VEC3(M.Columns[2], C2);
+
+    return M;
+}
+
+mat3 Mat3_Mul(mat3 A, mat3 B)
+{
+    mat3 Result;
+    Result.Columns[0] = Mat3_MulVec3(A, B.Columns[0]);
+    Result.Columns[1] = Mat3_MulVec3(A, B.Columns[1]);
+    Result.Columns[2] = Mat3_MulVec3(A, B.Columns[2]);
+    return Result;
+}
+
+/************/
+/*   Mat4   */
+/************/
+typedef struct mat4
+{
+    vec4 Columns[4];
+} mat4;
+
+mat4 Mat4_Id(void)
+{
+    return (mat4){{
+        { 1, 0, 0, 0 },
+        { 0, 1, 0, 0 },
+        { 0, 0, 1, 0 },
+        { 0, 0, 0, 1 },
+    }};    
+}
+
+mat4 Mat4_Translation(vec3 Translation)
+{
+    return (mat4){{
+        { 1, 0, 0, 0 },
+        { 0, 1, 0, 0 },
+        { 0, 0, 1, 0 },
+        { -Translation.x, -Translation.y, -Translation.z, 1 },
+    }};
+}
+
+mat4 Mat4_RotYaw(f32 Yaw)
+{
+    f32 S = Sin(Yaw);
+    f32 C = Cos(Yaw);
+    return (mat4){{
+        { C, S, 0, 0 },
+        {-S, C, 0, 0 },
+        { 0, 0, 1, 0 },
+        { 0, 0, 0, 1 },
+    }};
+}
+
+mat4 Mat4_RotPitch(f32 Pitch)
+{
+    f32 S = Sin(Pitch);
+    f32 C = Cos(Pitch);
+    return (mat4){{
+        { 1, 0, 0, 0 },
+        { 0, C,-S, 0 },
+        { 0, S, C, 0 },
+        { 0, 0, 0, 1 },
+    }};
+}
+
+mat4 Mat4_Transpose(mat4 M)
+{
+    __m128 C0 = LOAD_VEC4(M.Columns[0]);
+    __m128 C1 = LOAD_VEC4(M.Columns[1]);
+    __m128 C2 = LOAD_VEC4(M.Columns[2]);
+    __m128 C3 = LOAD_VEC4(M.Columns[3]);
+
+    __m128 T0 = _mm_unpacklo_ps(C0, C1);
+    __m128 T1 = _mm_unpackhi_ps(C0, C1);
+    __m128 T2 = _mm_unpacklo_ps(C2, C3);
+    __m128 T3 = _mm_unpackhi_ps(C2, C3);
+
+    C0 = _mm_movelh_ps(T0, T2);
+    C1 = _mm_movehl_ps(T2, T0);
+    C2 = _mm_movelh_ps(T1, T3);
+    C3 = _mm_movehl_ps(T1, T3);
+
+    STORE_VEC4(M.Columns[0], C0);
+    STORE_VEC4(M.Columns[1], C1);
+    STORE_VEC4(M.Columns[2], C2);
+    STORE_VEC4(M.Columns[3], C3);
+
+    return M;
+}
+
+vec4 Mat4_MulVec4(mat4 M, vec4 V)
+{
+    __m128 C = LOAD_VEC4(V);
+    __m128 C0 = _mm_mul_ps(LOAD_VEC4(M.Columns[0]), _mm_shuffle_ps(C, C, _MM_SHUFFLE(0,0,0,0)));
+    __m128 C1 = _mm_mul_ps(LOAD_VEC4(M.Columns[1]), _mm_shuffle_ps(C, C, _MM_SHUFFLE(1,1,1,1)));
+    __m128 C2 = _mm_mul_ps(LOAD_VEC4(M.Columns[2]), _mm_shuffle_ps(C, C, _MM_SHUFFLE(2,2,2,2)));
+    __m128 C3 = _mm_mul_ps(LOAD_VEC4(M.Columns[3]), _mm_shuffle_ps(C, C, _MM_SHUFFLE(3,3,3,3)));
+    STORE_VEC4(V, _mm_add_ps(_mm_add_ps(C0, C1), _mm_add_ps(C2, C3)));
+    return V;
+}
+
+mat4 Mat4_Mul(mat4 A, mat4 B)
+{
+    __m128 C0 = LOAD_VEC4(A.Columns[0]);
+    __m128 C1 = LOAD_VEC4(A.Columns[1]);
+    __m128 C2 = LOAD_VEC4(A.Columns[2]);
+    __m128 C3 = LOAD_VEC4(A.Columns[3]);
+
+    mat4 Result;
+    for (u32 i = 0; i < 4; ++i)
+    {
+        __m128 V = LOAD_VEC4(B.Columns[i]);
+        __m128 V0 = _mm_mul_ps(C0, _mm_shuffle_ps(V, V, _MM_SHUFFLE(0,0,0,0)));
+        __m128 V1 = _mm_mul_ps(C1, _mm_shuffle_ps(V, V, _MM_SHUFFLE(1,1,1,1)));
+        __m128 V2 = _mm_mul_ps(C2, _mm_shuffle_ps(V, V, _MM_SHUFFLE(2,2,2,2)));
+        __m128 V3 = _mm_mul_ps(C3, _mm_shuffle_ps(V, V, _MM_SHUFFLE(3,3,3,3)));
+        STORE_VEC4(Result.Columns[i], _mm_add_ps(_mm_add_ps(V0, V1), _mm_add_ps(V2, V3)));
+    }
+    return Result;
+}
