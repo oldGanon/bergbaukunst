@@ -57,7 +57,7 @@ bitmap Bitmap_Section(bitmap Bitmap, i32 X, i32 Y, u32 W, u32 H);
 color Bitmap_GetPixel(bitmap Bitmap, i32 X, i32 Y);
 void Bitmap_SetPixel(bitmap Bitmap, color Color, i32 X, i32 Y);
 void Bitmap_Clear(bitmap Bitmap, color Color);
-void Draw_Bitmap(bitmap Target, const bitmap Bitmap, i32 X, i32 Y);
+void Draw_Bitmap(bitmap Target, const bitmap Bitmap, ivec2 Position);
 
 // Rasterizer
 void Raserizer_Rasterize(void);
@@ -91,7 +91,8 @@ void Draw_RectIVec2(bitmap, color, ivec2, ivec2);
 void Draw_RectVec2(bitmap, color, vec2, vec2);
 
 // String
-void Draw_String(bitmap, const bitmap, color, ivec2, const char *);
+ivec2 Draw_Character(bitmap, const bitmap, color, ivec2, char);
+ivec2 Draw_String(bitmap, const bitmap, color, ivec2, const char *);
 
 // Vertex Triangle
 void Draw_TriangleVerts(bitmap, color, vertex, vertex, vertex);
@@ -238,10 +239,10 @@ void Bitmap_Clear(bitmap Bitmap, color Color)
         Bitmap__SetPixelFast(Bitmap, Color, x, y);
 }
 
-void Draw_Bitmap(bitmap Target, const bitmap Bitmap, i32 X, i32 Y)
+void Draw_Bitmap(bitmap Target, const bitmap Bitmap, ivec2 Position)
 {
-    bitmap Src = Bitmap_Section(Bitmap,-X,-Y, Target.Width, Target.Height);
-    bitmap Dst = Bitmap_Section(Target, X, Y, Bitmap.Width, Bitmap.Height);
+    bitmap Src = Bitmap_Section(Bitmap,-Position.x,-Position.y, Target.Width, Target.Height);
+    bitmap Dst = Bitmap_Section(Target, Position.x, Position.y, Bitmap.Width, Bitmap.Height);
     Bitmap_Blit(Dst, Src);
 }
 
@@ -536,22 +537,65 @@ void Draw_RectVec2(bitmap Target, color Color, vec2 Min, vec2 Dim)
 /*   String   */
 /**************/
 
-void Draw_String(bitmap Target, const bitmap Font, color Color, ivec2 Position, const char *String)
+ivec2 Draw_Character(bitmap Target, const bitmap Font, color Color, ivec2 Position, char Character)
 {
-    i32 X = Position.x;
-    i32 Y = Position.y;
     i32 CW = Font.Width / 8;
     i32 CH = Font.Height / 8;
+    i32 CX = (Character % CW) * 8;
+    i32 CY = (Character / CW) * 8;
+    struct bitmap Char = Bitmap_Section(Font, CX, CY, 8, 8);
+    Draw_Bitmap(Target, Char, Position);
+    Position.x += 8;
+    return Position;
+}
+
+ivec2 Draw_String(bitmap Target, const bitmap Font, color Color, ivec2 Position, const char *String)
+{
+    ivec2 Cursor = Position;
     while (*String)
     {
         char C = *String++;
-        if (C == '\n') { X = Position.x; Y -= 8; continue; }
-        i32 CX = (C % CW) * 8;
-        i32 CY = (C / CW) * 8;
-        struct bitmap Char = Bitmap_Section(Font, CX, CY, 8, 8);
-        Draw_Bitmap(Target, Char, X, Y);
-        X += 8;
+        if (C == '\n') { Cursor.x = Position.x; Cursor.y -= 8; continue; }
+        Cursor = Draw_Character(Target, Font, Color, Cursor, C);
     }
+    return Cursor;
+}
+
+ivec2 Draw_Number(bitmap Target, const bitmap Font, color Color, ivec2 Position, f32 Number)
+{    
+    if (Number < 0)
+    {
+        Position = Draw_Character(Target, Font, Color, Position, '-');
+        Number = F32_Negate(Number);
+    }
+    
+    u32 Length = 1;
+    while (Number >= 10.0f)
+    {
+        Number *= 0.1f;
+        ++Length;
+    }
+
+    while (Length--)
+    {
+        u8 Decimal = (u8)F32_FloorToI32(Number);
+        Number = Fract(Number) * 10;
+        char Character = Decimal + '0';
+        Position = Draw_Character(Target, Font, Color, Position, Character);
+    }
+
+    Position = Draw_Character(Target, Font, Color, Position, '.');
+
+    u32 DecimalPlaces = 2;
+    while (DecimalPlaces--)
+    {
+        u8 Decimal = (u8)F32_FloatToI32(Number);
+        Number = Fract(Number) * 10;
+        char Character = Decimal + '0';
+        Position = Draw_Character(Target, Font, Color, Position, Character);        
+    }
+
+    return Position;
 }
 
 /********************/

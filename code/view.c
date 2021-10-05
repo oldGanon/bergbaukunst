@@ -573,15 +573,21 @@ void View_Draw(view *View, const bitmap Target, bitmap TerrainTexture, const cam
 {
     // draw chunks
     ivec3 iWorldPosition = Vec3_FloorToIVec3(Camera.Position);
-    ivec2 Mid = World_ToChunkPosition(iWorldPosition);
-    ivec2 Min = iVec2_Sub(Mid, iVec2_Set1(DRAW_DISTANCE));
-    ivec2 Max = iVec2_Add(Mid, iVec2_Set1(DRAW_DISTANCE));
+    ivec2 Center = World_ToChunkPosition(iWorldPosition);
 
-    for (i32 y = Min.y; y <= Max.y; ++y)
-    for (i32 x = Min.x; x <= Max.x; ++x)
+    View_DrawChunk(View, Center, Target, TerrainTexture, Camera);
+    for (i32 i = 1; i < DRAW_DISTANCE; ++i)
     {
-        ivec2 ChunkPosition = (ivec2){ x, y };
-        View_DrawChunk(View, ChunkPosition, Target, TerrainTexture, Camera);
+        for (i32 j = -i; j < i; ++j)
+        {
+            ivec2 OffsetX = (ivec2){ i, j };
+            View_DrawChunk(View, iVec2_Add(Center, OffsetX), Target, TerrainTexture, Camera);
+            View_DrawChunk(View, iVec2_Sub(Center, OffsetX), Target, TerrainTexture, Camera);
+
+            ivec2 OffsetY = (ivec2){ -j, i };
+            View_DrawChunk(View, iVec2_Add(Center, OffsetY), Target, TerrainTexture, Camera);
+            View_DrawChunk(View, iVec2_Sub(Center, OffsetY), Target, TerrainTexture, Camera);
+        }
     }
 }
 

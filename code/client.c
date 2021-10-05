@@ -55,6 +55,9 @@ typedef struct client
     camera Camera;
     player Player;
     view View;
+
+    /* DEBUG */
+    f32 Fps;
 } client;
 
 #include "player.c"
@@ -80,6 +83,9 @@ void Client_Init(client *Client, const char *Ip)
         .Position = (vec3) { 3.0f, 10.0f, 70.0f },
         .NoClip = true,
     };
+
+    /* DEBUG */
+    Client->Fps = 0;
 }
 
 void Client_ProcessMessages(client *Client)
@@ -108,6 +114,9 @@ void Client_Input(client *Client, const input Input, f32 DeltaTime)
     if (Input.NoClip) Client->Player.NoClip = !Client->Player.NoClip;
 
     Player_Input(&Client->Player, Client, Input, DeltaTime);
+
+    f32 Fps = (1.0f / DeltaTime);
+    Client->Fps = Lerp(Client->Fps, Fps, DeltaTime);
 }
 
 void Client_Update(client *Client, const input Input, f32 DeltaTime)
@@ -124,7 +133,9 @@ void Client_Draw(client *Client, bitmap Target, f32 DeltaTime)
 
     View_DrawEntityBoxes(&Client->View, Target, Client->Camera);
 
-    Draw_String(Target, Client->Font, COLOR_WHITE, (ivec2){8,8}, "ver. 0.001a");
+    Draw_String(Target, Client->Font, COLOR_WHITE, (ivec2){8,8}, "Ver: 0.001a");
+    ivec2 Position = Draw_String(Target, Client->Font, COLOR_WHITE, (ivec2){8,16}, "Fps: ");
+    Draw_Number(Target, Client->Font, COLOR_WHITE, Position, Client->Fps);
 
     vec3 A = Camera_WorldToScreen(Client->Camera, Target, (vec3) {  0, 0, 1 });
     vec3 B = Camera_WorldToScreen(Client->Camera, Target, (vec3) { 16, 0, 1 });
