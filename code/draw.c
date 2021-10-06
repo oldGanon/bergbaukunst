@@ -615,10 +615,12 @@ inline u32 Draw__TriangleClipZ(vertex *V)
     // if (Max(Max(V[0].Position.z, V[1].Position.z), V[2].Position.z) > CAMERA_FAR)
     //     return 0;
 
-    vertex T;
     u32 Z = ((V[0].Position.z < CAMERA_NEAR) ? 1 : 0) |
             ((V[1].Position.z < CAMERA_NEAR) ? 2 : 0) |
             ((V[2].Position.z < CAMERA_NEAR) ? 4 : 0);
+    if (Z == 0) return 1;
+
+    vertex T;
     switch (Z)
     {
         case 0: return 1;
@@ -663,7 +665,7 @@ inline bool Draw__PrepareTriangleVerts(i32 Width, i32 Height, vertex *A, vertex 
     A->Position = Vec3_Sub(A->Position, PixelCenter);
     B->Position = Vec3_Sub(B->Position, PixelCenter);
     C->Position = Vec3_Sub(C->Position, PixelCenter);
-
+#if 0
     // triangle offscreen left
     f32 MaxX = Max(Max(A->Position.x, B->Position.x), C->Position.x);
     if (MaxX < 0) return false;
@@ -679,10 +681,11 @@ inline bool Draw__PrepareTriangleVerts(i32 Width, i32 Height, vertex *A, vertex 
     // triangle offscreen top
     f32 MinY = Min(Min(A->Position.y, B->Position.y), C->Position.y);
     if (MinY > (f32)Height) return false;
-
+    
     // triangle too small
     if (Abs(Floor(MaxX) - Floor(MinX)) < 1.0f) return false;
     if (Abs(Floor(MaxY) - Floor(MinY)) < 1.0f) return false;
+#endif
     
     return true;
 }
@@ -1034,7 +1037,6 @@ void Raserizer_Rasterize(void)
             V[vertex] = _mm256_permute2f128_ps(Tmp[1], Tmp[5], 0x31);
             S[vertex] = _mm256_permute2f128_ps(Tmp[2], Tmp[6], 0x31);
             // __m256 _[vertex] = _mm256_permute2f128_ps(Tmp[3], Tmp[7], 0x31);
-
         }
         
         Z[0] = _mm256_div_ps(One, Z[0]);
@@ -1254,6 +1256,19 @@ void Raserizer_Blit(bitmap Target)
         Target.Pixels[y * Target.Pitch + x].Value = GlobalRasterizer.ColorBuffer[y * SCREEN_WIDTH + x];
 }
 
+inline vec3 Raserizer__VertexToPixel(vec3 A)
+{
+    // perspective divide
+    A.x = (A.x - SCREEN_WIDTH  / 2) / A.z + SCREEN_WIDTH  / 2;
+    A.y = (A.y - SCREEN_HEIGHT / 2) / A.z + SCREEN_HEIGHT / 2;
+
+    // move pixel center
+    vec3 PixelCenter = (vec3){ 0.5f, 0.5f, 0.0f };
+    A = Vec3_Sub(A, PixelCenter);
+
+    return A;
+}
+
 void Raserizer_DrawTriangle(vertex A, vertex B, vertex C)
 {
     vertex Vertices[6] = { A, B, C };
@@ -1261,11 +1276,9 @@ void Raserizer_DrawTriangle(vertex A, vertex B, vertex C)
     for (u32 i = 0; i < TriangleCount; ++i)
     {
         vertex *V = Vertices + (i * 3);
-        V[0].Position = Draw__PerspectiveDivide(SCREEN_WIDTH, SCREEN_HEIGHT, V[0].Position);
-        V[1].Position = Draw__PerspectiveDivide(SCREEN_WIDTH, SCREEN_HEIGHT, V[1].Position);
-        V[2].Position = Draw__PerspectiveDivide(SCREEN_WIDTH, SCREEN_HEIGHT, V[2].Position);
-
-        if (!Draw__PrepareTriangleVerts(SCREEN_WIDTH, SCREEN_HEIGHT, &V[0], &V[1], &V[2])) return;
+        V[0].Position = Raserizer__VertexToPixel(V[0].Position);
+        V[1].Position = Raserizer__VertexToPixel(V[1].Position);
+        V[2].Position = Raserizer__VertexToPixel(V[2].Position);
 
         u64 Batch = GlobalRasterizer.TriangleCount >> 3;
         u64 Triangle = GlobalRasterizer.TriangleCount & 7;
@@ -1277,10 +1290,109 @@ void Raserizer_DrawTriangle(vertex A, vertex B, vertex C)
     }
 }
 
+inline bool Rasterizer__QuadIsVisible(vertex A, vertex B, vertex C, vertex D)
+{
+    __m128i Sign = _mm_set1_epi32(0x80000000);
+    __m128 Near = _mm_set1_ps(CAMERA_NEAR);
+    __m128 N[4] = {
+        _mm_set_ps(0,-SCREEN_WIDTH  / 2, 0, 1),
+        _mm_set_ps(0,-SCREEN_WIDTH  / 2, 0,-1),
+        _mm_set_ps(0,-SCREEN_HEIGHT / 2, 1, 0),
+        _mm_set_ps(0,-SCREEN_HEIGHT / 2,-1, 0),
+    };
+
+    __m128 mA = _mm_loadu_ps(A.Position.E);
+    __m128 mB = _mm_loadu_ps(B.Position.E);
+    __m128 mC = _mm_loadu_ps(C.Position.E);
+    __m128 mD = _mm_loadu_ps(D.Position.E);
+
+    __m128 T0 = _mm_unpacklo_ps(mA, mB);
+    __m128 T1 = _mm_unpackhi_ps(mA, mB);
+    __m128 T2 = _mm_unpacklo_ps(mC, mD);
+    __m128 T3 = _mm_unpackhi_ps(mC, mD);
+
+    __m128 X = _mm_movelh_ps(T0, T2);
+    __m128 Y = _mm_movehl_ps(T2, T0);
+    __m128 Z = _mm_movelh_ps(T1, T3);
+
+    // quad in front of near plane
+    __m128i M = _mm_castps_si128(_mm_cmpgt_ps(Z, Near));
+    if (_mm_testz_si128(M, M))
+        return false;
+
+    // quad outside of view frustum
+    X = _mm_sub_ps(X, _mm_set1_ps(SCREEN_WIDTH / 2));
+    Y = _mm_sub_ps(Y, _mm_set1_ps(SCREEN_HEIGHT / 2));
+    for (u32 i = 0; i < 4; ++i)
+    {
+        __m128 P = _mm_mul_ps(X, _mm_shuffle_ps(N[i], N[i], _MM_SHUFFLE(0,0,0,0)));
+        P = _mm_add_ps(P, _mm_mul_ps(Y, _mm_shuffle_ps(N[i], N[i], _MM_SHUFFLE(1,1,1,1))));
+        P = _mm_add_ps(P, _mm_mul_ps(Z, _mm_shuffle_ps(N[i], N[i], _MM_SHUFFLE(2,2,2,2))));
+        if (_mm_testz_si128(_mm_castps_si128(P), Sign))
+            return false;
+    }
+
+    // quad between pixels
+    X = _mm_div_ps(X, Z);
+    X = _mm_sub_ps(X, _mm_set1_ps(0.5f));
+    __m128 X0 = _mm_movehdup_ps(X);
+    __m128 X1 = _mm_max_ps(X, X0);
+    X0 = _mm_movehl_ps(X0, X1);
+    X1 = _mm_max_ss(X1, X0);
+    f32 MaxX = _mm_cvtss_f32(X1);
+    X0 = _mm_movehdup_ps(X);
+    X1 = _mm_min_ps(X, X0);
+    X0 = _mm_movehl_ps(X0, X1);
+    X1 = _mm_min_ss(X1, X0);
+    f32 MinX = _mm_cvtss_f32(X1);
+    if (Floor(MinX) == Floor(MaxX))
+        return false;
+
+    // quad between pixels
+    Y = _mm_div_ps(Y, Z);
+    Y = _mm_sub_ps(Y, _mm_set1_ps(0.5f));
+    __m128 Y0 = _mm_movehdup_ps(Y);
+    __m128 Y1 = _mm_max_ps(Y, Y0);
+    Y0 = _mm_movehl_ps(Y0, Y1);
+    Y1 = _mm_max_ss(Y1, Y0);
+    f32 MaxY = _mm_cvtss_f32(Y1);
+    Y0 = _mm_movehdup_ps(Y);
+    Y1 = _mm_min_ps(Y, Y0);
+    Y0 = _mm_movehl_ps(Y0, Y1);
+    Y1 = _mm_min_ss(Y1, Y0);
+    f32 MinY = _mm_cvtss_f32(Y1);
+    if (Floor(MinX) == Floor(MaxX))
+        return false;
+
+    // clipped
+    __m128 ZSign = _mm_and_ps(Z, _mm_castsi128_ps(Sign));
+    if (!_mm_testz_si128(_mm_castps_si128(ZSign), _mm_castps_si128(ZSign)))
+        return true;
+
+    // check winding order
+    X = _mm_xor_ps(X, ZSign);
+    Y = _mm_xor_ps(Y, ZSign);
+    __m128 AAAA = _mm_shuffle_ps(X, Y, _MM_SHUFFLE(0,0,0,0));
+    __m128 BCCB = _mm_shuffle_ps(X, Y, _MM_SHUFFLE(1,2,2,1));
+    __m128 C0 = _mm_sub_ps(BCCB, AAAA);
+    __m128 C1 = _mm_movehl_ps(C0, C0);
+    C0 = _mm_mul_ps(C0, C1);
+    C1 = _mm_movehdup_ps(C0);
+    C0 = _mm_sub_ps(C0, C1);
+    if (!_mm_testz_si128(_mm_castps_si128(C0), _mm_set_epi32(0,0,0,0x80000000)))
+        return false;
+
+    return true;
+}
+
 void Raserizer_DrawQuad(vertex A, vertex B, vertex C, vertex D)
 {
-    // TODO: check convex
-    // TODO: check coplanar
+    // TODO: check convex?
+    // TODO: check coplanar?
+
+    if (!Rasterizer__QuadIsVisible(A, B, C, D))
+        return;
+
     Raserizer_DrawTriangle(A, B, C);
     Raserizer_DrawTriangle(C, D, A);
 }
