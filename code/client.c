@@ -18,8 +18,6 @@ typedef struct input
     bool Use;
     bool Jump;
     bool Crouch;
-    
-    bool NoClip;
 } input;
 
 typedef struct player
@@ -38,7 +36,6 @@ typedef struct player
     bool OnGround;
     f32 Cooldown;
     f32 Yaw, Pitch;
-    bool NoClip;
 } player;
 
 typedef struct client
@@ -58,6 +55,8 @@ typedef struct client
 
     /* DEBUG */
     f32 Fps;
+    bool NoClip;
+    bool Hitboxes;
 } client;
 
 #include "player.c"
@@ -81,11 +80,12 @@ void Client_Init(client *Client, const char *Ip)
 
     Client->Player = (player){
         .Position = (vec3) { 3.0f, 10.0f, 70.0f },
-        .NoClip = true,
     };
 
     /* DEBUG */
     Client->Fps = 0;
+    Client->NoClip = true;
+    Client->Hitboxes = false;
 }
 
 void Client_ProcessMessages(client *Client)
@@ -111,8 +111,6 @@ void Client_Input(client *Client, const input Input, f32 DeltaTime)
 {
     Client_ProcessMessages(Client);
 
-    if (Input.NoClip) Client->Player.NoClip = !Client->Player.NoClip;
-
     Player_Input(&Client->Player, Client, Input, DeltaTime);
 
     f32 Fps = (1.0f / DeltaTime);
@@ -121,17 +119,18 @@ void Client_Input(client *Client, const input Input, f32 DeltaTime)
 
 void Client_Update(client *Client, const input Input, f32 DeltaTime)
 {
-    Player_Update(&Client->Player, &Client->View, DeltaTime);
+    Player_Update(&Client->Player, Client, DeltaTime);
 }
 
 void Client_Draw(client *Client, bitmap Target, f32 DeltaTime)
 {
     Raserizer_Clear(COLOR_SKYBLUE);
-    Player_Draw(&Client->Player, &Client->View, &Client->Camera, DeltaTime);
+    Player_Draw(&Client->Player, Client, &Client->Camera, DeltaTime);
     View_Draw(&Client->View, Target, Client->Terrain, Client->Camera);
     Raserizer_Blit(Target);
 
-    View_DrawEntityBoxes(&Client->View, Target, Client->Camera);
+    if (Client->Hitboxes)
+        View_DrawEntityBoxes(&Client->View, Target, Client->Camera);
 
     Draw_String(Target, Client->Font, COLOR_WHITE, (ivec2){8,8}, "Ver: 0.001a");
     ivec2 Position = Draw_String(Target, Client->Font, COLOR_WHITE, (ivec2){8,16}, "Fps: ");

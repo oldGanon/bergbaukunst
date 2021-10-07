@@ -33,12 +33,12 @@ box Player_Box(player *Player)
     };
 }
 
-vec3 Player_CheckMove(player *Player, view *View, vec3 Move)
+vec3 Player_CheckMove(player *Player, const view *View, vec3 Move)
 {
     return View_CheckMoveBox(View, Player_Box(Player), Move);
 }
 
-void Player_Move(player *Player, view *View, vec3 Move)
+void Player_Move(player *Player, const view *View, vec3 Move)
 {
     vec3 CheckMove = Player_CheckMove(Player, View, Move);
     if (Abs(CheckMove.x) < Abs(Move.x)) Player->Velocity.x = 0;
@@ -58,8 +58,8 @@ void Player_Input(player *Player, client *Client, input Input, f32 DeltaTime)
 #define NO_CLIP_SPEED   10.0f
 #define GROUND_SPEED    10.0f
 #define AIR_SPEED        2.5f
-#define ACCELERATION    10.0f
-#define GROUND_FRICTION 10.0f
+#define ACCELERATION    25.0f
+#define GROUND_FRICTION 25.0f
 #define AIR_FRICTION     0.0f
 
     // Look Input
@@ -108,9 +108,6 @@ void Player_Input(player *Player, client *Client, input Input, f32 DeltaTime)
             msg Message;
             Message_BreakBlock(&Message, PunchPosition);
             Network_ClientSendMessage(&Client->Client, &Message);
-
-            // block Block = (block){ .Id = BLOCK_ID_AIR };
-            // View_SetBlock(&Client->View, PunchPosition, Block);
         }
         Player->Cooldown = 0.125f;
     }
@@ -126,21 +123,14 @@ void Player_Input(player *Player, client *Client, input Input, f32 DeltaTime)
             msg Message;
             Message_PlaceBlock(&Message, UsePosition, BlockFace);
             Network_ClientSendMessage(&Client->Client, &Message);
-
-            // block Block = (block){ .Id = BLOCK_ID_GRAS };
-            // box PlayerBox = Player_Box(Player);
-            // if (!Block_BoxIntersect(Block, UsePosition, PlayerBox))
-            // {
-            //     View_SetBlock(&Client->View, UsePosition, Block);
-            // }
         }
         Player->Cooldown = 0.125f;
     }
 }
 
-void Player_Update(player *Player, view *View, f32 DeltaTime)
+void Player_Update(player *Player, client *Client, f32 DeltaTime)
 {
-    if (Player->NoClip)
+    if (Client->NoClip)
     {
         Player->Acceleration = Vec3_Zero();
         Player->Velocity = Vec3_Zero();
@@ -185,16 +175,16 @@ void Player_Update(player *Player, view *View, f32 DeltaTime)
         vec3 AddVelocity = Vec3_Mul(Player->Acceleration, Vec3_Set1(DeltaTime));
         Player->Velocity = Vec3_Add(Player->Velocity, AddVelocity);
         vec3 AddPosition = Vec3_Mul(Player->Velocity, Vec3_Set1(DeltaTime));
-        Player_Move(Player, View, AddPosition);
+        Player_Move(Player, &Client->View, AddPosition);
     }
 }
 
-void Player_Draw(player *Player, view *View, camera *Camera, f32 DeltaTime)
+void Player_Draw(player *Player, const client *Client, camera *Camera, f32 DeltaTime)
 {
     vec3 AddVelocity = Vec3_Mul(Player->Acceleration, Vec3_Set1(DeltaTime));
     vec3 Velocity = Vec3_Add(Player->Velocity, AddVelocity);
     vec3 AddPosition = Vec3_Mul(Velocity, Vec3_Set1(DeltaTime));
-    AddPosition = Player_CheckMove(Player, View, AddPosition);
+    AddPosition = Player_CheckMove(Player, &Client->View, AddPosition);
     vec3 Position = Vec3_Add(Player->Position, AddPosition);
 
     Camera_SetPosition(Camera, Position);

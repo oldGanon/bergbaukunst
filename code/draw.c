@@ -1332,6 +1332,11 @@ inline bool Rasterizer__QuadIsVisible(vertex A, vertex B, vertex C, vertex D)
             return false;
     }
 
+    // clipped
+    __m128 ZSign = _mm_and_ps(Z, _mm_castsi128_ps(Sign));
+    if (!_mm_testz_si128(_mm_castps_si128(ZSign), _mm_castps_si128(ZSign)))
+        return true;
+
     // quad between pixels
     X = _mm_div_ps(X, Z);
     X = _mm_sub_ps(X, _mm_set1_ps(0.5f));
@@ -1363,11 +1368,6 @@ inline bool Rasterizer__QuadIsVisible(vertex A, vertex B, vertex C, vertex D)
     f32 MinY = _mm_cvtss_f32(Y1);
     if (Floor(MinX) == Floor(MaxX))
         return false;
-
-    // clipped
-    __m128 ZSign = _mm_and_ps(Z, _mm_castsi128_ps(Sign));
-    if (!_mm_testz_si128(_mm_castps_si128(ZSign), _mm_castps_si128(ZSign)))
-        return true;
 
     // check winding order
     X = _mm_xor_ps(X, ZSign);

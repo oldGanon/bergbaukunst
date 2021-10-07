@@ -547,9 +547,14 @@ int Win32_ClientMain(const char *Ip)
                     
                     if (IsDown && AltDown)
                     {
-                        if (Code == VK_F4)
-                            GlobalRunning = false;
-                        // if (Code == VK_RETURN) FULLSCREEN
+                        if (Code == VK_F4) GlobalRunning = false;
+                        // if (Code == VK_RETURN) ; // FULLSCREEN
+                    }
+
+                    if (IsDown && !WasDown)
+                    {
+                        if (Code == VK_F1) Client->NoClip = !Client->NoClip;
+                        if (Code == VK_F2) Client->Hitboxes = !Client->Hitboxes;
                     }
 
                     if (WasDown != IsDown)
@@ -565,8 +570,6 @@ int Win32_ClientMain(const char *Ip)
                             case VK_LEFT:  Input.LookLeft = IsDown; break;
                             case VK_DOWN:  Input.LookDown = IsDown; break;
                             case VK_RIGHT: Input.LookRight = IsDown; break;
-
-                            case 'R': Input.NoClip = IsDown; break;
 
                             case VK_SPACE: Input.Jump = IsDown; break;
                             case VK_SHIFT: Input.Crouch = IsDown; break;

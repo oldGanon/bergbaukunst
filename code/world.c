@@ -53,8 +53,12 @@ void World_Update(world *World, vec3 Player)
 }
 
 
+chunk *World_GetChunk(world *World, ivec2 ChunkPosition)
+{
+    return ChunkMap_GetChunk(&World->ChunkMap, ChunkPosition);
+}
 
-chunk *World_GetChunk(const world *World, ivec2 ChunkPosition)
+const chunk *World_GetConstChunk(const world *World, ivec2 ChunkPosition)
 {
     return ChunkMap_GetChunk(&World->ChunkMap, ChunkPosition);
 }
@@ -65,7 +69,7 @@ block World_GetBlock(const world *World, ivec3 WorldPosition)
     if (WorldPosition.z > CHUNK_HEIGHT - 1) return DEFAULT_HELL_BLOCK;
 
     ivec2 ChunkPosition = World_ToChunkPosition(WorldPosition);
-    const chunk *Chunk = World_GetChunk(World, ChunkPosition);
+    const chunk *Chunk = World_GetConstChunk(World, ChunkPosition);
     if (!Chunk) return DEFAULT_BLOCK; // maybe generate chunk instead?
     return Chunk_GetBlock(Chunk, WorldPosition);
 }

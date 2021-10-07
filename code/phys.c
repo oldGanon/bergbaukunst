@@ -8,9 +8,9 @@ typedef struct trace_result
     ivec3 FreePosition;
 } trace_result;
 
-typedef block get_block_func(void *Data, ivec3 Position);
+typedef block get_block_func(const void *Data, ivec3 Position);
 
-f32 Phys_TraceRay(get_block_func *GetBlock, void *Data, vec3 RayOrigin, vec3 RayDirection, f32 RayLength, trace_result *Result)
+f32 Phys_TraceRay(get_block_func *GetBlock, const void *Data, vec3 RayOrigin, vec3 RayDirection, f32 RayLength, trace_result *Result)
 {
     vec3 RayPosition = RayOrigin;
     vec3 RaySign = Sign(RayDirection);
@@ -76,7 +76,7 @@ f32 Phys_TraceRay(get_block_func *GetBlock, void *Data, vec3 RayOrigin, vec3 Ray
 }
 
 
-box Phys_BoxIntersection(get_block_func *GetBlock, void *Data, box Box)
+box Phys_BoxIntersection(get_block_func *GetBlock, const void *Data, box Box)
 {
     ivec3 Min = Vec3_FloorToIVec3(Box.Min);
     ivec3 Max = Vec3_CeilToIVec3(Box.Max);
@@ -95,7 +95,7 @@ box Phys_BoxIntersection(get_block_func *GetBlock, void *Data, box Box)
     return Intersection;
 }
 
-vec3 Phys_CheckMoveBox(get_block_func *GetBlock, void *Data, box Box, vec3 Move)
+vec3 Phys_CheckMoveBox(get_block_func *GetBlock, const void *Data, box Box, vec3 Move)
 {
     {
         box MoveBox = Box;
