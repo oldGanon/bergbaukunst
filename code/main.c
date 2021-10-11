@@ -81,6 +81,27 @@ __declspec(restrict) void * malloc(size_t);
 __declspec(restrict) void * realloc(void *, size_t);
 void free(void *);
 
+//
+// SYNC
+//
+
+typedef struct semaphore
+{
+    void *Handle;
+    volatile i32 Count;
+} semaphore;
+
+semaphore Semaphore_Create(i32);
+i32 Semaphore_Count(semaphore *);
+void Semaphore_Destroy(semaphore *);
+bool Semaphore_TryWait(semaphore *);
+void Semaphore_Wait(semaphore *);
+void Semaphore_Signal(semaphore *, i32);
+
+//
+// SERVER
+//
+
 #include "string.c"
 #include "math.c"
 #include "hash.c"
@@ -94,6 +115,10 @@ void free(void *);
 #include "message.c"
 #include "network.c"
 #include "server.c"
+
+//
+// CLIENT
+//
 
 struct bitmap Win32_LoadBitmap(const char*);
 void Win32_DestroyBitmap(struct bitmap);
@@ -113,6 +138,10 @@ global bool GlobalRunning;
 global bool GlobalFocus;
 global bitmap GlobalBackbuffer;
 
+//
+// WINDOWS HEADERS
+//
+
 #define _AMD64_
 #include <windef.h>
 #include <libloaderapi.h>
@@ -122,14 +151,9 @@ global bitmap GlobalBackbuffer;
 #include <wingdi.h>
 #include <dsound.h>
 
-typedef struct {
-    BITMAPINFOHEADER bmiHeader;
-    RGBQUAD          bmiColors[256];
-} BITMAPINFO_AND_PALETTE;
-
-global HWND GlobalWindow;
-global BITMAPINFO_AND_PALETTE GlobalBackbufferInfo;
-
+//
+// C STD LIB
+//
 __declspec(restrict)
 void *malloc(size_t size)
 {
@@ -148,6 +172,165 @@ void free(void *ptr)
     if (!ptr) return;
     HeapFree(GetProcessHeap(), 0, ptr);
 }
+
+//
+// SYNC
+//
+
+semaphore Semaphore_Create(i32 Count)
+{
+    assert(Count >= 0);
+    return (semaphore) {
+        .Count = Count,
+        .Handle = CreateSemaphore(NULL, Count, MAXLONG, NULL),
+    };
+}
+
+i32 Semaphore_Count(semaphore *Semaphore)
+{
+    return InterlockedCompareExchange((volatile LONG *)&Semaphore->Count, 0, 0);
+}
+
+void Semaphore_Destroy(semaphore *Semaphore)
+{
+    Semaphore->Count = 0;
+    CloseHandle(Semaphore->Handle);
+}
+
+bool Semaphore_TryWait(semaphore *Semaphore)
+{
+    LONG Count = Semaphore_Count(Semaphore);
+    if (Count <= 0) return false;
+
+    LONG NewCount = Count - 1;
+    LONG OldCount = InterlockedCompareExchange((volatile LONG *)&Semaphore->Count, NewCount, Count);
+    return (OldCount == Count);
+}
+
+void Semaphore_Wait(semaphore *Semaphore)
+{
+    u32 Spin = 10000;
+    while (--Spin)
+        if (Semaphore_TryWait(Semaphore))
+            return;
+
+    LONG Count = Semaphore_Count(Semaphore);
+    LONG NewCount = InterlockedDecrement((volatile LONG *)&Semaphore->Count);
+    if (NewCount < 0)
+        WaitForSingleObject(Semaphore->Handle, INFINITE);
+}
+
+void Semaphore_Signal(semaphore *Semaphore, i32 Count)
+{
+    assert(Count >= 0);
+    LONG NewCount = InterlockedAdd((volatile LONG *)&Semaphore->Count, Count);
+    LONG OldCount = NewCount - Count;
+    LONG ReleaseCount = MIN(Count, -OldCount);
+    if (ReleaseCount > 0)
+        ReleaseSemaphore(Semaphore->Handle, ReleaseCount, NULL);
+}
+
+//
+// GUI
+//
+
+typedef struct {
+    BITMAPINFOHEADER bmiHeader;
+    RGBQUAD          bmiColors[256];
+} BITMAPINFO_AND_PALETTE;
+
+global HWND GlobalWindow;
+global BITMAPINFO_AND_PALETTE GlobalBackbufferInfo;
+
+ivec2 Win32_GetWindowDimension(void)
+{
+    RECT ClientRect;
+    GetClientRect(GlobalWindow, &ClientRect);
+    return (ivec2) { ClientRect.right - ClientRect.left, ClientRect.bottom - ClientRect.top };
+}
+
+void Win32_DisplayBitmap(HDC DeviceContext)
+{
+    ivec2 Dim = Win32_GetWindowDimension();
+    StretchDIBits(DeviceContext,
+                  0, 0, Dim.x, Dim.y,
+                  0, 0, GlobalBackbuffer.Width, GlobalBackbuffer.Height,
+                  GlobalBackbuffer.Pixels,
+                  (BITMAPINFO *)&GlobalBackbufferInfo,
+                  DIB_RGB_COLORS, SRCCOPY);
+}
+
+bitmap Win32_LoadBitmap(const char* Name)
+{
+    HBITMAP hImage = LoadImageA(GetModuleHandle(0), Name, IMAGE_BITMAP, 0, 0, LR_CREATEDIBSECTION);
+    if (!hImage) return (bitmap){ 0 };
+
+    BITMAP Image;
+    GetObject(hImage, sizeof(BITMAP), &Image);
+    bitmap Bitmap = Bitmap_Create(Image.bmWidth, Image.bmHeight);
+
+    BITMAPINFO_AND_PALETTE BitmapInfo = {
+        .bmiHeader = {
+            .biSize = sizeof(BITMAPINFOHEADER),
+            .biWidth = Image.bmWidth,
+            .biHeight = Image.bmHeight,
+            .biPlanes = 1,
+            .biBitCount = BYTES_PER_PIXEL << 3,
+            .biCompression = BI_RGB
+        }
+    };
+
+    HDC DeviceContext = GetDC(GlobalWindow);
+    GetDIBits(DeviceContext, hImage, 0, Bitmap.Height, Bitmap.Pixels, (BITMAPINFO *)&BitmapInfo, DIB_RGB_COLORS);
+    ReleaseDC(GlobalWindow, DeviceContext);
+    DeleteObject(hImage);
+
+    return Bitmap;
+}
+
+void Win32_SetPalette(const palette *Palette)
+{
+    memcpy(GlobalBackbufferInfo.bmiColors, Palette->Colors, sizeof(RGBQUAD) * 256);
+}
+
+palette Win32_LoadPalette(const char* Name)
+{
+    palette Palette = { 0 };
+
+    HBITMAP hImage = LoadImageA(GetModuleHandle(0), Name, IMAGE_BITMAP, 0, 0, LR_CREATEDIBSECTION);
+    if (!hImage) return Palette;
+
+    BITMAP Image;
+    GetObject(hImage, sizeof(BITMAP), &Image);
+
+    if (Image.bmWidth == 16 && Image.bmHeight == 16)
+    {
+        BITMAPINFO_AND_PALETTE BitmapInfo = {
+            .bmiHeader = {
+                .biSize = sizeof(BITMAPINFOHEADER),
+                .biWidth = 16,
+                .biHeight = 16,
+                .biPlanes = 1,
+                .biBitCount = BYTES_PER_PIXEL << 3,
+                .biCompression = BI_RGB
+            }
+        };
+
+        u8 Bitmap[256];
+        HDC DeviceContext = GetDC(GlobalWindow);
+        GetDIBits(DeviceContext, hImage, 0, 16, Bitmap, (BITMAPINFO*)&BitmapInfo, DIB_RGB_COLORS);
+        ReleaseDC(GlobalWindow, DeviceContext);
+        memcpy(Palette.Colors, BitmapInfo.bmiColors, sizeof(RGBQUAD) * 256);
+    }
+    
+    DeleteObject(hImage);
+
+    return Palette;
+}
+
+//
+// AUDIO
+//
 
 typedef HRESULT WINAPI DIRECT_SOUND_CREATE(LPCGUID, LPDIRECTSOUND *, LPUNKNOWN);
 global LPDIRECTSOUNDBUFFER GlobalAudioBuffer;
@@ -269,91 +452,9 @@ void Win32_GatherSamples(DWORD AudioCursor)
     }
 }
 
-ivec2 Win32_GetWindowDimension(void)
-{
-    RECT ClientRect;
-    GetClientRect(GlobalWindow, &ClientRect);
-    return (ivec2) { ClientRect.right - ClientRect.left, ClientRect.bottom - ClientRect.top };
-}
-
-void Win32_DisplayBitmap(HDC DeviceContext)
-{
-    ivec2 Dim = Win32_GetWindowDimension();
-    StretchDIBits(DeviceContext,
-                  0, 0, Dim.x, Dim.y,
-                  0, 0, GlobalBackbuffer.Width, GlobalBackbuffer.Height,
-                  GlobalBackbuffer.Pixels,
-                  (BITMAPINFO *)&GlobalBackbufferInfo,
-                  DIB_RGB_COLORS, SRCCOPY);
-}
-
-bitmap Win32_LoadBitmap(const char* Name)
-{
-    HBITMAP hImage = LoadImageA(GetModuleHandle(0), Name, IMAGE_BITMAP, 0, 0, LR_CREATEDIBSECTION);
-    if (!hImage) return (bitmap){ 0 };
-
-    BITMAP Image;
-    GetObject(hImage, sizeof(BITMAP), &Image);
-    bitmap Bitmap = Bitmap_Create(Image.bmWidth, Image.bmHeight);
-
-    BITMAPINFO_AND_PALETTE BitmapInfo = {
-        .bmiHeader = {
-            .biSize = sizeof(BITMAPINFOHEADER),
-            .biWidth = Image.bmWidth,
-            .biHeight = Image.bmHeight,
-            .biPlanes = 1,
-            .biBitCount = BYTES_PER_PIXEL << 3,
-            .biCompression = BI_RGB
-        }
-    };
-
-    HDC DeviceContext = GetDC(GlobalWindow);
-    GetDIBits(DeviceContext, hImage, 0, Bitmap.Height, Bitmap.Pixels, (BITMAPINFO *)&BitmapInfo, DIB_RGB_COLORS);
-    ReleaseDC(GlobalWindow, DeviceContext);
-    DeleteObject(hImage);
-
-    return Bitmap;
-}
-
-void Win32_SetPalette(const palette *Palette)
-{
-    memcpy(GlobalBackbufferInfo.bmiColors, Palette->Colors, sizeof(RGBQUAD) * 256);
-}
-
-palette Win32_LoadPalette(const char* Name)
-{
-    palette Palette = { 0 };
-
-    HBITMAP hImage = LoadImageA(GetModuleHandle(0), Name, IMAGE_BITMAP, 0, 0, LR_CREATEDIBSECTION);
-    if (!hImage) return Palette;
-
-    BITMAP Image;
-    GetObject(hImage, sizeof(BITMAP), &Image);
-
-    if (Image.bmWidth == 16 && Image.bmHeight == 16)
-    {
-        BITMAPINFO_AND_PALETTE BitmapInfo = {
-            .bmiHeader = {
-                .biSize = sizeof(BITMAPINFOHEADER),
-                .biWidth = 16,
-                .biHeight = 16,
-                .biPlanes = 1,
-                .biBitCount = BYTES_PER_PIXEL << 3,
-                .biCompression = BI_RGB
-            }
-        };
-
-        u8 Bitmap[256];
-        HDC DeviceContext = GetDC(GlobalWindow);
-        GetDIBits(DeviceContext, hImage, 0, 16, Bitmap, (BITMAPINFO*)&BitmapInfo, DIB_RGB_COLORS);
-        ReleaseDC(GlobalWindow, DeviceContext);
-        memcpy(Palette.Colors, BitmapInfo.bmiColors, sizeof(RGBQUAD) * 256);
-    }
-    
-    DeleteObject(hImage);
-
-    return Palette;
-}
+//
+// TIME
+//
 
 u64 Win32_GetTime(void)
 {    
@@ -367,6 +468,10 @@ u64 Win32_TimeSince(u64 Counter)
     u64 Result = Win32_GetTime() - Counter;
     return Result;
 }
+
+//
+// INPUT
+//
 
 void Win32_LockMouse(bool Lock)
 {
@@ -446,6 +551,10 @@ LRESULT CALLBACK Win32_WindowCallback(HWND Window, UINT Message, WPARAM WParam, 
     return Result;
 }
 
+//
+//
+//
+
 int Win32_ClientMain(const char *Ip)
 {
     HANDLE hInstance = GetModuleHandle(0);
@@ -489,6 +598,9 @@ int Win32_ClientMain(const char *Ip)
     DWORD AudioCursor = 0;
     Win32_InitDSound();
     
+    // GRAPHICS
+    Rasterizer_Init();
+
     // TIMING
     LARGE_INTEGER PerfCountFrequency;
     QueryPerformanceFrequency(&PerfCountFrequency);
@@ -717,7 +829,7 @@ int WinStartUp(void)
         // CloseHandle(ProcessInformation.hThread);
         
         DWORD ServerThreadID;
-        HANDLE ServerThrad = CreateThread(0, 0,  Win32_ServerMainThreadProc, 0, 0, &ServerThreadID);
+        HANDLE ServerThread = CreateThread(0, 0,  Win32_ServerMainThreadProc, 0, 0, &ServerThreadID);
 
         ExitCode = Win32_ClientMain("localhost");
 

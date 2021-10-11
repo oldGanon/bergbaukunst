@@ -58,8 +58,8 @@ void Player_Input(player *Player, client *Client, input Input, f32 DeltaTime)
 #define NO_CLIP_SPEED   10.0f
 #define GROUND_SPEED    10.0f
 #define AIR_SPEED        2.5f
-#define ACCELERATION    25.0f
-#define GROUND_FRICTION 25.0f
+#define ACCELERATION    20.0f
+#define GROUND_FRICTION 20.0f
 #define AIR_FRICTION     0.0f
 
     // Look Input

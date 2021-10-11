@@ -142,7 +142,7 @@ void Draw_QuadTexturedVerts(bitmap, const bitmap, vertex, vertex, vertex, vertex
 )(BUFFER, COLOR, X, __VA_ARGS__)
 
 // Util
-inline vec3 Draw__PerspectiveDivide(i32 Width, i32 Height, vec3 Position)
+static vec3 Draw__PerspectiveDivide(i32 Width, i32 Height, vec3 Position)
 {
     f32 HalfWidth = Width * 0.5f;
     f32 HalfHeight = Height * 0.5f;
@@ -665,7 +665,7 @@ inline bool Draw__PrepareTriangleVerts(i32 Width, i32 Height, vertex *A, vertex 
     A->Position = Vec3_Sub(A->Position, PixelCenter);
     B->Position = Vec3_Sub(B->Position, PixelCenter);
     C->Position = Vec3_Sub(C->Position, PixelCenter);
-#if 0
+
     // triangle offscreen left
     f32 MaxX = Max(Max(A->Position.x, B->Position.x), C->Position.x);
     if (MaxX < 0) return false;
@@ -685,7 +685,6 @@ inline bool Draw__PrepareTriangleVerts(i32 Width, i32 Height, vertex *A, vertex 
     // triangle too small
     if (Abs(Floor(MaxX) - Floor(MinX)) < 1.0f) return false;
     if (Abs(Floor(MaxY) - Floor(MinY)) < 1.0f) return false;
-#endif
     
     return true;
 }
@@ -925,36 +924,49 @@ void Draw_QuadTexturedVerts(bitmap Target, bitmap Texture, vertex A, vertex B, v
 //
 //
 
-#define TRIANGLE_BATCHES 1
-#define VERTICES_PER_BATCH (8 * TRIANGLE_BATCHES * 3)
 typedef struct rasterizer
 {
     bitmap Texture;
-    mat4 Transform;
+
+    vec4 Clip;
+    vec3 Frustum[4];
+
+    u32 TriangleCount;
+    vertex Triangles[3][8];
 
     u8 ColorBuffer[SCREEN_WIDTH * SCREEN_HEIGHT];
     f32 DepthBuffer[SCREEN_WIDTH * SCREEN_HEIGHT];
-
-    u32 TriangleCount;
-    vertex Triangles[VERTICES_PER_BATCH];
-
-
 } rasterizer;
 
 global rasterizer GlobalRasterizer;
 
-void Raserizer_Rasterize(void)
+void Rasterizer_Init(void)
 {
-    bitmap Texture = GlobalRasterizer.Texture;
-    u8 *ColorBuffer = GlobalRasterizer.ColorBuffer;
-    f32 *DepthBuffer = GlobalRasterizer.DepthBuffer;
-    vertex *Triangles = GlobalRasterizer.Triangles;
-    u32 TriangleCount = GlobalRasterizer.TriangleCount;
+    rasterizer *Rasterizer = &GlobalRasterizer;
+    Rasterizer->Clip = (vec4){ 0, 0, SCREEN_WIDTH, SCREEN_HEIGHT };
+    Rasterizer->Frustum[0] = (vec3){ 1, 0,-SCREEN_WIDTH / 2 };
+    Rasterizer->Frustum[1] = (vec3){-1, 0,-SCREEN_WIDTH / 2 };
+    Rasterizer->Frustum[2] = (vec3){ 0, 1,-SCREEN_HEIGHT / 2 };
+    Rasterizer->Frustum[3] = (vec3){ 0,-1,-SCREEN_HEIGHT / 2 };
+}
 
-    __m256 ClipMinX = _mm256_setzero_ps();
-    __m256 ClipMinY = _mm256_setzero_ps();
-    __m256 ClipMaxX = _mm256_set1_ps((f32)SCREEN_WIDTH);
-    __m256 ClipMaxY = _mm256_set1_ps((f32)SCREEN_HEIGHT);
+static void Rasterizer__Rasterize(void)
+{
+    rasterizer *Rasterizer = &GlobalRasterizer;
+    const bitmap Texture = Rasterizer->Texture;
+    u8 *ColorBuffer = Rasterizer->ColorBuffer;
+    f32 *DepthBuffer = Rasterizer->DepthBuffer;
+
+    if (!Rasterizer->TriangleCount) return;
+
+    __m256 ClipMinX = _mm256_broadcast_ss(&Rasterizer->Clip.E[0]);
+    __m256 ClipMinY = _mm256_broadcast_ss(&Rasterizer->Clip.E[1]);
+    __m256 ClipMaxX = _mm256_broadcast_ss(&Rasterizer->Clip.E[2]);
+    __m256 ClipMaxY = _mm256_broadcast_ss(&Rasterizer->Clip.E[3]);
+
+    u32 ScreenPitch = SCREEN_WIDTH;
+    __m256 ScreenWidth = _mm256_set1_ps(SCREEN_WIDTH);
+    __m256 ScreenHeight = _mm256_set1_ps(SCREEN_HEIGHT);
 
     _mm_setcsr(_mm_getcsr() | 0x8040);
 #define PACK_WIDTH_SHIFT 2
@@ -963,6 +975,8 @@ void Raserizer_Rasterize(void)
 #define PACK_HEIGHT (1 << PACK_HEIGHT_SHIFT)
 #define PACK_WIDTH_MASK (PACK_WIDTH - 1)
 #define PACK_HEIGHT_MASK (PACK_HEIGHT - 1)
+#define PACK_SHIFT (PACK_WIDTH_SHIFT + PACK_HEIGHT_SHIFT)
+#define PACK_SIZE (1 << PACK_SHIFT)
 
     __m256 ColOffset = _mm256_setr_ps(0 & PACK_WIDTH_MASK, 1 & PACK_WIDTH_MASK, 
                                       2 & PACK_WIDTH_MASK, 3 & PACK_WIDTH_MASK, 
@@ -973,6 +987,7 @@ void Raserizer_Rasterize(void)
                                       4 >> PACK_WIDTH_SHIFT, 5 >> PACK_WIDTH_SHIFT,
                                       6 >> PACK_WIDTH_SHIFT, 7 >> PACK_WIDTH_SHIFT);
     __m256 One = _mm256_set1_ps(1);
+    __m256 Half = _mm256_set1_ps(0.5f);
     __m256 PackWidth8 = _mm256_set1_ps(PACK_WIDTH);
     __m256 PackHeight8 = _mm256_set1_ps(PACK_HEIGHT);
 
@@ -989,12 +1004,7 @@ void Raserizer_Rasterize(void)
                       15.0f/16.0f, 7.0f/16.0f,13.0f/16.0f, 5.0f/16.0f),
     };
 
-    u32 PackCount = ((TriangleCount - 1) >> 3) + 1;
-    for (u32 Pack = 0; Pack < PackCount; ++Pack)
     {
-        vertex *TrianglePack = Triangles + Pack * VERTICES_PER_BATCH;
-        u32 PackTriangleCount = MIN(8, TriangleCount - Pack * 8);
-
         __m256 X[3], Y[3], Z[3], U[3], V[3], S[3];
 
         for (u32 vertex = 0; vertex < 3; ++vertex)
@@ -1002,14 +1012,14 @@ void Raserizer_Rasterize(void)
             __m256 Tmp[8];
             __m256 TTmp[8];
 
-            Tmp[0] = _mm256_loadu_ps((const float *)&TrianglePack[vertex*8+0]);
-            Tmp[1] = _mm256_loadu_ps((const float *)&TrianglePack[vertex*8+1]);
-            Tmp[2] = _mm256_loadu_ps((const float *)&TrianglePack[vertex*8+2]);
-            Tmp[3] = _mm256_loadu_ps((const float *)&TrianglePack[vertex*8+3]);
-            Tmp[4] = _mm256_loadu_ps((const float *)&TrianglePack[vertex*8+4]);
-            Tmp[5] = _mm256_loadu_ps((const float *)&TrianglePack[vertex*8+5]);
-            Tmp[6] = _mm256_loadu_ps((const float *)&TrianglePack[vertex*8+6]);
-            Tmp[7] = _mm256_loadu_ps((const float *)&TrianglePack[vertex*8+7]);
+            Tmp[0] = _mm256_loadu_ps((const float *)&Rasterizer->Triangles[vertex][0]);
+            Tmp[1] = _mm256_loadu_ps((const float *)&Rasterizer->Triangles[vertex][1]);
+            Tmp[2] = _mm256_loadu_ps((const float *)&Rasterizer->Triangles[vertex][2]);
+            Tmp[3] = _mm256_loadu_ps((const float *)&Rasterizer->Triangles[vertex][3]);
+            Tmp[4] = _mm256_loadu_ps((const float *)&Rasterizer->Triangles[vertex][4]);
+            Tmp[5] = _mm256_loadu_ps((const float *)&Rasterizer->Triangles[vertex][5]);
+            Tmp[6] = _mm256_loadu_ps((const float *)&Rasterizer->Triangles[vertex][6]);
+            Tmp[7] = _mm256_loadu_ps((const float *)&Rasterizer->Triangles[vertex][7]);
 
             TTmp[0] = _mm256_unpacklo_ps(Tmp[0], Tmp[1]);
             TTmp[1] = _mm256_unpackhi_ps(Tmp[0], Tmp[1]);
@@ -1045,6 +1055,31 @@ void Raserizer_Rasterize(void)
         __m256 A[3] = { Z[0], _mm256_setzero_ps(), _mm256_setzero_ps() };
         __m256 B[3] = { _mm256_setzero_ps(), Z[1], _mm256_setzero_ps() };
         
+        // perspective divide
+        __m256 XX = _mm256_mul_ps(ScreenWidth, Half);
+        X[0] = _mm256_sub_ps(X[0], XX);
+        X[1] = _mm256_sub_ps(X[1], XX);
+        X[2] = _mm256_sub_ps(X[2], XX);
+        X[0] = _mm256_mul_ps(X[0], Z[0]);
+        X[1] = _mm256_mul_ps(X[1], Z[1]);
+        X[2] = _mm256_mul_ps(X[2], Z[2]);
+        XX = _mm256_sub_ps(XX, Half);
+        X[0] = _mm256_add_ps(X[0], XX);
+        X[1] = _mm256_add_ps(X[1], XX);
+        X[2] = _mm256_add_ps(X[2], XX);
+
+        __m256 YY = _mm256_mul_ps(ScreenHeight, Half);
+        Y[0] = _mm256_sub_ps(Y[0], YY);
+        Y[1] = _mm256_sub_ps(Y[1], YY);
+        Y[2] = _mm256_sub_ps(Y[2], YY);
+        Y[0] = _mm256_mul_ps(Y[0], Z[0]);
+        Y[1] = _mm256_mul_ps(Y[1], Z[1]);
+        Y[2] = _mm256_mul_ps(Y[2], Z[2]);
+        YY = _mm256_sub_ps(YY, Half);
+        Y[0] = _mm256_add_ps(Y[0], YY);
+        Y[1] = _mm256_add_ps(Y[1], YY);
+        Y[2] = _mm256_add_ps(Y[2], YY);
+
         // barycentric edge functions
         // FAB(x, y) = (A.y - B.y)x + (B.x - A.x)y + (A.x * B.yy - B.x * A.y) = 0
         // FBC(x, y) = (B.y - C.y)x + (C.x - B.x)y + (B.x * C.yy - C.x * B.y) = 0
@@ -1075,7 +1110,7 @@ void Raserizer_Rasterize(void)
         __m256 MaxX = _mm256_min_ps(_mm256_ceil_ps(_mm256_max_ps(_mm256_max_ps(X[0], X[1]), X[2])), ClipMaxX);
         __m256 MaxY = _mm256_min_ps(_mm256_ceil_ps(_mm256_max_ps(_mm256_max_ps(Y[0], Y[1]), Y[2])), ClipMaxY);
 
-        for (u32 Tri = 0; Tri < PackTriangleCount; ++Tri)
+        for (u32 Tri = 0; Tri < Rasterizer->TriangleCount; ++Tri)
         {
             __m256i Tri8 = _mm256_broadcastd_epi32(_mm_loadu_si32(&Tri));
             __m256 Z8[3] = { _mm256_permutevar8x32_ps(Z[0], Tri8),
@@ -1136,8 +1171,8 @@ void Raserizer_Rasterize(void)
             i32 iMaxX = _mm256_cvtsi256_si32(_mm256_cvtps_epi32(_mm256_permutevar8x32_ps(MaxX, Tri8)));
             i32 iMaxY = _mm256_cvtsi256_si32(_mm256_cvtps_epi32(_mm256_permutevar8x32_ps(MaxY, Tri8)));
 
-            i32 RowPixel = iMinY * SCREEN_WIDTH + iMinX;
-            i32 RowDepthPixel = iMinY * SCREEN_WIDTH + iMinX * PACK_HEIGHT;
+            i32 RowPixel = iMinY * ScreenPitch + iMinX;
+            i32 RowDepthPixel = iMinY * ScreenPitch + iMinX * PACK_HEIGHT;
 
             for(i32 y = iMinY; y < iMaxY; y += PACK_HEIGHT)
             {
@@ -1155,7 +1190,8 @@ void Raserizer_Rasterize(void)
 
                 for(i32 x = iMinX; x < iMaxX; x += PACK_WIDTH)
                 {
-                    __m256 Depth = _mm256_loadu_ps(DepthBuffer + DepthPixel);
+                    f32 *DepthPtr = DepthBuffer + DepthPixel;
+                    __m256 Depth = _mm256_loadu_ps(DepthPtr);
                     __m256i DepthMask = _mm256_castps_si256(_mm256_cmp_ps(ZZ, Depth, _CMP_LE_OQ));   
                     __m256i EdgeMask = _mm256_srai_epi32(_mm256_castps_si256(_mm256_or_ps(_mm256_or_ps(Alpha, Beta), Gamma)), 32);
                     __m256i Mask = _mm256_or_si256(DepthMask, EdgeMask);
@@ -1163,7 +1199,7 @@ void Raserizer_Rasterize(void)
                     {
                         // depth update
                         Depth = _mm256_blendv_ps(ZZ, Depth, _mm256_castsi256_ps(Mask));
-                        _mm256_storeu_ps(DepthBuffer + DepthPixel, Depth);
+                        _mm256_storeu_ps(DepthPtr, Depth);
 
                         // interpolation factors
                         __m256 ZZZ = _mm256_div_ps(One, ZZ);
@@ -1186,7 +1222,7 @@ void Raserizer_Rasterize(void)
 
                         // gather
                         u8 *Dst0 = ColorBuffer + Pixel;
-                        u8 *Dst1 = Dst0 + SCREEN_WIDTH;
+                        u8 *Dst1 = Dst0 + ScreenPitch;
                         __m256i Dst = _mm256_set_m128i(_mm_loadu_si32(Dst1), _mm_loadu_si32(Dst0));
                         Dst = _mm256_shuffle_epi8(Dst, _mm256_set_epi8(3,3,3,3,2,2,2,2,1,1,1,1,0,0,0,0,3,3,3,3,2,2,2,2,1,1,1,1,0,0,0,0));
 
@@ -1213,8 +1249,8 @@ void Raserizer_Rasterize(void)
                     BB = _mm256_add_ps(BB, BB_dx);
                 }
 
-                RowPixel += PACK_HEIGHT * SCREEN_WIDTH;
-                RowDepthPixel += PACK_HEIGHT * SCREEN_WIDTH;
+                RowPixel += PACK_HEIGHT * ScreenPitch;
+                RowDepthPixel += PACK_HEIGHT * ScreenPitch;
                 F12_Row = _mm256_add_ps(F12_Row, F12_dy8);
                 F20_Row = _mm256_add_ps(F20_Row, F20_dy8);
                 F01_Row = _mm256_add_ps(F01_Row, F01_dy8);
@@ -1223,83 +1259,13 @@ void Raserizer_Rasterize(void)
     }
 }
 
-void Raserizer_Clear(color Color)
+static bool Rasterizer__QuadIsVisible(vertex A, vertex B, vertex C, vertex D)
 {
-    memset(GlobalRasterizer.ColorBuffer, Color.Value, SCREEN_WIDTH * SCREEN_HEIGHT * sizeof(u8));
-    memset(GlobalRasterizer.DepthBuffer, 0, SCREEN_WIDTH * SCREEN_HEIGHT * sizeof(f32));
-}
+    rasterizer *Rasterizer = &GlobalRasterizer;
 
-void Raserizer_Flush(void)
-{
-    if (GlobalRasterizer.TriangleCount)
-    {
-        Raserizer_Rasterize();
-        GlobalRasterizer.TriangleCount = 0;
-    }
-}
-
-void Raserizer_SetTexture(bitmap Texture)
-{
-    Raserizer_Flush();
-
-    GlobalRasterizer.Texture = Texture;
-}
-
-void Raserizer_Blit(bitmap Target)
-{
-    Raserizer_Flush();
-
-    u32 Width = Min(Target.Width, SCREEN_WIDTH);
-    u32 Height = Min(Target.Height, SCREEN_HEIGHT);
-    for (u32 y = 0; y < Height; ++y)
-    for (u32 x = 0; x < Width; ++x)
-        Target.Pixels[y * Target.Pitch + x].Value = GlobalRasterizer.ColorBuffer[y * SCREEN_WIDTH + x];
-}
-
-inline vec3 Raserizer__VertexToPixel(vec3 A)
-{
-    // perspective divide
-    A.x = (A.x - SCREEN_WIDTH  / 2) / A.z + SCREEN_WIDTH  / 2;
-    A.y = (A.y - SCREEN_HEIGHT / 2) / A.z + SCREEN_HEIGHT / 2;
-
-    // move pixel center
-    vec3 PixelCenter = (vec3){ 0.5f, 0.5f, 0.0f };
-    A = Vec3_Sub(A, PixelCenter);
-
-    return A;
-}
-
-void Raserizer_DrawTriangle(vertex A, vertex B, vertex C)
-{
-    vertex Vertices[6] = { A, B, C };
-    u32 TriangleCount = Draw__TriangleClipZ(Vertices);
-    for (u32 i = 0; i < TriangleCount; ++i)
-    {
-        vertex *V = Vertices + (i * 3);
-        V[0].Position = Raserizer__VertexToPixel(V[0].Position);
-        V[1].Position = Raserizer__VertexToPixel(V[1].Position);
-        V[2].Position = Raserizer__VertexToPixel(V[2].Position);
-
-        u64 Batch = GlobalRasterizer.TriangleCount >> 3;
-        u64 Triangle = GlobalRasterizer.TriangleCount & 7;
-        GlobalRasterizer.Triangles[Batch * 24 + Triangle +  0] = V[0];
-        GlobalRasterizer.Triangles[Batch * 24 + Triangle +  8] = V[1];
-        GlobalRasterizer.Triangles[Batch * 24 + Triangle + 16] = V[2];
-        if (++GlobalRasterizer.TriangleCount >= TRIANGLE_BATCHES * 8)
-            Raserizer_Flush();
-    }
-}
-
-inline bool Rasterizer__QuadIsVisible(vertex A, vertex B, vertex C, vertex D)
-{
     __m128i Sign = _mm_set1_epi32(0x80000000);
     __m128 Near = _mm_set1_ps(CAMERA_NEAR);
-    __m128 N[4] = {
-        _mm_set_ps(0,-SCREEN_WIDTH  / 2, 0, 1),
-        _mm_set_ps(0,-SCREEN_WIDTH  / 2, 0,-1),
-        _mm_set_ps(0,-SCREEN_HEIGHT / 2, 1, 0),
-        _mm_set_ps(0,-SCREEN_HEIGHT / 2,-1, 0),
-    };
+    __m128 Half = _mm_set1_ps(0.5f);
 
     __m128 mA = _mm_loadu_ps(A.Position.E);
     __m128 mB = _mm_loadu_ps(B.Position.E);
@@ -1325,9 +1291,10 @@ inline bool Rasterizer__QuadIsVisible(vertex A, vertex B, vertex C, vertex D)
     Y = _mm_sub_ps(Y, _mm_set1_ps(SCREEN_HEIGHT / 2));
     for (u32 i = 0; i < 4; ++i)
     {
-        __m128 P = _mm_mul_ps(X, _mm_shuffle_ps(N[i], N[i], _MM_SHUFFLE(0,0,0,0)));
-        P = _mm_add_ps(P, _mm_mul_ps(Y, _mm_shuffle_ps(N[i], N[i], _MM_SHUFFLE(1,1,1,1))));
-        P = _mm_add_ps(P, _mm_mul_ps(Z, _mm_shuffle_ps(N[i], N[i], _MM_SHUFFLE(2,2,2,2))));
+        __m128 N = _mm_loadu_ps(Rasterizer->Frustum[i].E);
+        __m128 P = _mm_mul_ps(X, _mm_shuffle_ps(N, N, _MM_SHUFFLE(0,0,0,0)));
+        P = _mm_add_ps(P, _mm_mul_ps(Y, _mm_shuffle_ps(N, N, _MM_SHUFFLE(1,1,1,1))));
+        P = _mm_add_ps(P, _mm_mul_ps(Z, _mm_shuffle_ps(N, N, _MM_SHUFFLE(2,2,2,2))));
         if (_mm_testz_si128(_mm_castps_si128(P), Sign))
             return false;
     }
@@ -1339,7 +1306,7 @@ inline bool Rasterizer__QuadIsVisible(vertex A, vertex B, vertex C, vertex D)
 
     // quad between pixels
     X = _mm_div_ps(X, Z);
-    X = _mm_sub_ps(X, _mm_set1_ps(0.5f));
+    X = _mm_sub_ps(X, Half);
     __m128 X0 = _mm_movehdup_ps(X);
     __m128 X1 = _mm_max_ps(X, X0);
     X0 = _mm_movehl_ps(X0, X1);
@@ -1355,7 +1322,7 @@ inline bool Rasterizer__QuadIsVisible(vertex A, vertex B, vertex C, vertex D)
 
     // quad between pixels
     Y = _mm_div_ps(Y, Z);
-    Y = _mm_sub_ps(Y, _mm_set1_ps(0.5f));
+    Y = _mm_sub_ps(Y, Half);
     __m128 Y0 = _mm_movehdup_ps(Y);
     __m128 Y1 = _mm_max_ps(Y, Y0);
     Y0 = _mm_movehl_ps(Y0, Y1);
@@ -1385,7 +1352,68 @@ inline bool Rasterizer__QuadIsVisible(vertex A, vertex B, vertex C, vertex D)
     return true;
 }
 
-void Raserizer_DrawQuad(vertex A, vertex B, vertex C, vertex D)
+static void Rasterizer__DrawTriangle(vertex A, vertex B, vertex C)
+{
+    rasterizer *Rasterizer = &GlobalRasterizer;
+
+    vertex Vertices[6] = { A, B, C };
+    u32 TriangleCount = Draw__TriangleClipZ(Vertices);
+    for (u32 i = 0; i < TriangleCount; ++i)
+    {
+        vertex *V = Vertices + (i * 3);
+        Rasterizer->Triangles[0][Rasterizer->TriangleCount] = V[0];
+        Rasterizer->Triangles[1][Rasterizer->TriangleCount] = V[1];
+        Rasterizer->Triangles[2][Rasterizer->TriangleCount] = V[2];
+        if (++Rasterizer->TriangleCount == 8)
+            Rasterizer__Rasterize();
+        Rasterizer->TriangleCount &= 7;
+    }
+}
+
+void Rasterizer_Flush(void)
+{
+    rasterizer *Rasterizer = &GlobalRasterizer;
+
+    if (Rasterizer->TriangleCount)
+    {
+        Rasterizer__Rasterize();
+        Rasterizer->TriangleCount = 0;
+    }
+}
+
+void Rasterizer_Clear(color Color)
+{
+    rasterizer *Rasterizer = &GlobalRasterizer;
+
+    Rasterizer_Flush();
+
+    memset(Rasterizer->ColorBuffer, Color.Value, SCREEN_WIDTH * SCREEN_HEIGHT * sizeof(u8));
+    memset(Rasterizer->DepthBuffer, 0, SCREEN_WIDTH * SCREEN_HEIGHT * sizeof(f32));
+}
+
+void Rasterizer_SetTexture(bitmap Texture)
+{
+    rasterizer *Rasterizer = &GlobalRasterizer;
+
+    Rasterizer_Flush();
+
+    Rasterizer->Texture = Texture;
+}
+
+void Rasterizer_Blit(bitmap Target)
+{
+    rasterizer *Rasterizer = &GlobalRasterizer;
+
+    Rasterizer_Flush();
+
+    u32 Width = Min(Target.Width, SCREEN_WIDTH);
+    u32 Height = Min(Target.Height, SCREEN_HEIGHT);
+    for (u32 y = 0; y < Height; ++y)
+    for (u32 x = 0; x < Width; ++x)
+        Target.Pixels[y * Target.Pitch + x].Value = Rasterizer->ColorBuffer[y * SCREEN_WIDTH + x];
+}
+
+void Rasterizer_DrawQuad(vertex A, vertex B, vertex C, vertex D)
 {
     // TODO: check convex?
     // TODO: check coplanar?
@@ -1393,6 +1421,38 @@ void Raserizer_DrawQuad(vertex A, vertex B, vertex C, vertex D)
     if (!Rasterizer__QuadIsVisible(A, B, C, D))
         return;
 
-    Raserizer_DrawTriangle(A, B, C);
-    Raserizer_DrawTriangle(C, D, A);
+    Rasterizer__DrawTriangle(A, B, C);
+    Rasterizer__DrawTriangle(C, D, A);
+}
+
+void Rasterizer_DrawMesh(const vertex *Quads, u32 QuadCount, const bitmap Texture, mat4 Transform)
+{
+    __m128 C0 = LOAD_VEC4(Transform.Columns[0]);
+    __m128 C1 = LOAD_VEC4(Transform.Columns[1]);
+    __m128 C2 = LOAD_VEC4(Transform.Columns[2]);
+    __m128 C3 = LOAD_VEC4(Transform.Columns[3]);
+    C3 = _mm_and_ps(C3, _mm_castsi128_ps(_mm_set_epi32(0,0xFFFFFFFF,0xFFFFFFFF,0xFFFFFFFF)));
+    
+    for (u32 i = 0; i < QuadCount; i++) 
+    {
+        vertex V[4] = {
+            Quads[i * 4 + 0],
+            Quads[i * 4 + 1],
+            Quads[i * 4 + 2],
+            Quads[i * 4 + 3],
+        };
+
+        for (u32 j = 0; j < 4; ++j)
+        {
+            __m128 P = LOAD_VEC3(V[j].Position);
+            __m128 P0 = _mm_mul_ps(C0, _mm_shuffle_ps(P, P, _MM_SHUFFLE(0,0,0,0)));
+            __m128 P1 = _mm_mul_ps(C1, _mm_shuffle_ps(P, P, _MM_SHUFFLE(1,1,1,1)));
+            __m128 P2 = _mm_mul_ps(C2, _mm_shuffle_ps(P, P, _MM_SHUFFLE(2,2,2,2)));
+            __m128 P3 = C3;
+            P = _mm_add_ps(_mm_add_ps(P0, P1), _mm_add_ps(P2, P3));
+            STORE_VEC3(V[j].Position, P);
+        }
+        
+        Rasterizer_DrawQuad(V[0], V[1], V[2], V[3]);
+    }
 }

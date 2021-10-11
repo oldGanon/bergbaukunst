@@ -124,10 +124,10 @@ void Client_Update(client *Client, const input Input, f32 DeltaTime)
 
 void Client_Draw(client *Client, bitmap Target, f32 DeltaTime)
 {
-    Raserizer_Clear(COLOR_SKYBLUE);
+    Rasterizer_Clear(COLOR_SKYBLUE);
     Player_Draw(&Client->Player, Client, &Client->Camera, DeltaTime);
     View_Draw(&Client->View, Target, Client->Terrain, Client->Camera);
-    Raserizer_Blit(Target);
+    Rasterizer_Blit(Target);
 
     if (Client->Hitboxes)
         View_DrawEntityBoxes(&Client->View, Target, Client->Camera);

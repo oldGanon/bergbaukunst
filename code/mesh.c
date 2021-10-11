@@ -2,7 +2,6 @@
 typedef struct quad
 {
     vertex Verts[4];
-    vec3 Center;
 } quad;
 
 typedef struct quad_mesh
@@ -67,7 +66,7 @@ void Mesh_AddQuad(quad_mesh *Mesh, quad Quad)
 
 void Mesh_Draw(bitmap Target, const camera Camera, bitmap Texture, vec3 Position, quad_mesh *Mesh)
 {
-    Raserizer_SetTexture(Texture);
+    Rasterizer_SetTexture(Texture);
 
     mat4 Transform = Mat4_Translation(Vec3_Negate(Position));
     Transform = Mat4_Mul(Camera_WorldToScreenMatrix(Camera, Target), Transform);
@@ -97,7 +96,6 @@ void Mesh_Draw(bitmap Target, const camera Camera, bitmap Texture, vec3 Position
             P = _mm_add_ps(_mm_add_ps(P0, P1), _mm_add_ps(P2, P3));
             STORE_VEC3(V[j].Position, P);
         }
-        Raserizer_DrawQuad(V[0], V[1], V[2], V[3]);
+        Rasterizer_DrawQuad(V[0], V[1], V[2], V[3]);
     }
-    Raserizer_Flush();
 }

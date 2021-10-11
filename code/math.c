@@ -158,6 +158,8 @@ inline u32 U32_Modulo(u32 N, u32 D) { return N % D; }
 /************/
 /*   Vec2   */
 /************/
+// #define LOAD_VEC2(V) _mm_maskload_ps(V.E, _mm_set_epi32(0, 0, 0xFFFFFFFF, 0xFFFFFFFF))
+// #define STORE_VEC2(V,M) _mm_maskstore_ps(V.E, _mm_set_epi32(0, 0, 0xFFFFFFFF, 0xFFFFFFFF), M)
 #define LOAD_VEC2(V) _mm_castpd_ps(_mm_load_sd((f64*)&V.E[0]))
 #define STORE_VEC2(V,M) _mm_store_sd((f64*)V.E,_mm_castps_pd(M))
 inline vec2 Vec2_Zero(void) { vec2 B; STORE_VEC2(B, _mm_setzero_ps()); return B; }
@@ -239,6 +241,8 @@ inline f32 Vec2_Dot(vec2 A, vec2 B)
 /************/
 /*   Vec3   */
 /************/
+// #define LOAD_VEC3(V) _mm_maskload_ps(V.E, _mm_set_epi32(0, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF))
+// #define STORE_VEC3(V,M) _mm_maskstore_ps(V.E, _mm_set_epi32(0, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF), M)
 #define LOAD_VEC3(V) _mm_loadu_ps(V.E)
 #define STORE_VEC3(V,M) _mm_storeu_ps(V.E,M)
 inline vec3 Vec3_Zero(void) { vec3 B; STORE_VEC3(B, _mm_setzero_ps()); return B; }
