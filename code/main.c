@@ -599,7 +599,12 @@ int Win32_ClientMain(const char *Ip)
     Win32_InitDSound();
     
     // GRAPHICS
-    Rasterizer_Init();
+#if (RASTERIZER_THREAD_COUNT > 0)
+    DWORD RasterizerThreadIDs[RASTERIZER_TILE_COUNT];
+    HANDLE RasterizerThreads[RASTERIZER_TILE_COUNT];
+    for (u64 i = 0; i < RASTERIZER_TILE_COUNT; ++i)
+        RasterizerThreads[i] = CreateThread(0, 0,  Rasterizer_TileThreadProc, (void*)i, 0, &RasterizerThreadIDs[i]);
+#endif
 
     // TIMING
     LARGE_INTEGER PerfCountFrequency;
