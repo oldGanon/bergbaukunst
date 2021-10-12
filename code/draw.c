@@ -924,7 +924,7 @@ void Draw_QuadTexturedVerts(bitmap Target, bitmap Texture, vertex A, vertex B, v
 //
 //
 
-#define RASTERIZER_THREAD_COUNT 0
+// #define RASTERIZER_USE_THREADS
 #define RASTERIZER_TILE_COUNT 1
 #define RASTERIZER_TILE_WIDTH (SCREEN_WIDTH / RASTERIZER_TILE_COUNT)
 #define RASTERIZER_TILE_HEIGHT SCREEN_HEIGHT
@@ -1509,7 +1509,7 @@ DWORD Rasterizer_TileThreadProc(void *Parameter)
 
 void Rasterizer_Flush(void)
 {
-#if (RASTERIZER_THREAD_COUNT > 0)
+#if defined(RASTERIZER_USE_THREADS)
 
     rasterizer *Rasterizer = &GlobalRasterizer;
 

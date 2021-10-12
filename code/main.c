@@ -469,6 +469,25 @@ u64 Win32_TimeSince(u64 Counter)
     return Result;
 }
 
+#include <winternl.h>
+typedef NTSYSAPI NTSTATUS (NTAPI *nt_query_timer_resolution) (PULONG, PULONG, PULONG);
+typedef NTSYSAPI NTSTATUS (NTAPI *nt_set_timer_resolution) (ULONG, BOOLEAN, PULONG);
+
+void Win32_HighResolutionTimer(bool Set)
+{
+    HMODULE ntdll = LoadLibraryA("ntdll.dll");
+    if (!ntdll) return;
+
+    nt_query_timer_resolution NtQueryTimerResolution = (nt_query_timer_resolution)GetProcAddress(ntdll, "NtQueryTimerResolution");
+    nt_set_timer_resolution NtSetTimerResolution = (nt_set_timer_resolution)GetProcAddress(ntdll, "NtSetTimerResolution");
+
+    ULONG Minimum, Maximum, Current;
+    NtQueryTimerResolution(&Minimum, &Maximum, &Current);
+    NtSetTimerResolution(Maximum, Set, &Current);
+
+    FreeLibrary(ntdll);
+}
+
 //
 // INPUT
 //
@@ -599,14 +618,19 @@ int Win32_ClientMain(const char *Ip)
     Win32_InitDSound();
     
     // GRAPHICS
-#if (RASTERIZER_THREAD_COUNT > 0)
+#if defined(RASTERIZER_USE_THREADS)
     DWORD RasterizerThreadIDs[RASTERIZER_TILE_COUNT];
     HANDLE RasterizerThreads[RASTERIZER_TILE_COUNT];
     for (u64 i = 0; i < RASTERIZER_TILE_COUNT; ++i)
+    {
         RasterizerThreads[i] = CreateThread(0, 0,  Rasterizer_TileThreadProc, (void*)i, 0, &RasterizerThreadIDs[i]);
+        SetThreadPriority(RasterizerThreads[i], THREAD_PRIORITY_TIME_CRITICAL);
+    }
 #endif
 
     // TIMING
+    SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_TIME_CRITICAL);
+    Win32_HighResolutionTimer(true);
     LARGE_INTEGER PerfCountFrequency;
     QueryPerformanceFrequency(&PerfCountFrequency);
     u64 TimePerSecond = PerfCountFrequency.QuadPart;
