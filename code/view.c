@@ -220,7 +220,7 @@ void View_DrawChunk(view *View, ivec2 ChunkPosition, const bitmap Target, bitmap
     }
 
     box ChunkBox = Chunk_Box(&Chunk->Chunk);
-    // if (!Camera_BoxVisible(Camera, Target, ChunkBox)) return;
+    if (!Camera_BoxVisible(Camera, Target, ChunkBox)) return;
     Mesh_Draw(Target, Camera, TerrainTexture, ChunkBox.Min, &Chunk->Mesh, ChunkBox);
 }
 

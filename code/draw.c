@@ -924,8 +924,7 @@ void Draw_QuadTexturedVerts(bitmap Target, bitmap Texture, vertex A, vertex B, v
 //
 //
 
-// #define RASTERIZER_USE_THREADS
-#define RASTERIZER_TILE_COUNT 1
+#define RASTERIZER_TILE_COUNT 8
 #define RASTERIZER_TILE_WIDTH (SCREEN_WIDTH / RASTERIZER_TILE_COUNT)
 #define RASTERIZER_TILE_HEIGHT SCREEN_HEIGHT
 
@@ -939,8 +938,8 @@ typedef struct rasterizer_tile
     vertex Triangles[3][8];
     u32 TriangleCount;
 
-    semaphore DrawCalls;
-    u32 DrawCallIndex;
+    event Start;
+    event Finish;
 
     u8 ColorBuffer[RASTERIZER_TILE_WIDTH * RASTERIZER_TILE_HEIGHT];
     f32 DepthBuffer[RASTERIZER_TILE_WIDTH * RASTERIZER_TILE_HEIGHT];
@@ -956,10 +955,9 @@ typedef struct rasterizer_draw_call
 } rasterizer_draw_call;
 
 #define RASTERIZER_MAX_DRAWCALLS 4096
-
 typedef struct rasterizer
 {
-    u32 DrawCallIndex;
+    u32 DrawCallCount;
     rasterizer_draw_call DrawCalls[RASTERIZER_MAX_DRAWCALLS];
 
     rasterizer_tile Tiles[RASTERIZER_TILE_COUNT];
@@ -1489,64 +1487,38 @@ DWORD Rasterizer_TileThreadProc(void *Parameter)
     u64 TileId = (u64)Parameter;
     rasterizer *Rasterizer = &GlobalRasterizer;
     rasterizer_tile *Tile = &Rasterizer->Tiles[TileId];
-
-    f32 T0 = (f32)TileId;
-    f32 T1 = (f32)TileId + 1;
-
-    Tile->DrawCalls = Semaphore_Create(0);
-    Tile->Clip = (vec4){ RASTERIZER_TILE_WIDTH * T0, 0, RASTERIZER_TILE_WIDTH * T1, RASTERIZER_TILE_HEIGHT };
-    Tile->Frustum[0] = (vec3){-1, 0, -(SCREEN_WIDTH / 2) + (RASTERIZER_TILE_WIDTH * (T0 + 0.0f)) };
-    Tile->Frustum[1] = (vec3){ 1, 0,  (SCREEN_WIDTH / 2) - (RASTERIZER_TILE_WIDTH * (T1 - 0.0f)) };
-    Tile->Frustum[2] = (vec3){ 0,-1, 0 - (SCREEN_HEIGHT / 2) };
-    Tile->Frustum[3] = (vec3){ 0, 1, 0 - (SCREEN_HEIGHT / 2) };
-
     for (;;)
     {
-        Semaphore_Wait(&Tile->DrawCalls);
-        Rasterizer__DrawCall(Tile, &Rasterizer->DrawCalls[Tile->DrawCallIndex++]);
+        Event_Wait(Tile->Start);
+        for (u32 i = 0; i < Rasterizer->DrawCallCount; ++i)
+            Rasterizer__DrawCall(Tile, &Rasterizer->DrawCalls[i]);
+        Event_Signal(Tile->Finish);
     }
 }
 
-void Rasterizer_Flush(void)
+void Rasterizer_Init(void)
 {
-#if defined(RASTERIZER_USE_THREADS)
-
     rasterizer *Rasterizer = &GlobalRasterizer;
 
     for (u32 i = 0; i < RASTERIZER_TILE_COUNT; ++i)
     {
         rasterizer_tile *Tile = &Rasterizer->Tiles[i];
-        while (Semaphore_Count(&Tile->DrawCalls) > -1);
-        Tile->DrawCallIndex = 0;
+    
+        f32 T0 = (f32)i;
+        f32 T1 = (f32)i + 1;
+        Tile->Start = Event_Create();
+        Tile->Finish = Event_Create();
+        Tile->Clip = (vec4){ RASTERIZER_TILE_WIDTH * T0, 0, RASTERIZER_TILE_WIDTH * T1, RASTERIZER_TILE_HEIGHT };
+        Tile->Frustum[0] = (vec3){-1, 0, -(SCREEN_WIDTH / 2) + (RASTERIZER_TILE_WIDTH * (T0 + 0.0f)) };
+        Tile->Frustum[1] = (vec3){ 1, 0,  (SCREEN_WIDTH / 2) - (RASTERIZER_TILE_WIDTH * (T1 - 0.0f)) };
+        Tile->Frustum[2] = (vec3){ 0,-1, 0 - (SCREEN_HEIGHT / 2) };
+        Tile->Frustum[3] = (vec3){ 0, 1, 0 - (SCREEN_HEIGHT / 2) };
     }
-    Rasterizer->DrawCallIndex = 0;
-
-#else
-
-    rasterizer *Rasterizer = &GlobalRasterizer;
-    rasterizer_tile *Tile = &Rasterizer->Tiles[0];
-
-    Tile->Clip = (vec4){ 0, 0, RASTERIZER_TILE_WIDTH, RASTERIZER_TILE_HEIGHT };
-    Tile->Frustum[0] = (vec3){-1, 0, -(SCREEN_WIDTH / 2) };
-    Tile->Frustum[1] = (vec3){ 1, 0, -(SCREEN_WIDTH / 2) };
-    Tile->Frustum[2] = (vec3){ 0,-1, - (SCREEN_HEIGHT / 2) };
-    Tile->Frustum[3] = (vec3){ 0, 1, - (SCREEN_HEIGHT / 2) };
-
-    while (Tile->DrawCallIndex < Rasterizer->DrawCallIndex)
-    {
-        Rasterizer__DrawCall(Tile, &Rasterizer->DrawCalls[Tile->DrawCallIndex++]);
-    }
-        Tile->DrawCallIndex = 0;
-    Rasterizer->DrawCallIndex = 0;
-
-#endif
 }
 
 void Rasterizer_Clear(color Color)
 {
     rasterizer *Rasterizer = &GlobalRasterizer;
-
-    Rasterizer_Flush();
 
     u32 PixelCount = RASTERIZER_TILE_WIDTH * RASTERIZER_TILE_HEIGHT;
     for (u32 i = 0; i < RASTERIZER_TILE_COUNT; ++i)
@@ -1556,11 +1528,30 @@ void Rasterizer_Clear(color Color)
     }
 }
 
-void Rasterizer_Blit(bitmap Target)
+void Rasterizer_Rasterize(void)
 {
     rasterizer *Rasterizer = &GlobalRasterizer;
 
-    Rasterizer_Flush();
+    event TilesFinished[RASTERIZER_TILE_COUNT-1];
+    for (u32 i = 1; i < RASTERIZER_TILE_COUNT; ++i)
+    {
+        rasterizer_tile *Tile = &Rasterizer->Tiles[i];
+        TilesFinished[i-1] = Tile->Finish;
+        Event_Signal(Tile->Start);
+    }
+
+    rasterizer_tile *Tile = &Rasterizer->Tiles[0];
+    for (u32 i = 0; i < Rasterizer->DrawCallCount; ++i)
+        Rasterizer__DrawCall(Tile, &Rasterizer->DrawCalls[i]);
+    
+    Event_WaitAll(TilesFinished, RASTERIZER_TILE_COUNT-1);
+
+    Rasterizer->DrawCallCount = 0;
+}
+
+void Rasterizer_Blit(bitmap Target)
+{
+    rasterizer *Rasterizer = &GlobalRasterizer;
     
     for (u32 i = 0; i < RASTERIZER_TILE_COUNT; ++i)
     {
@@ -1588,32 +1579,15 @@ void Rasterizer_Blit(bitmap Target)
     }
 }
 
-// void Rasterizer_DrawQuad(vertex A, vertex B, vertex C, vertex D)
-// {
-//     if (!Rasterizer__QuadIsVisible(A, B, C, D))
-//         return;
-
-//     Rasterizer__DrawTriangle(A, B, C);
-//     Rasterizer__DrawTriangle(C, D, A);
-// }
-
 void Rasterizer_DrawMesh(const vertex *Quads, u32 QuadCount, const bitmap Texture, mat4 Transform, box BoundingBox)
 {
     rasterizer *Rasterizer = &GlobalRasterizer;
-    if (Rasterizer->DrawCallIndex >= RASTERIZER_MAX_DRAWCALLS)
-        return;
-
-    Rasterizer->DrawCalls[Rasterizer->DrawCallIndex++] = (rasterizer_draw_call){
-        .Quads = Quads,
-        .QuadCount = QuadCount,
-        .Texture = Texture,
-        .Transform = Transform,
-        .BoundingBox = BoundingBox,
-    };
-    
-    for (u32 i = 0; i < RASTERIZER_TILE_COUNT; ++i)
-    {
-        rasterizer_tile *Tile = &Rasterizer->Tiles[i];
-        Semaphore_Signal(&Tile->DrawCalls, 1);
-    }
+    if (Rasterizer->DrawCallCount < RASTERIZER_MAX_DRAWCALLS)
+        Rasterizer->DrawCalls[Rasterizer->DrawCallCount++] = (rasterizer_draw_call){
+            .Quads = Quads,
+            .QuadCount = QuadCount,
+            .Texture = Texture,
+            .Transform = Transform,
+            .BoundingBox = BoundingBox,
+        };
 }

@@ -35,9 +35,9 @@ typedef size_t index;
 #endif
 
 #define GAME_NAME "Bergbaukunst"
-#define SCREEN_WIDTH 640 // 1920
-#define SCREEN_HEIGHT 360 // 1080
-#define SCREEN_SCALE 2
+#define SCREEN_WIDTH 1280
+#define SCREEN_HEIGHT 720
+#define SCREEN_SCALE 1
 #define BYTES_PER_PIXEL 1
 #define SERVER_UPDATES_PER_SECOND 20
 #define CLIENT_UPDATES_PER_SECOND 100
@@ -85,18 +85,17 @@ void free(void *);
 // SYNC
 //
 
-typedef struct semaphore
+typedef struct event
 {
     void *Handle;
-    volatile i32 Count;
-} semaphore;
+} event;
 
-semaphore Semaphore_Create(i32);
-i32 Semaphore_Count(semaphore *);
-void Semaphore_Destroy(semaphore *);
-bool Semaphore_TryWait(semaphore *);
-void Semaphore_Wait(semaphore *);
-void Semaphore_Signal(semaphore *, i32);
+event Event_Create(void);
+void Event_Destroy(event *);
+void Event_Wait(event);
+void Event_Signal(event);
+void Event_WaitAll(const event *, u32);
+u32 Event_WaitOne(const event *, u32);
 
 //
 // SERVER
@@ -177,57 +176,37 @@ void free(void *ptr)
 // SYNC
 //
 
-semaphore Semaphore_Create(i32 Count)
+event Event_Create(void)
 {
-    assert(Count >= 0);
-    return (semaphore) {
-        .Count = Count,
-        .Handle = CreateSemaphore(NULL, Count, MAXLONG, NULL),
+    return (event) {
+        .Handle = CreateEventA(0, false, false, 0),
     };
 }
 
-i32 Semaphore_Count(semaphore *Semaphore)
+void Event_Destroy(event *Event)
 {
-    return InterlockedCompareExchange((volatile LONG *)&Semaphore->Count, 0, 0);
+    CloseHandle(Event->Handle);
+    Event->Handle = 0;
 }
 
-void Semaphore_Destroy(semaphore *Semaphore)
+void Event_Wait(event Event)
 {
-    Semaphore->Count = 0;
-    CloseHandle(Semaphore->Handle);
+    WaitForSingleObject(Event.Handle, INFINITE);
 }
 
-bool Semaphore_TryWait(semaphore *Semaphore)
+void Event_Signal(event Event)
 {
-    LONG Count = Semaphore_Count(Semaphore);
-    if (Count <= 0) return false;
-
-    LONG NewCount = Count - 1;
-    LONG OldCount = InterlockedCompareExchange((volatile LONG *)&Semaphore->Count, NewCount, Count);
-    return (OldCount == Count);
+    SetEvent(Event.Handle);
 }
 
-void Semaphore_Wait(semaphore *Semaphore)
+void Event_WaitAll(const event *Events, u32 Count)
 {
-    u32 Spin = 10000;
-    while (--Spin)
-        if (Semaphore_TryWait(Semaphore))
-            return;
-
-    LONG Count = Semaphore_Count(Semaphore);
-    LONG NewCount = InterlockedDecrement((volatile LONG *)&Semaphore->Count);
-    if (NewCount < 0)
-        WaitForSingleObject(Semaphore->Handle, INFINITE);
+    WaitForMultipleObjects(Count, (const HANDLE *)Events, true, INFINITE);
 }
 
-void Semaphore_Signal(semaphore *Semaphore, i32 Count)
+u32 Event_WaitOne(const event *Events, u32 Count)
 {
-    assert(Count >= 0);
-    LONG NewCount = InterlockedAdd((volatile LONG *)&Semaphore->Count, Count);
-    LONG OldCount = NewCount - Count;
-    LONG ReleaseCount = MIN(Count, -OldCount);
-    if (ReleaseCount > 0)
-        ReleaseSemaphore(Semaphore->Handle, ReleaseCount, NULL);
+    return WaitForMultipleObjects(Count, (const HANDLE *)Events, false, INFINITE);
 }
 
 //
@@ -618,13 +597,14 @@ int Win32_ClientMain(const char *Ip)
     Win32_InitDSound();
     
     // GRAPHICS
-#if defined(RASTERIZER_USE_THREADS)
-    DWORD RasterizerThreadIDs[RASTERIZER_TILE_COUNT];
-    HANDLE RasterizerThreads[RASTERIZER_TILE_COUNT];
-    for (u64 i = 0; i < RASTERIZER_TILE_COUNT; ++i)
+#if (RASTERIZER_TILE_COUNT > 1)
+    Rasterizer_Init();
+    DWORD RasterizerThreadIDs[RASTERIZER_TILE_COUNT-1];
+    HANDLE RasterizerThreads[RASTERIZER_TILE_COUNT-1];
+    for (u64 i = 1; i < RASTERIZER_TILE_COUNT; ++i)
     {
-        RasterizerThreads[i] = CreateThread(0, 0,  Rasterizer_TileThreadProc, (void*)i, 0, &RasterizerThreadIDs[i]);
-        SetThreadPriority(RasterizerThreads[i], THREAD_PRIORITY_TIME_CRITICAL);
+        RasterizerThreads[i] = CreateThread(0, 0,  Rasterizer_TileThreadProc, (void*)i, 0, &RasterizerThreadIDs[i-1]);
+        SetThreadPriority(RasterizerThreads[i-1], THREAD_PRIORITY_TIME_CRITICAL);
     }
 #endif
 
