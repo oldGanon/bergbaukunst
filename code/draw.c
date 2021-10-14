@@ -924,7 +924,7 @@ void Draw_QuadTexturedVerts(bitmap Target, bitmap Texture, vertex A, vertex B, v
 //
 //
 
-#define RASTERIZER_TILE_COUNT 8
+#define RASTERIZER_TILE_COUNT 4
 #define RASTERIZER_TILE_WIDTH (SCREEN_WIDTH / RASTERIZER_TILE_COUNT)
 #define RASTERIZER_TILE_HEIGHT SCREEN_HEIGHT
 
