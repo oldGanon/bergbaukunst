@@ -8,11 +8,19 @@ typedef struct view_chunk
 	bool MeshDirty;
 } view_chunk;
 
+typedef struct view_entity
+{
+    u32 Type;
+    vec3 Position;
+    quad_mesh Model;
+    f32 Angle;
+} view_entity;
+
 typedef struct view_entity_map
 {
     u32 Count;
     u32 Capacity;
-    entity *Entities;
+    view_entity *Entities;
 } view_entity_map;
 
 typedef struct view
@@ -250,9 +258,9 @@ void View_DrawEntityBoxes(view *View, const bitmap Target, const camera Camera)
 {
     for (u32 i = 0; i < View->EntityMap.Capacity; ++i)
     {
-        entity *Entity = &View->EntityMap.Entities[i];
+        view_entity *Entity = &View->EntityMap.Entities[i];
         if (Entity->Type == ENTITY_NONE) continue;
-        box EntityBox = Entity_Box(Entity);
+        box EntityBox = Entity_Box(Entity->Position, Entity->Type);
         View_DrawLineBox(Target, Camera, EntityBox);
     }
 }
@@ -308,7 +316,9 @@ void View_SetEntity(view *View, const msg_set_entity *SetEntity)
         View->EntityMap.Entities = realloc(View->EntityMap.Entities, View->EntityMap.Capacity * sizeof(entity));
     }
 
-    View->EntityMap.Entities[SetEntity->Id] = SetEntity->Entity;
+    View->EntityMap.Entities[SetEntity->Id].Position = SetEntity->Entity.Position;
+    View->EntityMap.Entities[SetEntity->Id].Type = SetEntity->Entity.Type;
+
 }
 
 void View_Init(view *View)
@@ -323,7 +333,7 @@ void View_Init(view *View)
 
     View->EntityMap.Count = 0;
     View->EntityMap.Capacity = 256;
-    View->EntityMap.Entities = malloc(View->EntityMap.Capacity * sizeof(entity));
+    View->EntityMap.Entities = malloc(View->EntityMap.Capacity * sizeof(view_entity));
 }
 
 f32 View_TraceRay(view *View, vec3 RayOrigin, vec3 RayDirection, f32 RayLength, trace_result *Result)

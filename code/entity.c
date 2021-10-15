@@ -11,20 +11,20 @@ typedef struct entity
     vec3 Position;
 } entity;
 
-box Entity_Box(entity *Entity);
+box Entity_Box(vec3 Position, u32 Type);
 
 /******************/
 /* IMPLEMENTATION */
 /******************/
 
-box Entity_Box(entity *Entity)
+box Entity_Box(vec3 Position, u32 Type)
 {
-    switch (Entity->Type)
+    switch (Type)
     {
         case ENTITY_PLAYER:
             return (box){
-                .Min = Vec3_Sub(Entity->Position, (vec3){ 0.25f, 0.25f, 1.85f }),
-                .Max = Vec3_Add(Entity->Position, (vec3){ 0.25f, 0.25f, 0.15f }),
+                .Min = Vec3_Sub(Position, (vec3){ 0.25f, 0.25f, 1.85f }),
+                .Max = Vec3_Add(Position, (vec3){ 0.25f, 0.25f, 0.15f }),
             };
 
         default: return Box_Empty();
