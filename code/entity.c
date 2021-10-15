@@ -9,22 +9,21 @@ typedef struct entity
 {
     u32 Type;
     vec3 Position;
+    f32 Yaw, Pitch;
 } entity;
-
-box Entity_Box(vec3 Position, u32 Type);
 
 /******************/
 /* IMPLEMENTATION */
 /******************/
 
-box Entity_Box(vec3 Position, u32 Type)
+box Entity_Box(const entity *Entity)
 {
-    switch (Type)
+    switch (Entity->Type)
     {
         case ENTITY_PLAYER:
             return (box){
-                .Min = Vec3_Sub(Position, (vec3){ 0.25f, 0.25f, 1.85f }),
-                .Max = Vec3_Add(Position, (vec3){ 0.25f, 0.25f, 0.15f }),
+                .Min = Vec3_Sub(Entity->Position, (vec3){ 0.25f, 0.25f, 1.85f }),
+                .Max = Vec3_Add(Entity->Position, (vec3){ 0.25f, 0.25f, 0.15f }),
             };
 
         default: return Box_Empty();

@@ -129,7 +129,7 @@ void Server_ClientPlaceBlock(server *Server, u32 ClientId, const msg_place_block
     if (!Player) return;
 
     block Block = (block){ .Id = BLOCK_ID_GRAS };
-    box ClientPlayerBox = Entity_Box(Player->Position, Player->Type);
+    box ClientPlayerBox = Entity_Box(Player);
     if (!Block_BoxIntersect(Block, PlaceBlock->Position, ClientPlayerBox))
         Server_SetBlock(Server, PlaceBlock->Position, Block);
 }

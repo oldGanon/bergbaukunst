@@ -10,10 +10,8 @@ typedef struct view_chunk
 
 typedef struct view_entity
 {
-    u32 Type;
-    vec3 Position;
+    entity Entity;
     quad_mesh Model;
-    f32 Angle;
 } view_entity;
 
 typedef struct view_entity_map
@@ -258,9 +256,9 @@ void View_DrawEntityBoxes(view *View, const bitmap Target, const camera Camera)
 {
     for (u32 i = 0; i < View->EntityMap.Capacity; ++i)
     {
-        view_entity *Entity = &View->EntityMap.Entities[i];
+        entity *Entity = &View->EntityMap.Entities[i].Entity;
         if (Entity->Type == ENTITY_NONE) continue;
-        box EntityBox = Entity_Box(Entity->Position, Entity->Type);
+        box EntityBox = Entity_Box(Entity);
         View_DrawLineBox(Target, Camera, EntityBox);
     }
 }
@@ -316,8 +314,7 @@ void View_SetEntity(view *View, const msg_set_entity *SetEntity)
         View->EntityMap.Entities = realloc(View->EntityMap.Entities, View->EntityMap.Capacity * sizeof(entity));
     }
 
-    View->EntityMap.Entities[SetEntity->Id].Position = SetEntity->Entity.Position;
-    View->EntityMap.Entities[SetEntity->Id].Type = SetEntity->Entity.Type;
+    View->EntityMap.Entities[SetEntity->Id].Entity = SetEntity->Entity;
 
 }
 
