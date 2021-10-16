@@ -1403,8 +1403,8 @@ static void Rasterizer__DrawCall(rasterizer_tile *Tile, const rasterizer_draw_ca
     
     // cull bounding box
     __m256i Sign = _mm256_set1_epi32(0x80000000);
-    __m128 BoxMin = _mm_setzero_ps();
-    __m128 BoxMax = _mm_sub_ps(_mm_loadu_ps(DrawCall->BoundingBox.Max.E), _mm_loadu_ps(DrawCall->BoundingBox.Min.E));
+    __m128 BoxMin = _mm_loadu_ps(DrawCall->BoundingBox.Min.E);
+    __m128 BoxMax = _mm_loadu_ps(DrawCall->BoundingBox.Max.E);
     __m128 Box[8] = {
         _mm_blend_ps(BoxMin, BoxMax, 0),
         _mm_blend_ps(BoxMin, BoxMax, 1),

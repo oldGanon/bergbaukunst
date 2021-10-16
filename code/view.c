@@ -11,7 +11,7 @@ typedef struct view_chunk
 typedef struct view_entity
 {
     entity Entity;
-    quad_mesh Model;
+    quad_mesh Mesh;
 } view_entity;
 
 typedef struct view_entity_map
@@ -227,7 +227,15 @@ void View_DrawChunk(view *View, ivec2 ChunkPosition, const bitmap Target, bitmap
 
     box ChunkBox = Chunk_Box(&Chunk->Chunk);
     if (!Camera_BoxVisible(Camera, Target, ChunkBox)) return;
-    Mesh_Draw(Target, Camera, TerrainTexture, ChunkBox.Min, &Chunk->Mesh, ChunkBox);
+    vec3 ChunkPos = ChunkBox.Min;
+    Mesh_Draw(Target, Camera, TerrainTexture, ChunkPos, &Chunk->Mesh);
+}
+
+void View_DrawEntity(view_entity *Entity, const bitmap Target, bitmap TerrainTexture, const camera Camera)
+{
+    if (Entity->Mesh.Count == 0) return;
+
+    Mesh_Draw(Target, Camera, TerrainTexture, Entity->Entity.Position, &Entity->Mesh);
 }
 
 void View_Draw(view *View, const bitmap Target, bitmap TerrainTexture, const camera Camera)
@@ -249,6 +257,14 @@ void View_Draw(view *View, const bitmap Target, bitmap TerrainTexture, const cam
             View_DrawChunk(View, iVec2_Add(Center, OffsetY), Target, TerrainTexture, Camera);
             View_DrawChunk(View, iVec2_Sub(Center, OffsetY), Target, TerrainTexture, Camera);
         }
+    }
+
+    // draw entity
+    for (u32 i = 0; i < View->EntityMap.Capacity; ++i)
+    {
+        view_entity *Entity = &View->EntityMap.Entities[i];
+        if (Entity->Entity.Type == ENTITY_NONE) continue;
+        View_DrawEntity(Entity, Target, TerrainTexture, Camera);
     }
 }
 
@@ -314,8 +330,11 @@ void View_SetEntity(view *View, const msg_set_entity *SetEntity)
         View->EntityMap.Entities = realloc(View->EntityMap.Entities, View->EntityMap.Capacity * sizeof(entity));
     }
 
-    View->EntityMap.Entities[SetEntity->Id].Entity = SetEntity->Entity;
-
+    view_entity *ViewEntity = &View->EntityMap.Entities[SetEntity->Id];
+    ViewEntity->Entity = SetEntity->Entity;
+    if (ViewEntity->Mesh.Quads == 0) 
+        ViewEntity->Mesh = Mesh_Create();
+    View_GenerateMobMesh(ViewEntity);
 }
 
 void View_Init(view *View)
@@ -341,11 +360,4 @@ f32 View_TraceRay(view *View, vec3 RayOrigin, vec3 RayDirection, f32 RayLength, 
 vec3 View_CheckMoveBox(const view *View, box Box, vec3 Move)
 {
     return Phys_CheckMoveBox(View_GetBlock, View, Box, Move);
-}
-
-void Entity_DrawMesh(view_entity *Entity, const bitmap Target, bitmap TerrainTexture, const camera Camera)
-{
-    if (Entity->Model.Count == 0) return;
-
-    Mesh_Draw(Target, Camera, TerrainTexture, (vec3) { 0 }, &Entity->Model, Entity_Box(&Entity->Entity));
 }

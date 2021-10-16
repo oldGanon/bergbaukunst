@@ -30,6 +30,9 @@ void World_Init(world *World)
     World->ChunkMap = ChunkMap_Create();
     World->EntityManager = EntityManager_Create();
     WorldGen_Init();
+    
+    entity Test = (entity){ .Type = ENTITY_MOB, .Position = (vec3){ 0,0,70 } };
+    Entity_Spawn(&World->EntityManager, Test);
 }
 
 void World_Update(world *World, vec3 Player)

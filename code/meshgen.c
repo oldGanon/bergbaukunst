@@ -360,57 +360,52 @@ void View_GenerateChunkMesh(view *View, ivec2 ChunkPosition)
     Chunk->MeshDirty = false;
 }
 
-void Mob_AddBlockMesh(quad_mesh* Mesh, vec3 Position, f32 Height, f32 Width)
+void Mob_AddBlockMesh(quad_mesh *Mesh, f32 Height, f32 Width)
 {
     vec2 UV = { 32.0f, 0.0f };
     f32 Shadow[4] = { 0, 0, 0, 0 };
-    vec3 Pos;
-    quad Face;
     
     //Left
-    Pos = Vec3_Add(Position, (vec3) { -Width / 2, Width / 2, -Height / 2 });
-    Face = Block_FaceQuad(Pos, (vec3) { 0, -Width, 0 }, (vec3) { 0, 0, Height }, UV, (vec2) { 16, 0 }, (vec2) { 0, 16 }, Shadow);
+    vec3 Pos = (vec3) { -Width / 2, Width / 2, -Height / 2 };
+    quad Face = Block_FaceQuad(Pos, (vec3) { 0, -Width, 0 }, (vec3) { 0, 0, Height }, UV, (vec2) { 16, 0 }, (vec2) { 0, 16 }, Shadow);
     Mesh_AddQuad(Mesh, Face);
     
     //Right
-    Pos = Vec3_Add(Position, (vec3) { Width / 2, Width / 2, -Height / 2 });
+    Pos = (vec3) { Width / 2, Width / 2, -Height / 2 };
     Face = Block_FaceQuad(Pos, (vec3) { 0, 0, Height }, (vec3){ 0, -Width, 0 }, UV, (vec2) { 16, 0 }, (vec2) { 0, 16 }, Shadow);
     Mesh_AddQuad(Mesh, Face);
     //Front
-    Pos = Vec3_Add(Position, (vec3) { -Width / 2, -Width / 2, -Height / 2 });
+    Pos = (vec3) { -Width / 2, -Width / 2, -Height / 2 };
     Face = Block_FaceQuad(Pos, (vec3) { Width, 0, 0 }, (vec3) { 0, 0, Height }, UV, (vec2) { 16, 0 }, (vec2) { 0, 16 }, Shadow);
     Mesh_AddQuad(Mesh, Face);
     //Back
-    Pos = Vec3_Add(Position, (vec3) { -Width / 2, Width / 2, -Height / 2 });
+    Pos = (vec3) { -Width / 2, Width / 2, -Height / 2 };
     Face = Block_FaceQuad(Pos, (vec3) { 0, 0, Height }, (vec3) { Width, 0, 0 }, UV, (vec2) { 16, 0 }, (vec2) { 0, 16 }, Shadow);
     Mesh_AddQuad(Mesh, Face);
     //Bottom
-    Pos = Pos = Vec3_Add(Position, (vec3) { -Width / 2, -Width / 2, -Height / 2 });
+    Pos = (vec3) { -Width / 2, -Width / 2, -Height / 2 };
     Face = Block_FaceQuad(Pos, (vec3) { 0, Width, 0 }, (vec3) { Width, 0, 0 }, UV, (vec2) { 16, 0 }, (vec2) { 0, 16 }, Shadow);
     Mesh_AddQuad(Mesh, Face);
     //Top
-    Pos = Vec3_Add(Position, (vec3) { -Width / 2, -Width / 2, Height / 2 });
+    Pos = (vec3) { -Width / 2, -Width / 2, Height / 2 };
     Face = Block_FaceQuad(Pos, (vec3) { Width, 0, 0 }, (vec3) { 0, Width, 0 }, UV, (vec2) { 16, 0 }, (vec2) { 0, 16 }, Shadow);
     Mesh_AddQuad(Mesh, Face);
-    
 }
 
-void Mob_AddMesh(quad_mesh* Mesh, vec3 Position)
+void Mob_AddMesh(quad_mesh *Mesh)
 {
     f32 Height = 1.0f;
     f32 Width = 2.0f;
-    Mob_AddBlockMesh(Mesh, Position, Height, Width);
+    Mesh_Clear(Mesh);
+    Mob_AddBlockMesh(Mesh, Height, Width);
 }
 
 void View_GenerateMobMesh(view_entity *Entity)
 {
     if (ENTITY_NONE == Entity->Entity.Type) return;
 
-    Entity->Model = Mesh_Create();
     switch (Entity->Entity.Type)
     {
-    case(ENTITY_MOB):
-        Mob_AddMesh(&Entity->Model, Entity->Entity.Position); break;
+        case(ENTITY_MOB): Mob_AddMesh(&Entity->Mesh); break;
     }
-
 }

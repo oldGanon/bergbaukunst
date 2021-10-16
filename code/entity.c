@@ -28,8 +28,8 @@ box Entity_Box(const entity *Entity)
             };
         case ENTITY_MOB:
             return (box) {
-                .Min = Vec3_Sub(Entity->Position, (vec3) { 10.0f, 10.0f, 10.0f}),
-                .Max = Vec3_Add(Entity->Position, (vec3) { 10.0f, 10.0f, 10.0f}),
+                .Min = Vec3_Sub(Entity->Position, (vec3) { 1.0f, 1.0f, 1.0f}),
+                .Max = Vec3_Add(Entity->Position, (vec3) { 1.0f, 1.0f, 1.0f}),
             };
 
         default: return Box_Empty();

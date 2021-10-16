@@ -45,43 +45,34 @@ f32 WorldGen_Noise(u64 Seed, vec2 Position, f32 Lowest, f32 Highest, f32 MaxIncl
 
 f32 WorldGen_OceanNoise(vec2 Position)
 {
-	f32 Lowest = 32.0f;
-	f32 Highest = 64.0f;
-	f32 MaxIncline = 1.0f;
-	return WorldGen_Noise(GlobalWorldGen.OceanSeed, Position, Lowest, Highest, MaxIncline);
+	return WorldGen_Noise(GlobalWorldGen.OceanSeed, Position, 32, 64, 1);
 }
 
 f32 WorldGen_PlainNoise(vec2 Position)
 {
-	f32 Lowest = 64.0f;
-	f32 Highest = 72.0f;
-	f32 MaxIncline = 0.25f;
-	return WorldGen_Noise(GlobalWorldGen.PlainSeed, Position, Lowest, Highest, MaxIncline);
+	return WorldGen_Noise(GlobalWorldGen.PlainSeed, Position, 64, 72, 0.25f);
 }
 
 f32 WorldGen_ForestNoise(vec2 Position)
 {
-	f32 Lowest = 64.0f;
-	f32 Highest = 72.0f;
-	f32 MaxIncline = 0.25f;
-	return WorldGen_Noise(GlobalWorldGen.ForestSeed, Position, Lowest, Highest, MaxIncline);
+	return WorldGen_Noise(GlobalWorldGen.ForestSeed, Position, 64, 72, 0.25f);
 }
 
 f32 WorldGen_DesertNoise(vec2 Position)
 {
-	f32 Lowest = 64.0f;
-	f32 Highest = 72.0f;
-	f32 MaxIncline = 0.25f;
-	return WorldGen_Noise(GlobalWorldGen.DesertSeed, Position, Lowest, Highest, MaxIncline);
+	return WorldGen_Noise(GlobalWorldGen.DesertSeed, Position, 64, 72, 0.25f);
 }
 
 f32 WorldGen_MountainNoise(vec2 Position)
 {
-	f32 Lowest = 64.0f;
-	f32 Highest = 96.0f;
-	f32 MaxIncline = 0.25f;
-	return WorldGen_Noise(GlobalWorldGen.MountainSeed, Position, Lowest, Highest, MaxIncline);
+	return WorldGen_Noise(GlobalWorldGen.MountainSeed, Position, 64, 96, 0.25f);
 }
+
+// u32 WordlGen_CellBiome(ivec2 Cell)
+// {
+// 	u64 Continent = Hash_IVec2(iVec2_And(Cell, iVec2_Set1(~0xFF)));
+	
+// }
 
 void WorldGen_GenerateChunk(chunk *Chunk)
 {

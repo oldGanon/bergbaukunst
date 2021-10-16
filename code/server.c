@@ -77,6 +77,19 @@ void Server_ClientConnect(server *Server, u32 ClientId)
         Message_ChunkData(&Message, Chunk);
         Network_ServerSendMessage(&Server->Server, ClientId, &Message);
     }
+
+    // send entity data
+    entity_manager *Manager = &Server->World.EntityManager;
+    for (u32 i = 1; i <= Manager->Capacity; ++i)
+    {
+        entity *Entity = &Manager->Entities[i];
+        if (Entity->Type == ENTITY_NONE)
+            continue;
+
+        ivec2 Chunk = World_ToChunkPosition(Vec3_FloorToIVec3(Entity->Position));
+        Message_SetEntity(&Message, i, Entity);
+        Server_SendChunkMessage(Server, Chunk, &Message);
+    }
 }
 
 void Server_SetBlock(server *Server, ivec3 Position, block Block)
