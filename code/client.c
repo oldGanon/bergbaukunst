@@ -125,6 +125,17 @@ void Client_Update(client *Client, const input Input, f32 DeltaTime)
 void Client_Draw(client *Client, bitmap Target, f32 DeltaTime)
 {
     Rasterizer_Clear(COLOR_SKYBLUE);
+
+
+    //TEST
+    entity_manager manage = EntityManager_Create();
+    view_entity Test = { .Entity.Position = {3.0f, 10.0f, 70.0f}, .Entity.Type = ENTITY_MOB };
+    Entity_Spawn(&manage, Test.Entity);
+    View_GenerateMobMesh(&Test);
+    Entity_DrawMesh(&Test, Target, Client->Terrain, Client->Camera);
+    //
+
+
     Player_Draw(&Client->Player, Client, &Client->Camera, DeltaTime);
     View_Draw(&Client->View, Target, Client->Terrain, Client->Camera);
     Rasterizer_Rasterize();
@@ -157,4 +168,7 @@ void Client_Draw(client *Client, bitmap Target, f32 DeltaTime)
     Draw_RectIVec2(Target, COLOR_WHITE, iVec2_Add(Center, (ivec2){-1, 1 }), (ivec2){ 2, 4 });
     Draw_RectIVec2(Target, COLOR_WHITE, iVec2_Add(Center, (ivec2){-5,-1 }), (ivec2){ 4, 2 });
     Draw_RectIVec2(Target, COLOR_WHITE, iVec2_Add(Center, (ivec2){ 1,-1 }), (ivec2){ 4, 2 });
+
+    Mesh_Destroy(&Test.Model);
+
 }

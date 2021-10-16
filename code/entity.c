@@ -3,6 +3,7 @@ enum entity_type
 {
     ENTITY_NONE = 0,
     ENTITY_PLAYER,
+    ENTITY_MOB,
 };
 
 typedef struct entity
@@ -24,6 +25,11 @@ box Entity_Box(const entity *Entity)
             return (box){
                 .Min = Vec3_Sub(Entity->Position, (vec3){ 0.25f, 0.25f, 1.85f }),
                 .Max = Vec3_Add(Entity->Position, (vec3){ 0.25f, 0.25f, 0.15f }),
+            };
+        case ENTITY_MOB:
+            return (box) {
+                .Min = Vec3_Sub(Entity->Position, (vec3) { 10.0f, 10.0f, 10.0f}),
+                .Max = Vec3_Add(Entity->Position, (vec3) { 10.0f, 10.0f, 10.0f}),
             };
 
         default: return Box_Empty();

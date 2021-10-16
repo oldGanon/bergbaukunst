@@ -342,3 +342,10 @@ vec3 View_CheckMoveBox(const view *View, box Box, vec3 Move)
 {
     return Phys_CheckMoveBox(View_GetBlock, View, Box, Move);
 }
+
+void Entity_DrawMesh(view_entity *Entity, const bitmap Target, bitmap TerrainTexture, const camera Camera)
+{
+    if (Entity->Model.Count == 0) return;
+
+    Mesh_Draw(Target, Camera, TerrainTexture, (vec3) { 0 }, &Entity->Model, Entity_Box(&Entity->Entity));
+}
