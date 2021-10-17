@@ -159,14 +159,14 @@ void Server_ClientBreakBlock(server *Server, u32 ClientId, const msg_break_block
 void Update_Entities(server *Server)
 {
     entity_manager *Manager = &Server->World.EntityManager;
-    for (u32 i = 1; i <= Manager->Capacity; ++i)
+    for (u32 i = 0; i <= Manager->Capacity; ++i)
     {
         entity *Mob = &Manager->Entities[i];
         if (Mob->Type == ENTITY_MOB)
         {
-            for (u32 i = 1; i < SERVER_MAX_CLIENTS; ++i)
+            for (u32 j = 1; j < SERVER_MAX_CLIENTS; ++j)
             {
-                server_client *Client = Server_GetClient(Server, i);
+                server_client *Client = Server_GetClient(Server, j);
                 if (!Client) return;
 
                 entity *Player = EntityManager_GetEntity(&Server->World.EntityManager, Client->EntityId);
@@ -177,7 +177,7 @@ void Update_Entities(server *Server)
 
                 if(DistanceSquared < 10*10)
                 {
-                    f32 NewYaw = Mob->Yaw += 0.1;
+                    f32 NewYaw = Mob->Yaw += 0.1f;
 
                     msg Message;
                     ivec2 Chunk = World_ToChunkPosition(Vec3_FloorToIVec3(Mob->Position));
