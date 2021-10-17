@@ -35,7 +35,7 @@ void World_Init(world *World)
     Entity_Spawn(&World->EntityManager, Test);
 }
 
-void World_Update(world *World, vec3 Player)
+void World_Update(world* World, vec3 Player)
 {
     ivec2 CenterChunk = World_ToChunkPosition(Vec3_FloorToIVec3(Player));
     ivec2 LoadedChunkDist = iVec2_Set1(LOADED_CHUNKS_DIST);

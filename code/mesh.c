@@ -78,3 +78,25 @@ void Mesh_Draw(bitmap Target, const camera Camera, bitmap Texture, vec3 Position
     Transform = Mat4_Mul(Camera_WorldToScreenMatrix(Camera, Target), Transform);
     Rasterizer_DrawMesh(Mesh->Quads[0].Verts, Mesh->Count, Texture, Transform, Mesh->BoundingBox);
 }
+
+
+void Mesh_Rotate(f32 Angle, const quad_mesh *Mesh, quad_mesh *RotatedMesh)
+{
+    Mesh_Clear(RotatedMesh);
+    for (u32 i = 0; i < Mesh->Count; i++)
+    {
+        quad RotatedQuad;
+        for (u32 j = 0; j < 4; j++)
+        {
+            vec3 VertPosOriginal = Mesh->Quads[i].Verts[j].Position;
+            vec3 VertexPosRotated = {.x = VertPosOriginal.x * Cos(Angle) - VertPosOriginal.y * Sin(Angle),
+                                     .y = VertPosOriginal.x * Sin(Angle) + VertPosOriginal.y * Cos(Angle), 
+                                     .z = VertPosOriginal.z};
+
+            
+            RotatedQuad.Verts[j] = Mesh->Quads[i].Verts[j];
+            RotatedQuad.Verts[j].Position = VertexPosRotated;
+        }
+        Mesh_AddQuad(RotatedMesh, RotatedQuad);
+    }
+}

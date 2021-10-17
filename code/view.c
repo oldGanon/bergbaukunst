@@ -12,6 +12,7 @@ typedef struct view_entity
 {
     entity Entity;
     quad_mesh Mesh;
+    quad_mesh RotatedMesh;
 } view_entity;
 
 typedef struct view_entity_map
@@ -231,11 +232,14 @@ void View_DrawChunk(view *View, ivec2 ChunkPosition, const bitmap Target, bitmap
     Mesh_Draw(Target, Camera, TerrainTexture, ChunkPos, &Chunk->Mesh);
 }
 
+
 void View_DrawEntity(view_entity *Entity, const bitmap Target, bitmap TerrainTexture, const camera Camera)
 {
     if (Entity->Mesh.Count == 0) return;
 
-    Mesh_Draw(Target, Camera, TerrainTexture, Entity->Entity.Position, &Entity->Mesh);
+    Mesh_Rotate(Entity->Entity.Yaw, &Entity->Mesh, &Entity->RotatedMesh);
+
+    Mesh_Draw(Target, Camera, TerrainTexture, Entity->Entity.Position, &Entity->RotatedMesh);
 }
 
 void View_Draw(view *View, const bitmap Target, bitmap TerrainTexture, const camera Camera)
@@ -333,7 +337,10 @@ void View_SetEntity(view *View, const msg_set_entity *SetEntity)
     view_entity *ViewEntity = &View->EntityMap.Entities[SetEntity->Id];
     ViewEntity->Entity = SetEntity->Entity;
     if (ViewEntity->Mesh.Quads == 0) 
+    {
         ViewEntity->Mesh = Mesh_Create();
+        ViewEntity->RotatedMesh = Mesh_Create();
+    }
     View_GenerateMobMesh(ViewEntity);
 }
 

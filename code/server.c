@@ -1,6 +1,4 @@
-
 #include "world.c"
-
 typedef struct server_client
 {
     u32 EntityId;
@@ -10,6 +8,7 @@ typedef struct server_client
     // LookYaw;
     // LookPitch;
 } server_client;
+
 
 typedef struct server
 {
@@ -156,6 +155,41 @@ void Server_ClientBreakBlock(server *Server, u32 ClientId, const msg_break_block
     Server_SetBlock(Server, BreakBlock->Position, Block);
 }
 
+
+void Update_Entities(server *Server)
+{
+    entity_manager *Manager = &Server->World.EntityManager;
+    for (u32 i = 1; i <= Manager->Capacity; ++i)
+    {
+        entity *Mob = &Manager->Entities[i];
+        if (Mob->Type == ENTITY_MOB)
+        {
+            for (u32 i = 1; i < SERVER_MAX_CLIENTS; ++i)
+            {
+                server_client *Client = Server_GetClient(Server, i);
+                if (!Client) return;
+
+                entity *Player = EntityManager_GetEntity(&Server->World.EntityManager, Client->EntityId);
+                if (!Player) return;
+
+                vec3 MobToPlayer = Vec3_Sub(Player->Position, Mob->Position);
+                f32 DistanceSquared = MobToPlayer.x * MobToPlayer.x + MobToPlayer.y * MobToPlayer.y + MobToPlayer.z * MobToPlayer.z;
+
+                if(DistanceSquared < 10*10)
+                {
+                    f32 NewYaw = Mob->Yaw += 0.1;
+
+                    msg Message;
+                    ivec2 Chunk = World_ToChunkPosition(Vec3_FloorToIVec3(Mob->Position));
+                    Message_SetEntity(&Message, i, Mob);
+                    Server_SendChunkMessage(Server, Chunk, &Message);
+                }
+            }
+        }
+    }
+
+}
+
 void Server_Update(server *Server)
 {
     u32 NewClient = Network_ServerAcceptClient(&Server->Server);
@@ -176,7 +210,9 @@ void Server_Update(server *Server)
                 default: break;
             }
         }
+        
     }
 
     World_Update(&Server->World, Vec3_Zero());
+    Update_Entities(Server);
 }
