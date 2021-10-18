@@ -5,11 +5,11 @@ set NOCRT=-nodefaultlib kernel32.lib
 
 set DebugFlags=-Od -MTd -Z7
 set ReleaseFlags=-O2 -MT -Zi
-set CompilerFlags=%DebugFlags% -c -nologo -TC -std:c11 -arch:AVX2 -GS- -Gs9999999 -Gm- -GR- -Gr -EHa- -Oi -W4 -wd4100 -wd4189 -wd4201 -wd4505
+set CompilerFlags=%ReleaseFlags% -c -nologo -TC -std:c11 -arch:AVX2 -GS- -Gs9999999 -Gm- -GR- -Gr -EHa- -Oi -W4 -wd4100 -wd4189 -wd4201 -wd4505
 
 set DebugFlags=-debug -pdb:msvc.pdb -map:msvc.map -subsystem:console
 set ReleaseFlags=-subsystem:windows -incremental:no
-set LinkerFlags=%DebugFlags% -nologo -stack:0x100000,0x100000 -out:%NAME%.exe -opt:ref %NOCRT% user32.lib gdi32.lib Ws2_32.lib data.res
+set LinkerFlags=%ReleaseFlags% -nologo -stack:0x100000,0x100000 -out:%NAME%.exe -opt:ref %NOCRT% user32.lib gdi32.lib Ws2_32.lib data.res
 
 cd %~dp0
 cd ..

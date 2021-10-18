@@ -35,9 +35,10 @@ void World_Init(world *World)
     Entity_Spawn(&World->EntityManager, Test);
 }
 
-void World_Update(world* World, vec3 Player)
+void World_Update(world* World, vec3 PlayerPosition)
 {
-    ivec2 CenterChunk = World_ToChunkPosition(Vec3_FloorToIVec3(Player));
+    // chunks
+    ivec2 CenterChunk = World_ToChunkPosition(Vec3_FloorToIVec3(PlayerPosition));
     ivec2 LoadedChunkDist = iVec2_Set1(LOADED_CHUNKS_DIST);
     ivec2 MinPos = iVec2_Sub(CenterChunk, LoadedChunkDist);
     ivec2 MaxPos = iVec2_Add(CenterChunk, LoadedChunkDist);
@@ -53,8 +54,33 @@ void World_Update(world* World, vec3 Player)
         WorldGen_GenerateChunk(Chunk);
         Chunk_CalcSkyLight(Chunk);
     }
-}
 
+    // entities
+    entity_manager *Manager = &World->EntityManager;
+    FOREACH_ENTITY(EntityId, Manager)
+    {
+        entity *Entity = EntityManager_GetEntity(Manager, EntityId);
+        switch (Entity->Type)
+        {
+            case ENTITY_MOB:
+            {
+                FOREACH_ENTITY(PlayerId, Manager)
+                {
+                    entity *Player = EntityManager_GetEntity(&World->EntityManager, PlayerId);
+                    if (!Player || Player->Type != ENTITY_PLAYER) continue;
+
+                    vec3 MobToPlayer = Vec3_Sub(Player->Position, Entity->Position);
+                    f32 Distance = Vec3_Length(MobToPlayer);
+                    if(Distance < 10)
+                    {
+                        Entity->Yaw += 0.1f;
+                        EntityManager_EntityChanged(&World->EntityManager, EntityId);
+                    }
+                }
+            } break;
+        }
+    }
+}
 
 chunk *World_GetChunk(world *World, ivec2 ChunkPosition)
 {

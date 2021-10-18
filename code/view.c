@@ -140,7 +140,7 @@ void Block_HighlightFace(bitmap Buffer, camera Camera, ivec3 iBlockPosition, u32
 
 
 
-bool View_ChunkisLoaded(const view *View, ivec2 ChunkPosition)
+bool View_ChunkIsLoaded(const view *View, ivec2 ChunkPosition)
 {
     if (ChunkPosition.x < (View->Position.x - LOADED_CHUNKS_DIST) ||
         ChunkPosition.y < (View->Position.y - LOADED_CHUNKS_DIST) ||
@@ -152,7 +152,7 @@ bool View_ChunkisLoaded(const view *View, ivec2 ChunkPosition)
 
 view_chunk *View_GetChunk(view *View, ivec2 ChunkPosition)
 {
-    if (!View_ChunkisLoaded(View, ChunkPosition))
+    if (!View_ChunkIsLoaded(View, ChunkPosition))
         return 0;
 
     ivec2 ViewPosition = iVec2_And(ChunkPosition, iVec2_Set1(LOADED_CHUNKS_DIM_MASK));
@@ -161,7 +161,7 @@ view_chunk *View_GetChunk(view *View, ivec2 ChunkPosition)
 
 const view_chunk *View_GetConstChunk(const view *View, ivec2 ChunkPosition)
 {
-    if (!View_ChunkisLoaded(View, ChunkPosition))
+    if (!View_ChunkIsLoaded(View, ChunkPosition))
         return 0;
 
     ivec2 ViewPosition = iVec2_And(ChunkPosition, iVec2_Set1(LOADED_CHUNKS_DIM_MASK));
