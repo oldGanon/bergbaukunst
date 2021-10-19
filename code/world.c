@@ -52,7 +52,6 @@ void World_Update(world* World, vec3 PlayerPosition)
 
         Chunk = ChunkMap_AllocateChunk(&World->ChunkMap, ChunkPos);
         WorldGen_GenerateChunk(Chunk);
-        Chunk_CalcSkyLight(Chunk);
     }
 
     // entities

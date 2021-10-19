@@ -28,6 +28,10 @@ typedef struct world_gen
 	u64 MountainSeed;
 	u64 BiomeContourSeedX;
 	u64 BiomeContourSeedY;
+
+	u64 LowNoise;
+	u64 HighNoise;
+	u64 SelectorNoise;
 } world_gen;
 
 global world_gen GlobalWorldGen;
@@ -68,11 +72,26 @@ f32 WorldGen_MountainNoise(vec2 Position)
 	return WorldGen_Noise(GlobalWorldGen.MountainSeed, Position, 64, 96, 0.25f);
 }
 
-// u32 WordlGen_CellBiome(ivec2 Cell)
-// {
-// 	u64 Continent = Hash_IVec2(iVec2_And(Cell, iVec2_Set1(~0xFF)));
-	
-// }
+u32 WordlGen_CellBiome(ivec2 Cell)
+{
+	u64 Continent = Hash_IVec2(iVec2_And(Cell, iVec2_Set1(~0xFF)));	
+
+	return 0;
+}
+
+void WorldGen_Chunk(chunk *Chunk)
+{
+	u32 CellBiomes[5][5];
+	for (u32 y = 0; y < 5; ++y)
+	for (u32 x = 0; x < 5; ++x)
+	{
+		ivec2 Cell = iVec2_Add(iVec2_Sub(Chunk->Position, iVec2_Set1(2)), (ivec2){x,y});
+		CellBiomes[y][x] = WordlGen_CellBiome(Cell);
+	}
+}
+
+global f32 MINIMUM_LOW = 11111;
+global f32 MINIMUM_HIGH = 11111;
 
 void WorldGen_GenerateChunk(chunk *Chunk)
 {
@@ -81,7 +100,7 @@ void WorldGen_GenerateChunk(chunk *Chunk)
     {
         vec2 p = (vec2){ (f32)(Chunk->Position.x * CHUNK_WIDTH + xx),
                          (f32)(Chunk->Position.y * CHUNK_WIDTH + yy) };
-#if 1
+#if 0
         u32 BiomeSize = 64;
 		vec2 BiomeSize2 = Vec2_Set1((f32)BiomeSize);
 		vec2 BiomePosition = Vec2_Div(p, BiomeSize2);
@@ -146,20 +165,38 @@ void WorldGen_GenerateChunk(chunk *Chunk)
             Chunk->Blocks[zz][yy][xx] = Block;
         }
 #else
-        f32 DistanceBetweenPeaks = 128.0f;
-        f32 SeaLevel = 64;
-        f32 PeakHeight = 96;
+        p = Vec2_Div(p, (vec2){384.0f,384.0f});
 
-        p = Vec2_Mul(p, Vec2_Set1(1.0f / DistanceBetweenPeaks));
-
-        u32 Octaves = 7; // Log2(DistanceBetweenPeaks)
-        f32 Surface = Lerp(SeaLevel, PeakHeight, Noise_FBM2D(0, p, Octaves));
+        f32 LowNoise = Lerp(64.0f, 80.0f, Noise_FBM2D(GlobalWorldGen.LowNoise, p, 16));
+        f32 HighNoise = Lerp(96.0f, 128.0f, Noise_FBM2D(GlobalWorldGen.HighNoise, p, 16));
         
-        i32 iSurface = F32_FloorToI32(Surface);
-        for (i32 zz = iSurface; zz >= 0; --zz)
+        for (u32 zz = 0; zz < CHUNK_HEIGHT; ++zz)
         {
+        	vec3 pp = (vec3){ (f32)(Chunk->Position.x * CHUNK_WIDTH + xx),
+            	              (f32)(Chunk->Position.y * CHUNK_WIDTH + yy),
+            	              (f32)zz };
             block *CurrentBlock = &Chunk->Blocks[zz][yy][xx];
-            CurrentBlock->Id = BLOCK_ID_GRAS;
+
+        	pp = Vec3_Div(pp, (vec3){128.0f,128.0f,256.0f});
+
+        	f32 SelectorNoise = Clamp((Noise_FBM3D(GlobalWorldGen.SelectorNoise, pp, 4) - 0.0f) * 2.0f, 0, 1);
+        	f32 Surface = Lerp(LowNoise, HighNoise, F32_Smootherstep(SelectorNoise));
+        	if (zz < Surface) CurrentBlock->Id = BLOCK_ID_STONE;
+
+
+			MINIMUM_LOW = Min(MINIMUM_LOW, LowNoise);
+			MINIMUM_HIGH = Min(MINIMUM_HIGH, HighNoise);
+        }
+
+        for (i32 zz = CHUNK_HEIGHT - 1; zz >= 64; --zz)
+        {
+            if (Chunk->Blocks[zz][yy][xx].Id != BLOCK_ID_STONE) continue;
+        	Chunk->Blocks[zz][yy][xx].Id = BLOCK_ID_GRAS;
+            if (Chunk->Blocks[zz-1][yy][xx].Id != BLOCK_ID_STONE) break;
+        	Chunk->Blocks[zz-1][yy][xx].Id = BLOCK_ID_DIRT;
+            if (Chunk->Blocks[zz-2][yy][xx].Id != BLOCK_ID_STONE) break;
+        	Chunk->Blocks[zz-2][yy][xx].Id = BLOCK_ID_DIRT;
+        	break;
         }
 #endif
     }
@@ -177,4 +214,8 @@ void WorldGen_Init(void)
 	GlobalWorldGen.MountainSeed = Rng_U64(&Rng);
 	GlobalWorldGen.BiomeContourSeedX = Rng_U64(&Rng);
 	GlobalWorldGen.BiomeContourSeedY = Rng_U64(&Rng);
+
+	GlobalWorldGen.LowNoise = Rng_U64(&Rng);
+	GlobalWorldGen.HighNoise = Rng_U64(&Rng);
+	GlobalWorldGen.SelectorNoise = Rng_U64(&Rng);
 }

@@ -7,7 +7,10 @@ inline u64 Hash_U64Inverse(u64 x);
 inline u64 Hash_U64Seeded(u64 Seed, u64 x);
 inline u64 Hash_IVec2(ivec2 v);
 inline u64 Hash_IVec2Seeded(u64 Seed, ivec2 v);
+inline u64 Hash_IVec3(ivec3 v);
+inline u64 Hash_IVec3Seeded(u64 Seed, ivec3 v);
 inline u64 Hash_Bytes(const void *Data, size Length);
+inline u64 Hash_BytesSeeded(u64 Seed, const void *Data, size Length);
 inline f32 Hash_toF32(u64 Hash);
 inline f64 Hash_toF64(u64 Hash);
 inline vec2 Hash_toVec2(u64 Hash);
@@ -90,10 +93,29 @@ inline u64 Hash_IVec2Seeded(u64 Seed, ivec2 v)
     return Hash_U64(x);
 }
 
+inline u64 Hash_IVec3(ivec3 v)
+{
+    return Hash_Bytes(v.E, 12);
+}
+
+inline u64 Hash_IVec3Seeded(u64 Seed, ivec3 v)
+{
+    return Hash_BytesSeeded(Seed, v.E, 12);
+}
+
 inline u64 Hash_Bytes(const void *Data, size Length)
 {
     // FNV1a
     u64 Hash = 14695981039346656037U;
+    const u8 *Bytes = Data;
+    while (Length--) Hash = (Hash ^ *Bytes++) * 1099511628211U;
+    return Hash;
+}
+
+inline u64 Hash_BytesSeeded(u64 Seed, const void *Data, size Length)
+{
+    // FNV1a
+    u64 Hash = Seed;
     const u8 *Bytes = Data;
     while (Length--) Hash = (Hash ^ *Bytes++) * 1099511628211U;
     return Hash;

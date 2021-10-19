@@ -5,7 +5,7 @@ typedef struct view_chunk
 {
 	chunk Chunk;
 	quad_mesh Mesh;
-	bool MeshDirty;
+	bool Dirty;
 } view_chunk;
 
 typedef struct view_entity
@@ -150,7 +150,7 @@ bool View_ChunkIsLoaded(const view *View, ivec2 ChunkPosition)
     return true;
 }
 
-view_chunk *View_GetChunk(view *View, ivec2 ChunkPosition)
+view_chunk *View_GetViewChunk(view *View, ivec2 ChunkPosition)
 {
     if (!View_ChunkIsLoaded(View, ChunkPosition))
         return 0;
@@ -159,7 +159,7 @@ view_chunk *View_GetChunk(view *View, ivec2 ChunkPosition)
 	return &View->Chunks[ViewPosition.y][ViewPosition.x];
 }
 
-const view_chunk *View_GetConstChunk(const view *View, ivec2 ChunkPosition)
+const view_chunk *View_GetConstViewChunk(const view *View, ivec2 ChunkPosition)
 {
     if (!View_ChunkIsLoaded(View, ChunkPosition))
         return 0;
@@ -168,10 +168,24 @@ const view_chunk *View_GetConstChunk(const view *View, ivec2 ChunkPosition)
     return &View->Chunks[ViewPosition.y][ViewPosition.x];
 }
 
+chunk *View_GetChunk(view *View, ivec2 ChunkPosition)
+{
+    view_chunk *ViewChunk = View_GetViewChunk(View, ChunkPosition);
+    if (ViewChunk) return &ViewChunk->Chunk;
+    return 0;
+}
+
+const chunk *View_GetConstChunk(const view *View, ivec2 ChunkPosition)
+{
+    const view_chunk *ViewChunk = View_GetConstViewChunk(View, ChunkPosition);
+    if (ViewChunk) return &ViewChunk->Chunk;
+    return 0;
+}
+
 void View_MarkChunkDirty(view *View, ivec2 ChunkPosition)
 {
-	view_chunk *Chunk = View_GetChunk(View, ChunkPosition);
-    if (Chunk) Chunk->MeshDirty = true;
+	view_chunk *Chunk = View_GetViewChunk(View, ChunkPosition);
+    if (Chunk) Chunk->Dirty = true;
 }
 
 block View_GetBlock(const view *View, ivec3 WorldPosition)
@@ -180,9 +194,9 @@ block View_GetBlock(const view *View, ivec3 WorldPosition)
     if (WorldPosition.z > CHUNK_HEIGHT - 1) return DEFAULT_HELL_BLOCK;
 
     ivec2 ChunkPosition = World_ToChunkPosition(WorldPosition);
-    const view_chunk *Chunk = View_GetConstChunk(View, ChunkPosition);
+    const chunk *Chunk = View_GetConstChunk(View, ChunkPosition);
     if (!Chunk) return DEFAULT_BLOCK;
-    return Chunk_GetBlock(&Chunk->Chunk, WorldPosition);
+    return Chunk_GetBlock(Chunk, WorldPosition);
 }
 
 void View_SetBlock(view *View, ivec3 WorldPosition, block Block)
@@ -191,40 +205,56 @@ void View_SetBlock(view *View, ivec3 WorldPosition, block Block)
         return;
 
     ivec2 ChunkPosition = World_ToChunkPosition(WorldPosition);
-    view_chunk *Chunk = View_GetChunk(View, ChunkPosition);
+    chunk *Chunk = View_GetChunk(View, ChunkPosition);
     if (!Chunk) return;
-    Chunk_SetBlock(&Chunk->Chunk, WorldPosition, Block);
+    Chunk_SetBlock(Chunk, WorldPosition, Block);
 
-    View_MarkChunkDirty(View, ChunkPosition);
-    ivec3 BlockPosition = World_ToBlockPosition(WorldPosition);
-    if ((BlockPosition.x == 0))
-    	View_MarkChunkDirty(View, iVec2_Add(ChunkPosition, (ivec2){-1,0}));
-    if ((BlockPosition.y == 0))
-    	View_MarkChunkDirty(View, iVec2_Add(ChunkPosition, (ivec2){0,-1}));
-    if ((BlockPosition.x == CHUNK_WIDTH - 1))
-    	View_MarkChunkDirty(View, iVec2_Add(ChunkPosition, (ivec2){+1,0}));
-    if ((BlockPosition.y == CHUNK_WIDTH - 1))
-    	View_MarkChunkDirty(View, iVec2_Add(ChunkPosition, (ivec2){0,+1}));
-    if ((BlockPosition.x == 0) && (BlockPosition.y == 0))
-    	View_MarkChunkDirty(View, iVec2_Add(ChunkPosition, (ivec2){-1,-1}));
-    if ((BlockPosition.x == 0) && (BlockPosition.y == CHUNK_WIDTH - 1))
-    	View_MarkChunkDirty(View, iVec2_Add(ChunkPosition, (ivec2){-1,+1}));
-    if ((BlockPosition.x == CHUNK_WIDTH - 1) && (BlockPosition.y == 0))
-    	View_MarkChunkDirty(View, iVec2_Add(ChunkPosition, (ivec2){+1,-1}));
-    if ((BlockPosition.x == CHUNK_WIDTH - 1) && (BlockPosition.y == CHUNK_WIDTH - 1))
-    	View_MarkChunkDirty(View, iVec2_Add(ChunkPosition, (ivec2){+1,+1}));
+    // mark chunks dirty
+    for (i32 y = -1; y <= 1; ++y)
+    for (i32 x = -1; x <= 1; ++x)
+    {
+        ivec2 Offset = { x, y };
+        ivec2 ChunkPos = iVec2_Add(ChunkPosition, Offset);
+        View_MarkChunkDirty(View, ChunkPos);
+    }
 }
 
 #include "meshgen.c"
 
+void View_GenerateChunkVisuals(view *View, ivec2 ChunkPosition)
+{
+    for (i32 y = -1; y <= 1; ++y)
+    for (i32 x = -1; x <= 1; ++x)
+    {
+        ivec2 Offset = { x, y };
+        ivec2 ChunkPos = iVec2_Add(ChunkPosition, Offset);
+        view_chunk *ViewChunk = View_GetViewChunk(View, ChunkPos);
+        if (!ViewChunk) continue;
+
+        padded_chunk PaddedChunk;
+        Chunk_Pad(View_GetConstChunk, View, ChunkPos, &PaddedChunk);
+        Chunk_CalcLight(&PaddedChunk);
+        PaddedChunk_ExtractChunk(&PaddedChunk, &ViewChunk->Chunk);
+    }
+
+    for (i32 y = -1; y <= 1; ++y)
+    for (i32 x = -1; x <= 1; ++x)
+    {
+        ivec2 Offset = { x, y };
+        ivec2 ChunkPos = iVec2_Add(ChunkPosition, Offset);
+        view_chunk *ViewChunk = View_GetViewChunk(View, ChunkPos);
+        if (!ViewChunk) continue;
+        
+        View_GenerateChunkMesh(View, ChunkPos);
+        ViewChunk->Dirty = false;
+    }
+}
+
 void View_DrawChunk(view *View, ivec2 ChunkPosition, const bitmap Target, bitmap TerrainTexture, const camera Camera)
 {
-	view_chunk *Chunk = View_GetChunk(View, ChunkPosition);
+	view_chunk *Chunk = View_GetViewChunk(View, ChunkPosition);
 	if (!Chunk) return;
-    if (Chunk->MeshDirty)
-    {
-        View_GenerateChunkMesh(View, ChunkPosition);
-    }
+    if (Chunk->Dirty) View_GenerateChunkVisuals(View, ChunkPosition);
 
     box ChunkBox = Chunk_Box(&Chunk->Chunk);
     if (!Camera_BoxVisible(Camera, Target, ChunkBox)) return;
@@ -304,25 +334,23 @@ void View_SetPosition(view *View, ivec2 Position)
 
 void View_SetChunk(view *View, const msg_chunk_data *ChunkData)
 {
+    // copy data
     ivec2 ChunkPosition = ChunkData->Position;
-    view_chunk *Chunk = View_GetChunk(View, ChunkPosition);
+    chunk *Chunk = View_GetChunk(View, ChunkPosition);
     if (!Chunk) return;
     for (u32 z = 0; z < CHUNK_HEIGHT; ++z)
     for (u32 y = 0; y < CHUNK_WIDTH; ++y)
     for (u32 x = 0; x < CHUNK_WIDTH; ++x)
-    {
-        Chunk->Chunk.Blocks[z][y][x].Id = ChunkData->Blocks[z][y][x];
-    }
-    Chunk->Chunk.Position = ChunkPosition;
-    Chunk_CalcSkyLight(&Chunk->Chunk);
+        Chunk->Blocks[z][y][x].Id = ChunkData->Blocks[z][y][x];
+    Chunk->Position = ChunkPosition;
 
+    // mark chunks dirty
     for (i32 y = -1; y <= 1; ++y)
     for (i32 x = -1; x <= 1; ++x)
     {
         ivec2 Offset = { x, y };
-        Chunk = View_GetChunk(View, iVec2_Add(ChunkPosition, Offset));
-        if (!Chunk) continue;
-        Chunk->MeshDirty = true;
+        ivec2 ChunkPos = iVec2_Add(ChunkPosition, Offset);
+        View_MarkChunkDirty(View, ChunkPos);
     }
 }
 

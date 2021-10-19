@@ -2,7 +2,6 @@
 typedef struct block
 {
     u8 Id;
-    u8 Shadow;
 } block;
 
 bool Block_BoxIntersect(block Block, ivec3 BlockPosition, box Box);
@@ -74,11 +73,6 @@ const ivec3 iBlockFace_Normal[7] = {
     [BLOCK_FACE_BOTTOM] = { 0, 0,-1 },
     [BLOCK_FACE_TOP]    = { 0, 0,+1 },
 };
-
-typedef struct block_group
-{
-    block Blocks[3][3][3];
-} block_group;
 
 
 

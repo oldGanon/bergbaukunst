@@ -98,6 +98,8 @@ inline f32 F32_Min(f32 A, f32 B) { return _mm_cvtss_f32(_mm_min_ps(_mm_set_ss(A)
 inline f32 F32_Max(f32 A, f32 B) { return _mm_cvtss_f32(_mm_max_ps(_mm_set_ss(A), _mm_set_ss(B))); }
 inline f32 F32_Clamp(f32 A, f32 min, f32 max) { return F32_Min(F32_Max(A, min), max); }
 inline f32 F32_Modulo(f32 N, f32 D) { return N - D * F32_Floor(N / D); }
+inline f32 F32_Smoothstep(f32 x) { return F32_Clamp(x*x*(3-2*x), 0, 1); }
+inline f32 F32_Smootherstep(f32 x) { return F32_Clamp(x*x*x*(x*(x*6-15)+10), 0, 1); }
 
 f32 Sin(f32 x)
 {
@@ -246,7 +248,7 @@ inline f32 Vec2_Dot(vec2 A, vec2 B)
 #define LOAD_VEC3(V) _mm_loadu_ps(V.E)
 #define STORE_VEC3(V,M) _mm_storeu_ps(V.E,M)
 inline vec3 Vec3_Zero(void) { vec3 B; STORE_VEC3(B, _mm_setzero_ps()); return B; }
-inline vec3 Vec3_Set1(f32 A) { vec3 B; STORE_VEC3(B, _mm_set1_ps(A)); return B; }
+inline vec3 Vec3_Set1(f32 A) { vec3 B; STORE_VEC3(B, _mm_set_ps(0,A,A,A)); return B; }
 inline vec3 Vec3_Add(vec3 A, vec3 B) { STORE_VEC3(A, _mm_add_ps(LOAD_VEC3(A), LOAD_VEC3(B))); return A; }
 inline vec3 Vec3_Sub(vec3 A, vec3 B) { STORE_VEC3(A, _mm_sub_ps(LOAD_VEC3(A), LOAD_VEC3(B))); return A; }
 inline vec3 Vec3_Mul(vec3 A, vec3 B) { STORE_VEC3(A, _mm_mul_ps(LOAD_VEC3(A), LOAD_VEC3(B))); return A; }
@@ -273,6 +275,7 @@ inline vec3 Vec3_Modulo(vec3 N, vec3 D) { return Vec3_Sub(N, Vec3_Mul(D, Vec3_Fl
 inline f32 Vec3_Sum(vec3 A)
 {
     __m128 V = LOAD_VEC3(A);
+    V = _mm_and_ps(V, _mm_castsi128_ps(_mm_set_epi32(0,0xFFFFFFFF,0xFFFFFFFF,0xFFFFFFFF)));
     __m128 Shf = _mm_movehdup_ps(V);
     __m128 Sum = _mm_add_ps(V, Shf);
     Shf = _mm_movehl_ps(Shf, Sum);
@@ -283,6 +286,7 @@ inline f32 Vec3_Sum(vec3 A)
 inline f32 Vec3_LengthSq(vec3 A)
 {
     __m128 V = LOAD_VEC3(A);
+    V = _mm_and_ps(V, _mm_castsi128_ps(_mm_set_epi32(0,0xFFFFFFFF,0xFFFFFFFF,0xFFFFFFFF)));
     V = _mm_mul_ps(V, V);
     __m128 Shf = _mm_movehdup_ps(V);
     __m128 Sum = _mm_add_ps(V, Shf);
@@ -294,6 +298,7 @@ inline f32 Vec3_LengthSq(vec3 A)
 inline f32 Vec3_Length(vec3 A)
 {
     __m128 V = LOAD_VEC3(A);
+    V = _mm_and_ps(V, _mm_castsi128_ps(_mm_set_epi32(0,0xFFFFFFFF,0xFFFFFFFF,0xFFFFFFFF)));
     V = _mm_mul_ps(V, V);
     __m128 Shf = _mm_movehdup_ps(V);
     __m128 Sum = _mm_add_ps(V, Shf);
@@ -305,6 +310,7 @@ inline f32 Vec3_Length(vec3 A)
 inline vec3 Vec3_Normalize(vec3 A)
 {
     __m128 V = LOAD_VEC3(A);
+    V = _mm_and_ps(V, _mm_castsi128_ps(_mm_set_epi32(0,0xFFFFFFFF,0xFFFFFFFF,0xFFFFFFFF)));
     if (_mm_test_all_zeros(_mm_castps_si128(V), _mm_set1_epi32(0x7FFFFFFF))) return A;
     __m128 VV = _mm_mul_ps(V, V);
     __m128 Shf = _mm_movehdup_ps(VV);
@@ -321,6 +327,7 @@ inline vec3 Vec3_Normalize(vec3 A)
 inline f32 Vec3_Dot(vec3 A, vec3 B)
 {
     __m128 V = _mm_mul_ps(LOAD_VEC3(A), LOAD_VEC3(B));
+    V = _mm_and_ps(V, _mm_castsi128_ps(_mm_set_epi32(0,0xFFFFFFFF,0xFFFFFFFF,0xFFFFFFFF)));
     __m128 Shf = _mm_movehdup_ps(V);
     __m128 Sum = _mm_add_ps(V, Shf);
     Shf = _mm_movehl_ps(Shf, Sum);

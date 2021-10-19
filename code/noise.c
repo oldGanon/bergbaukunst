@@ -42,18 +42,6 @@ global const noise Noise_Default = {
     }
 };
 #if 0
-global const vec3 Noise_grad3lut[16] = {
-  { 1.0f, 0.0f, 1.0f }, { 0.0f, 1.0f, 1.0f },
-  {-1.0f, 0.0f, 1.0f }, { 0.0f,-1.0f, 1.0f },
-  { 1.0f, 0.0f,-1.0f }, { 0.0f, 1.0f,-1.0f },
-  {-1.0f, 0.0f,-1.0f }, { 0.0f,-1.0f,-1.0f },
-  { 1.0f,-1.0f, 0.0f }, { 1.0f, 1.0f, 0.0f },
-  {-1.0f, 1.0f, 0.0f }, {-1.0f,-1.0f, 0.0f },
-
-  { 1.0f, 0.0f, 1.0f }, {-1.0f, 0.0f, 1.0f },
-  { 0.0f, 1.0f,-1.0f }, { 0.0f,-1.0f,-1.0f }
-};
-
 global const vec4 Noise_grad4lut[32] = {
   { 0.0f, 1.0f, 1.0f, 1.0f }, { 0.0f, 1.0f, 1.0f,-1.0f }, { 0.0f, 1.0f,-1.0f, 1.0f }, { 0.0f, 1.0f,-1.0f,-1.0f },
   { 0.0f,-1.0f, 1.0f, 1.0f }, { 0.0f,-1.0f, 1.0f,-1.0f }, { 0.0f,-1.0f,-1.0f, 1.0f }, { 0.0f,-1.0f,-1.0f,-1.0f },
@@ -76,6 +64,7 @@ global const u8 Noise_simplex[64][4] = {
     {2,1,0,3},{0,0,0,0},{0,0,0,0},{0,0,0,0},{3,1,0,2},{0,0,0,0},{3,2,0,1},{3,2,1,0}
 };
 #endif
+
 inline f32 Noise_grad1(u32 hash)
 {
     u32 h = hash & 15;
@@ -87,6 +76,18 @@ inline f32 Noise_grad1(u32 hash)
 global const vec2 Noise_grad2[8] = {
   {-1.0f,-1.0f }, { 1.0f, 0.0f }, {-1.0f, 0.0f }, { 1.0f, 1.0f },
   {-1.0f, 1.0f }, { 0.0f,-1.0f }, { 0.0f, 1.0f }, { 1.0f,-1.0f }
+};
+
+global const vec3 Noise_grad3[16] = {
+  { 1.0f, 0.0f, 1.0f }, { 0.0f, 1.0f, 1.0f },
+  {-1.0f, 0.0f, 1.0f }, { 0.0f,-1.0f, 1.0f },
+  { 1.0f, 0.0f,-1.0f }, { 0.0f, 1.0f,-1.0f },
+  {-1.0f, 0.0f,-1.0f }, { 0.0f,-1.0f,-1.0f },
+  { 1.0f,-1.0f, 0.0f }, { 1.0f, 1.0f, 0.0f },
+  {-1.0f, 1.0f, 0.0f }, {-1.0f,-1.0f, 0.0f },
+
+  { 1.0f, 0.0f, 1.0f }, {-1.0f, 0.0f, 1.0f },
+  { 0.0f, 1.0f,-1.0f }, { 0.0f,-1.0f,-1.0f }
 };
 
 #if 0
@@ -236,103 +237,115 @@ f32 Noise_Simplex2D(u64 Seed, vec2 p, vec2 *grad)
     return SCALE * (n0 + n1 + n2);
 }
 
-#if 0
-
-f32 Noise_Simplex3D(vec3 p)
+f32 Noise_Simplex3D(u64 Seed, vec3 p)
 {
+    const f32 SCALE = 28.0f;
     const f32 F3 = 0.333333333f;
     const f32 G3 = 0.166666667f;
 
-    f32 x = p.x;
-    f32 y = p.y;
-    f32 z = p.z;
+    // skew to regular grid coordinates
+    vec3 s = Vec3_Set1(Vec3_Sum(p) * F3);
+    vec3 ps = Vec3_Floor(Vec3_Add(p, s));
 
-    f32 s = (x + y + z) * F3;
-    f32 xs = x + s;
-    f32 ys = y + s;
-    f32 zs = z + s;
-    i32 i = F32_FloorToI32(xs);
-    i32 j = F32_FloorToI32(ys);
-    i32 k = F32_FloorToI32(zs);
-
-    f32 t = (f32)(i + j + k) * G3;
-    f32 X0 = i - t;
-    f32 Y0 = j - t;
-    f32 Z0 = k - t;
-    f32 x0 = x - X0;
-    f32 y0 = y - Y0;
-    f32 z0 = z - Z0;
-
-    i32 i1, j1, k1;
-    i32 i2, j2, k2;
-
-    /* This code would benefit from a backport from the GLSL version! */
-    if(x0 >= y0)
+    // unskew to simplex grid coordinates
+    vec3 u = Vec3_Set1(Vec3_Sum(ps) * G3);
+    vec3 pu = Vec3_Sub(ps, u);
+    
+    // positions relative to simplex vertices 
+    vec3 p0 = Vec3_Sub(p, pu);
+    ivec3 ijk1;
+    ivec3 ijk2;
+    if(p0.x >= p0.y)
     {
-        if (y0>=z0){i1=1; j1=0; k1=0; i2=1; j2=1; k2=0;} // X Y Z order
-        else if (x0>=z0) { i1=1; j1=0; k1=0; i2=1; j2=0; k2=1; } // X Z Y order
-        else { i1=0; j1=0; k1=1; i2=1; j2=0; k2=1; } // Z X Y order
+        if (p0.y >= p0.z)
+        {
+            ijk1 = (ivec3) {1,0,0};
+            ijk2 = (ivec3) {1,1,0};
+        }// X Y Z order
+        else if (p0.x >= p0.z)
+        {
+            ijk1 = (ivec3) {1,0,0};
+            ijk2 = (ivec3) {1,0,1};
+        } // X Z Y order
+        else
+        {
+            ijk1 = (ivec3) {0,0,1};
+            ijk2 = (ivec3) {1,0,1};
+        } // Z X Y order
     }
     else
     {
-        if (y0<z0) { i1=0; j1=0; k1=1; i2=0; j2=1; k2=1; } // Z Y X order
-        else if (x0<z0) { i1=0; j1=1; k1=0; i2=0; j2=1; k2=1; } // Y Z X order
-        else { i1=0; j1=1; k1=0; i2=1; j2=1; k2=0; } // Y X Z order
+        if (p0.y < p0.z)
+        {
+            ijk1 = (ivec3) {0,0,1};
+            ijk2 = (ivec3) {0,1,1};
+        } // Z Y X order
+        else if (p0.x < p0.z)
+        {
+            ijk1 = (ivec3) {0,1,0};
+            ijk2 = (ivec3) {0,1,1};
+        } // Y Z X order
+        else
+        {
+            ijk1 = (ivec3) {0,1,0};
+            ijk2 = (ivec3) {1,1,0};
+        } // Y X Z order
     }
+    vec3 p1 = Vec3_Add(Vec3_Sub(p0, iVec3_toVec3(ijk1)), Vec3_Set1(G3));
+    vec3 p2 = Vec3_Add(Vec3_Sub(p0, iVec3_toVec3(ijk2)), Vec3_Set1(2.0f * G3));
+    vec3 p3 = Vec3_Add(p0, Vec3_Set1(-1.0f + 3.0f * G3));
 
-    f32 x1 = x0 - i1 + G3;
-    f32 y1 = y0 - j1 + G3;
-    f32 z1 = z0 - k1 + G3;
-    f32 x2 = x0 - i2 + 2.0f * G3;
-    f32 y2 = y0 - j2 + 2.0f * G3;
-    f32 z2 = z0 - k2 + 2.0f * G3;
-    f32 x3 = x0 - 1.0f + 3.0f * G3;
-    f32 y3 = y0 - 1.0f + 3.0f * G3;
-    f32 z3 = z0 - 1.0f + 3.0f * G3;
+    // simplex indices
+    ivec3 ip0 = Vec3_toIVec3(ps);
+    ivec3 ip1 = iVec3_Add(ip0, ijk1);
+    ivec3 ip2 = iVec3_Add(ip0, ijk2);
+    ivec3 ip3 = iVec3_Add(ip0, iVec3_Set1(1));
 
-    u8 ii = i & 0xFF;
-    u8 jj = j & 0xFF;
-    u8 kk = k & 0xFF;
+    // hashes
+    u64 h0 = Hash_IVec3Seeded(Seed, ip0);
+    u64 h1 = Hash_IVec3Seeded(Seed, ip1);
+    u64 h2 = Hash_IVec3Seeded(Seed, ip2);
+    u64 h3 = Hash_IVec3Seeded(Seed, ip3);
 
-    f32 n0 = 0.0f;
-    f32 t0 = 0.6f - x0*x0 - y0*y0 - z0*z0;
-    if (t0 >= 0.0f)
-    {
-        f32 t02 = t0 * t0;
-        f32 t04 = t02 * t02;
-        n0 = t04 * grad3(perm[ii+perm[jj+perm[kk]]], x0, y0, z0);
-    }
+    // gradients
+    vec3 g0 = Noise_grad3[h0 & 15];
+    vec3 g1 = Noise_grad3[h1 & 15];
+    vec3 g2 = Noise_grad3[h2 & 15];
+    vec3 g3 = Noise_grad3[h3 & 15];
 
-    f32 n1 = 0.0f;
-    f32 t1 = 0.6f - x1*x1 - y1*y1 - z1*z1;
-    if (t1 >= 0.0f)
-    {
-        f32 t12 = t1 * t1;
-        f32 t14 = t12 * t12;
-        n1 = t14 * grad3(perm[ii+i1+perm[jj+j1+perm[kk+k1]]], x1, y1, z1);
-    }
+    // values
+    f32 v0 = Vec3_Dot(g0, p0);
+    f32 v1 = Vec3_Dot(g1, p1);
+    f32 v2 = Vec3_Dot(g2, p2);
+    f32 v3 = Vec3_Dot(g3, p3);
 
-    f32 n2 = 0.0f;
-    f32 t2 = 0.6f - x2*x2 - y2*y2 - z2*z2;
-    if (t2 >= 0.0f)
-    {
-        f32 t22 = t2 * t2;
-        f32 t24 = t22 * t22;
-        n2 = t24 * grad3(perm[ii+i2+perm[jj+j2+perm[kk+k2]]], x2, y2, z2);
-    }
+    // interpolation values
+    f32 t0 = Max(0.0f, 0.6f - Vec3_LengthSq(p0));
+    f32 t0_2 = t0 * t0;
+    f32 t0_4 = t0_2 * t0_2;
 
-    f32 n3 = 0.0f;
-    f32 t3 = 0.6f - x3*x3 - y3*y3 - z3*z3;
-    if (t3 >= 0.0f)
-    {
-        f32 t32 = t3 * t3;
-        f32 t34 = t32 * t32;
-        n3 = t34 * grad3(perm[ii+1+perm[jj+1+perm[kk+1]]], x3, y3, z3);
-    }
+    f32 t1 = Max(0.0f, 0.6f - Vec3_LengthSq(p1));
+    f32 t1_2 = t1 * t1;
+    f32 t1_4 = t1_2 * t1_2;
 
-    return 28.0f * (n0 + n1 + n2 + n3);
+    f32 t2 = Max(0.0f, 0.6f - Vec3_LengthSq(p2));
+    f32 t2_2 = t2 * t2;
+    f32 t2_4 = t2_2 * t2_2;
+
+    f32 t3 = Max(0.0f, 0.6f - Vec3_LengthSq(p3));
+    f32 t3_2 = t3 * t3;
+    f32 t3_4 = t3_2 * t3_2;
+
+    // simplex vertex contributions
+    f32 n0 = t0_4 * v0;
+    f32 n1 = t1_4 * v1;
+    f32 n2 = t2_4 * v2;
+    f32 n3 = t3_4 * v3;
+
+    return SCALE * (n0 + n1 + n2 + n3);
 }
 
+#if 0
 
 f32 Noise_Simplex4D(f32 x, f32 y, f32 z, f32 w)
 {
@@ -461,6 +474,20 @@ f32 Noise_FBM2D(u64 Seed, vec2 Position, u32 Octaves)
     {
         Result += Amplitude * Noise_Simplex2D(Seed, Position, 0);
         Position = Vec2_Mul(Position, Vec2_Set1(2.0f));
+        Amplitude *= 0.5f;
+    }
+    return Result;
+}
+
+f32 Noise_FBM3D(u64 Seed, vec3 Position, u32 Octaves)
+{
+    f32 Result = 0.0f;
+    f32 Amplitude = 1.0f;
+
+    for (u32 i = 0; i < Octaves; ++i)
+    {
+        Result += Amplitude * Noise_Simplex3D(Seed, Position);
+        Position = Vec3_Mul(Position, Vec3_Set1(2.0f));
         Amplitude *= 0.5f;
     }
     return Result;

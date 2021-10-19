@@ -12,6 +12,7 @@ typedef struct chunk
     ivec2 Position;
 
     block Blocks[CHUNK_HEIGHT][CHUNK_WIDTH][CHUNK_WIDTH];
+    u8 Shades[CHUNK_HEIGHT][CHUNK_WIDTH][CHUNK_WIDTH];
 } chunk;
 
 void Chunk_Init(chunk *Chunk, ivec2 Position);
@@ -22,9 +23,9 @@ void Chunk_CalcSkyLight(chunk *Chunk);
 box Chunk_Box(chunk *Chunk);
 box Chunk_BoxIntersection(chunk *Chunk, const box Box);
 
-#define DEFAULT_BLOCK (block){ .Id = BLOCK_ID_AIR, .Shadow = 0x0 }
-#define DEFAULT_SKY_BLOCK (block){ .Id = BLOCK_ID_AIR, .Shadow = 0x0 }
-#define DEFAULT_HELL_BLOCK (block){ .Id = BLOCK_ID_AIR, .Shadow = 0xF }
+#define DEFAULT_BLOCK (block){ .Id = BLOCK_ID_AIR }
+#define DEFAULT_SKY_BLOCK (block){ .Id = BLOCK_ID_AIR }
+#define DEFAULT_HELL_BLOCK (block){ .Id = BLOCK_ID_AIR }
 
 /******************/
 /* IMPLEMENTATION */
@@ -41,22 +42,161 @@ inline ivec2 World_ToChunkPosition(ivec3 WorldPosition)
     return iVec2_ShiftRight(WorldPosition.xy, CHUNK_WIDTH_SHIFT);
 }
 
-void Chunk_CalcSkyLight(chunk *Chunk)
+/******************/
+/*  PADDED CHUNK  */
+/******************/
+
+typedef struct block_group
 {
-    for (i32 y = 0; y < CHUNK_WIDTH; y++)
-    for (i32 x = 0; x < CHUNK_WIDTH; x++)
+    block Blocks[3][3][3];
+    u8 Shades[3][3][3];
+} block_group;
+
+typedef struct padded_chunk
+{
+    block Blocks[CHUNK_HEIGHT+2][CHUNK_WIDTH+2][CHUNK_WIDTH+2];
+    u8 Shades[CHUNK_HEIGHT+2][CHUNK_WIDTH+2][CHUNK_WIDTH+2];
+} padded_chunk;
+
+typedef const chunk *get_chunk_func(const void *Data, ivec2 Position);
+
+void Chunk_Pad(get_chunk_func *GetChunk, const void *Data, ivec2 ChunkPosition, padded_chunk *PaddedChunk)
+{
+    for (i32 y = 0; y < CHUNK_WIDTH+2; ++y)
+    for (i32 x = 0; x < CHUNK_WIDTH+2; ++x)
+    {
+        PaddedChunk->Blocks[0][y][x] = DEFAULT_HELL_BLOCK;
+        PaddedChunk->Blocks[CHUNK_HEIGHT+1][y][x] = DEFAULT_SKY_BLOCK;
+        PaddedChunk->Shades[CHUNK_HEIGHT+1][y][x] = 0;
+    }
+
+    const chunk *Chunk = GetChunk(Data, ChunkPosition);
+    if (Chunk)
+    for (i32 z = 0; z < CHUNK_HEIGHT; ++z)
+    for (i32 y = 0; y < CHUNK_WIDTH; ++y)
+    for (i32 x = 0; x < CHUNK_WIDTH; ++x)
+    {
+        PaddedChunk->Blocks[z+1][y+1][x+1] = Chunk->Blocks[z][y][x];
+        PaddedChunk->Shades[z+1][y+1][x+1] = Chunk->Shades[z][y][x];
+    }
+
+    Chunk = GetChunk(Data, iVec2_Add(ChunkPosition, (ivec2){-1,-1}));
+    if (Chunk)
+    for (i32 z = 0; z < CHUNK_HEIGHT; ++z)
+    {
+        PaddedChunk->Blocks[z+1][0][0] = Chunk->Blocks[z][CHUNK_WIDTH-1][CHUNK_WIDTH-1];
+        PaddedChunk->Shades[z+1][0][0] = Chunk->Shades[z][CHUNK_WIDTH-1][CHUNK_WIDTH-1];
+    }
+
+    Chunk = GetChunk(Data, iVec2_Add(ChunkPosition, (ivec2){1,-1}));
+    if (Chunk)
+    for (i32 z = 0; z < CHUNK_HEIGHT; ++z)
+    {
+        PaddedChunk->Blocks[z+1][0][CHUNK_WIDTH+1] = Chunk->Blocks[z][CHUNK_WIDTH-1][0];
+        PaddedChunk->Shades[z+1][0][CHUNK_WIDTH+1] = Chunk->Shades[z][CHUNK_WIDTH-1][0];
+    }
+
+    Chunk = GetChunk(Data, iVec2_Add(ChunkPosition, (ivec2){-1,1}));
+    if (Chunk)
+    for (i32 z = 0; z < CHUNK_HEIGHT; ++z)
+    {
+        PaddedChunk->Blocks[z+1][CHUNK_WIDTH+1][0] = Chunk->Blocks[z][0][CHUNK_WIDTH-1];
+        PaddedChunk->Shades[z+1][CHUNK_WIDTH+1][0] = Chunk->Shades[z][0][CHUNK_WIDTH-1];
+    }
+
+    Chunk = GetChunk(Data, iVec2_Add(ChunkPosition, (ivec2){1,1}));
+    if (Chunk)
+    for (i32 z = 0; z < CHUNK_HEIGHT; ++z)
+    {
+        PaddedChunk->Blocks[z+1][CHUNK_WIDTH+1][CHUNK_WIDTH+1] = Chunk->Blocks[z][0][0];
+        PaddedChunk->Shades[z+1][CHUNK_WIDTH+1][CHUNK_WIDTH+1] = Chunk->Shades[z][0][0];
+    }
+
+    Chunk = GetChunk(Data, iVec2_Add(ChunkPosition, (ivec2){0,-1}));
+    if (Chunk)
+    for (i32 z = 0; z < CHUNK_HEIGHT; ++z)
+    for (i32 x = 0; x < CHUNK_WIDTH; ++x)
+    {
+        PaddedChunk->Blocks[z+1][0][x+1] = Chunk->Blocks[z][CHUNK_WIDTH-1][x];
+        PaddedChunk->Shades[z+1][0][x+1] = Chunk->Shades[z][CHUNK_WIDTH-1][x];
+    }
+
+    Chunk = GetChunk(Data, iVec2_Add(ChunkPosition, (ivec2){-1,0}));
+    if (Chunk)
+    for (i32 z = 0; z < CHUNK_HEIGHT; ++z)
+    for (i32 y = 0; y < CHUNK_WIDTH; ++y)
+    {
+        PaddedChunk->Blocks[z+1][y+1][0] = Chunk->Blocks[z][y][CHUNK_WIDTH-1];
+        PaddedChunk->Shades[z+1][y+1][0] = Chunk->Shades[z][y][CHUNK_WIDTH-1];
+    }
+
+    Chunk = GetChunk(Data, iVec2_Add(ChunkPosition, (ivec2){0,1}));
+    if (Chunk)
+    for (i32 z = 0; z < CHUNK_HEIGHT; ++z)
+    for (i32 x = 0; x < CHUNK_WIDTH; ++x)
+    {
+        PaddedChunk->Blocks[z+1][CHUNK_WIDTH+1][x+1] = Chunk->Blocks[z][0][x];
+        PaddedChunk->Shades[z+1][CHUNK_WIDTH+1][x+1] = Chunk->Shades[z][0][x];
+    }
+
+    Chunk = GetChunk(Data, iVec2_Add(ChunkPosition, (ivec2){1,0}));
+    if (Chunk)
+    for (i32 z = 0; z < CHUNK_HEIGHT; ++z)
+    for (i32 y = 0; y < CHUNK_WIDTH; ++y)
+    {
+        PaddedChunk->Blocks[z+1][y+1][CHUNK_WIDTH+1] = Chunk->Blocks[z][y][0];
+        PaddedChunk->Shades[z+1][y+1][CHUNK_WIDTH+1] = Chunk->Shades[z][y][0];
+    }
+}
+
+block_group PaddedChunk_GetBlockGroup(const padded_chunk *Chunk, ivec3 WorldPosition)
+{
+    block_group BlockGroup;
+    for (i32 z = 0; z < 3; ++z)
+    for (i32 y = 0; y < 3; ++y)
+    for (i32 x = 0; x < 3; ++x)
+    {
+        ivec3 BlockPosition = (ivec3){ x, y, z };
+        BlockPosition = iVec3_Add(BlockPosition, WorldPosition);
+        BlockGroup.Blocks[z][y][x] = Chunk->Blocks[BlockPosition.z][BlockPosition.y][BlockPosition.x];
+        BlockGroup.Shades[z][y][x] = Chunk->Shades[BlockPosition.z][BlockPosition.y][BlockPosition.x];
+    }
+    return BlockGroup;
+}
+
+block PaddedChunk_GetBlock(const padded_chunk *Chunk, ivec3 WorldPosition)
+{
+    ivec3 BlockPosition = World_ToBlockPosition(WorldPosition);
+    return Chunk->Blocks[BlockPosition.z+1][BlockPosition.y+1][BlockPosition.x+1];
+}
+
+void PaddedChunk_ExtractChunk(const padded_chunk *PaddedChunk, chunk *Chunk)
+{
+    for (i32 z = 0; z < CHUNK_HEIGHT; ++z)
+    for (i32 y = 0; y < CHUNK_WIDTH; ++y)
+    for (i32 x = 0; x < CHUNK_WIDTH; ++x)
+    {
+        Chunk->Blocks[z][y][x] = PaddedChunk->Blocks[z+1][y+1][x+1];
+        Chunk->Shades[z][y][x] = PaddedChunk->Shades[z+1][y+1][x+1];
+    }
+}
+
+/******************/
+/*      CHUNK     */
+/******************/
+
+void Chunk_CalcLight(padded_chunk *Chunk)
+{
+    //skylight
+    for (i32 y = 1; y <= CHUNK_WIDTH; y++)
+    for (i32 x = 1; x <= CHUNK_WIDTH; x++)
     for (i32 z = CHUNK_HEIGHT - 1; z >= 0; z--)
     {
-        block *Block = &Chunk->Blocks[z][y][x];
-        Block->Shadow = 0x0;
-        if (Block_Opaque[Block->Id])
+        Chunk->Shades[z][y][x] = 0x0;
+        if (Block_Opaque[Chunk->Blocks[z][y][x].Id])
         {
-            Block->Shadow = 0xF;
-            while (z-- > 0)
-            {
-                Block = &Chunk->Blocks[z][y][x];
-                Block->Shadow = 0xF;
-            }
+            Chunk->Shades[z][y][x] = 0xF;
+            while (z-- > 0) Chunk->Shades[z][y][x] = 0xF;
         }
     }
 }
@@ -77,8 +217,6 @@ void Chunk_SetBlock(chunk *Chunk, ivec3 WorldPosition, block Block)
 
     ivec3 BlockPosition = World_ToBlockPosition(WorldPosition);
     Chunk->Blocks[BlockPosition.z][BlockPosition.y][BlockPosition.x] = Block;
-
-    Chunk_CalcSkyLight(Chunk);
 }
 
 void Chunk_Init(chunk *Chunk, ivec2 Position)
