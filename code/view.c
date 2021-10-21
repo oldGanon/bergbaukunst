@@ -209,6 +209,8 @@ void View_SetBlock(view *View, ivec3 WorldPosition, block Block)
     if (!Chunk) return;
     Chunk_SetBlock(Chunk, WorldPosition, Block);
 
+    Chunk_CalcLight(View, View_GetChunk, ChunkPosition);
+    
     // mark chunks dirty
     for (i32 y = -1; y <= 1; ++y)
     for (i32 x = -1; x <= 1; ++x)
@@ -221,40 +223,11 @@ void View_SetBlock(view *View, ivec3 WorldPosition, block Block)
 
 #include "meshgen.c"
 
-void View_GenerateChunkVisuals(view *View, ivec2 ChunkPosition)
-{
-    for (i32 y = -1; y <= 1; ++y)
-    for (i32 x = -1; x <= 1; ++x)
-    {
-        ivec2 Offset = { x, y };
-        ivec2 ChunkPos = iVec2_Add(ChunkPosition, Offset);
-        view_chunk *ViewChunk = View_GetViewChunk(View, ChunkPos);
-        if (!ViewChunk) continue;
-
-        padded_chunk PaddedChunk;
-        Chunk_Pad(View_GetConstChunk, View, ChunkPos, &PaddedChunk);
-        Chunk_CalcLight(&PaddedChunk);
-        PaddedChunk_ExtractChunk(&PaddedChunk, &ViewChunk->Chunk);
-    }
-
-    for (i32 y = -1; y <= 1; ++y)
-    for (i32 x = -1; x <= 1; ++x)
-    {
-        ivec2 Offset = { x, y };
-        ivec2 ChunkPos = iVec2_Add(ChunkPosition, Offset);
-        view_chunk *ViewChunk = View_GetViewChunk(View, ChunkPos);
-        if (!ViewChunk) continue;
-        
-        View_GenerateChunkMesh(View, ChunkPos);
-        ViewChunk->Dirty = false;
-    }
-}
-
 void View_DrawChunk(view *View, ivec2 ChunkPosition, const bitmap Target, bitmap TerrainTexture, const camera Camera)
 {
 	view_chunk *Chunk = View_GetViewChunk(View, ChunkPosition);
 	if (!Chunk) return;
-    if (Chunk->Dirty) View_GenerateChunkVisuals(View, ChunkPosition);
+    if (Chunk->Dirty) View_GenerateChunkMesh(View, ChunkPosition);
 
     box ChunkBox = Chunk_Box(&Chunk->Chunk);
     if (!Camera_BoxVisible(Camera, Target, ChunkBox)) return;
@@ -277,7 +250,6 @@ void View_Draw(view *View, const bitmap Target, bitmap TerrainTexture, const cam
     // draw chunks
     ivec3 iWorldPosition = Vec3_FloorToIVec3(Camera.Position);
     ivec2 Center = World_ToChunkPosition(iWorldPosition);
-
     View_DrawChunk(View, Center, Target, TerrainTexture, Camera);
     for (i32 i = 1; i < DRAW_DISTANCE; ++i)
     {
@@ -344,7 +316,9 @@ void View_SetChunk(view *View, const msg_chunk_data *ChunkData)
         Chunk->Blocks[z][y][x].Id = ChunkData->Blocks[z][y][x];
     Chunk->Position = ChunkPosition;
 
-    // mark chunks dirty
+    Chunk_CalcLight(View, View_GetChunk, ChunkPosition);
+
+    // mark chunk dirty
     for (i32 y = -1; y <= 1; ++y)
     for (i32 x = -1; x <= 1; ++x)
     {
@@ -354,21 +328,31 @@ void View_SetChunk(view *View, const msg_chunk_data *ChunkData)
     }
 }
 
+void View_SetEntityMapCapacity(view_entity_map *EntityMap, u32 NewCapacity)
+{
+    if (NewCapacity <= EntityMap->Capacity)
+        return;
+
+    u32 OldCapacity = EntityMap->Capacity;
+    EntityMap->Capacity = NewCapacity;
+    EntityMap->Entities = realloc(EntityMap->Entities, NewCapacity * sizeof(view_entity));
+    for (u32 i = OldCapacity; i < NewCapacity; ++i)
+    {
+        EntityMap->Entities[i].Mesh = Mesh_Create();
+        EntityMap->Entities[i].RotatedMesh = Mesh_Create();
+    }    
+}
+
 void View_SetEntity(view *View, const msg_set_entity *SetEntity)
 {
     while (SetEntity->Id >= View->EntityMap.Capacity)
     {
-        View->EntityMap.Capacity <<= 1;
-        View->EntityMap.Entities = realloc(View->EntityMap.Entities, View->EntityMap.Capacity * sizeof(entity));
+        u32 NewCapacity = View->EntityMap.Capacity << 1;
+        View_SetEntityMapCapacity(&View->EntityMap, NewCapacity);
     }
 
     view_entity *ViewEntity = &View->EntityMap.Entities[SetEntity->Id];
     ViewEntity->Entity = SetEntity->Entity;
-    if (ViewEntity->Mesh.Quads == 0) 
-    {
-        ViewEntity->Mesh = Mesh_Create();
-        ViewEntity->RotatedMesh = Mesh_Create();
-    }
     View_GenerateMobMesh(ViewEntity);
 }
 
@@ -382,9 +366,7 @@ void View_Init(view *View)
         View->Chunks[y][x].Mesh = Mesh_Create();
     }
 
-    View->EntityMap.Count = 0;
-    View->EntityMap.Capacity = 256;
-    View->EntityMap.Entities = malloc(View->EntityMap.Capacity * sizeof(view_entity));
+    View_SetEntityMapCapacity(&View->EntityMap, 256);
 }
 
 f32 View_TraceRay(view *View, vec3 RayOrigin, vec3 RayDirection, f32 RayLength, trace_result *Result)

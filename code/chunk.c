@@ -52,15 +52,16 @@ typedef struct block_group
     u8 Shades[3][3][3];
 } block_group;
 
+typedef chunk *get_chunk_func(void *Data, ivec2 Position);
+typedef const chunk *get_const_chunk_func(const void *Data, ivec2 Position);
+
 typedef struct padded_chunk
 {
     block Blocks[CHUNK_HEIGHT+2][CHUNK_WIDTH+2][CHUNK_WIDTH+2];
     u8 Shades[CHUNK_HEIGHT+2][CHUNK_WIDTH+2][CHUNK_WIDTH+2];
 } padded_chunk;
 
-typedef const chunk *get_chunk_func(const void *Data, ivec2 Position);
-
-void Chunk_Pad(get_chunk_func *GetChunk, const void *Data, ivec2 ChunkPosition, padded_chunk *PaddedChunk)
+void Chunk_Pad(get_const_chunk_func *GetChunk, const void *Data, ivec2 ChunkPosition, padded_chunk *PaddedChunk)
 {
     for (i32 y = 0; y < CHUNK_WIDTH+2; ++y)
     for (i32 x = 0; x < CHUNK_WIDTH+2; ++x)
@@ -185,18 +186,99 @@ void PaddedChunk_ExtractChunk(const padded_chunk *PaddedChunk, chunk *Chunk)
 /*      CHUNK     */
 /******************/
 
-void Chunk_CalcLight(padded_chunk *Chunk)
+void Chunk_CalcLight(void *Data, get_chunk_func *GetChunk, ivec2 ChunkPosition)
 {
-    //skylight
-    for (i32 y = 1; y <= CHUNK_WIDTH; y++)
-    for (i32 x = 1; x <= CHUNK_WIDTH; x++)
-    for (i32 z = CHUNK_HEIGHT - 1; z >= 0; z--)
+    // get chunks
+    chunk *Chunks[3][3];
+    for (u32 y = 0; y < 3; ++y)
+    for (u32 x = 0; x < 3; ++x)
     {
-        Chunk->Shades[z][y][x] = 0x0;
-        if (Block_Opaque[Chunk->Blocks[z][y][x].Id])
+        ivec2 Offset = { x - 1, y - 1 };
+        ivec2 ChunkPos = iVec2_Add(ChunkPosition, Offset);
+        Chunks[y][x] = GetChunk(Data, ChunkPos);
+    }
+
+    // read values
+    u8 Shades[CHUNK_HEIGHT][CHUNK_WIDTH * 3][CHUNK_WIDTH * 3] = { 0 };
+    u8 Opaque[CHUNK_HEIGHT][CHUNK_WIDTH * 3][CHUNK_WIDTH * 3] = { 0 };
+    for (u32 cy = 0; cy < 3; ++cy)
+    for (u32 cx = 0; cx < 3; ++cx)
+    {
+        chunk *Chunk = Chunks[cy][cx];
+        if (!Chunk) continue;
+        for (u32 bz = 0; bz < CHUNK_HEIGHT; ++bz)
+        for (u32 by = 0; by < CHUNK_WIDTH; ++by)
+        for (u32 bx = 0; bx < CHUNK_WIDTH; ++bx)
         {
-            Chunk->Shades[z][y][x] = 0xF;
-            while (z-- > 0) Chunk->Shades[z][y][x] = 0xF;
+            u8 Block = Chunk->Blocks[bz][by][bx].Id;
+            Shades[bz][cy * CHUNK_WIDTH + by][cx * CHUNK_WIDTH + bx] = Chunk->Shades[bz][by][bx];
+            Opaque[bz][cy * CHUNK_WIDTH + by][cx * CHUNK_WIDTH + bx] = (Block_Opaque[Block]) ? 0xF : 0x0;
+        }
+    }
+
+    // sky light
+    for (i32 y = 1; y < CHUNK_WIDTH * 3 - 1; ++y)
+    {
+        __m256i S0 = _mm256_set1_epi8(0);
+        __m256i S1 = _mm256_set1_epi8(0);
+        for (i32 z = CHUNK_HEIGHT - 1; z >= 0; --z)
+        {
+            __m256i O0 = _mm256_loadu_si256((__m256i*)&Opaque[z][y][1]);
+            __m256i O1 = _mm256_loadu_si256((__m256i*)&Opaque[z][y][15]);
+            S0 = _mm256_or_si256(S0, O0);
+            S1 = _mm256_or_si256(S1, O1);
+            _mm256_store_si256((__m256i*)&Shades[z][y][1], S0);
+            _mm256_store_si256((__m256i*)&Shades[z][y][15], S1);
+        }
+    }
+
+    // block light
+    // TODO
+
+    // propagate light
+    __m256i One = _mm256_set1_epi8(1);
+    for (i32 i = 0; i < 15; ++i)
+    for (i32 y = 1; y < CHUNK_WIDTH * 3 - 1; ++y)
+    for (i32 z = 1; z < CHUNK_HEIGHT - 1; ++z)
+    {
+        __m256i Dst0 = _mm256_loadu_si256((__m256i*)&Shades[z][y][ 1]);
+        __m256i Dst1 = _mm256_loadu_si256((__m256i*)&Shades[z][y][15]);
+
+        Dst0 = _mm256_sub_epi8(Dst0, One);
+        Dst0 = _mm256_min_epi8(Dst0, _mm256_loadu_si256((__m256i*)&Shades[z  ][y  ][0]));
+        Dst0 = _mm256_min_epi8(Dst0, _mm256_loadu_si256((__m256i*)&Shades[z  ][y-1][1]));
+        Dst0 = _mm256_min_epi8(Dst0, _mm256_loadu_si256((__m256i*)&Shades[z-1][y  ][1]));
+        Dst0 = _mm256_min_epi8(Dst0, _mm256_loadu_si256((__m256i*)&Shades[z+1][y  ][1]));
+        Dst0 = _mm256_min_epi8(Dst0, _mm256_loadu_si256((__m256i*)&Shades[z  ][y+1][1]));
+        Dst0 = _mm256_min_epi8(Dst0, _mm256_loadu_si256((__m256i*)&Shades[z  ][y  ][2]));
+        Dst0 = _mm256_add_epi8(Dst0, One);
+        Dst0 = _mm256_or_si256(Dst0, _mm256_loadu_si256((__m256i*)&Opaque[z][y][1]));
+
+        Dst1 = _mm256_sub_epi8(Dst1, One);
+        Dst1 = _mm256_min_epi8(Dst1, _mm256_loadu_si256((__m256i*)&Shades[z  ][y  ][14]));
+        Dst1 = _mm256_min_epi8(Dst1, _mm256_loadu_si256((__m256i*)&Shades[z  ][y-1][15]));
+        Dst1 = _mm256_min_epi8(Dst1, _mm256_loadu_si256((__m256i*)&Shades[z-1][y  ][15]));
+        Dst1 = _mm256_min_epi8(Dst1, _mm256_loadu_si256((__m256i*)&Shades[z+1][y  ][15]));
+        Dst1 = _mm256_min_epi8(Dst1, _mm256_loadu_si256((__m256i*)&Shades[z  ][y+1][15]));
+        Dst1 = _mm256_min_epi8(Dst1, _mm256_loadu_si256((__m256i*)&Shades[z  ][y  ][16]));
+        Dst1 = _mm256_add_epi8(Dst1, One);
+        Dst1 = _mm256_or_si256(Dst1, _mm256_loadu_si256((__m256i*)&Opaque[z][y][15]));
+
+        _mm256_store_si256((__m256i*)&Shades[z][y][ 1], Dst0);
+        _mm256_store_si256((__m256i*)&Shades[z][y][15], Dst1);
+    }
+
+    // write new values
+    for (u32 cy = 0; cy < 3; ++cy)
+    for (u32 cx = 0; cx < 3; ++cx)
+    {
+        chunk *Chunk = Chunks[cy][cx];
+        if (!Chunk) continue;
+        for (u32 bz = 0; bz < CHUNK_HEIGHT; ++bz)
+        for (u32 by = 0; by < CHUNK_WIDTH; ++by)
+        for (u32 bx = 0; bx < CHUNK_WIDTH; ++bx)
+        {
+            Chunk->Shades[bz][by][bx] = Shades[bz][cy * CHUNK_WIDTH + by][cx * CHUNK_WIDTH + bx];
         }
     }
 }

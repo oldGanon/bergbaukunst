@@ -210,6 +210,13 @@ void View_GenerateChunkMesh(view *View, ivec2 ChunkPosition)
         if (Block.Id == BLOCK_ID_AIR) continue;
 
         block_group BlockGroup = PaddedChunk_GetBlockGroup(&PaddedChunk, iBlockPosition);
+        if (Block_Opaque[BlockGroup.Blocks[0][1][1].Id] &&
+            Block_Opaque[BlockGroup.Blocks[1][0][1].Id] &&
+            Block_Opaque[BlockGroup.Blocks[1][1][0].Id] &&
+            Block_Opaque[BlockGroup.Blocks[1][1][2].Id] &&
+            Block_Opaque[BlockGroup.Blocks[1][2][1].Id] &&
+            Block_Opaque[BlockGroup.Blocks[2][1][1].Id])
+            continue;
 
         vec3 BlockPosition = iVec3_toVec3(iBlockPosition);
         switch (Block.Id)
@@ -250,6 +257,8 @@ void View_GenerateChunkMesh(view *View, ivec2 ChunkPosition)
             } break;
         }
     }
+    
+    Chunk->Dirty = false;
 }
 
 void Mob_AddBlockMesh(quad_mesh *Mesh, f32 Height, f32 Width)
