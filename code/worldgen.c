@@ -90,9 +90,6 @@ void WorldGen_Chunk(chunk *Chunk)
 	}
 }
 
-global f32 MINIMUM_LOW = 11111;
-global f32 MINIMUM_HIGH = 11111;
-
 void WorldGen_GenerateChunk(chunk *Chunk)
 {
 	for (i32 yy = 0; yy < CHUNK_WIDTH; yy++)
@@ -170,7 +167,11 @@ void WorldGen_GenerateChunk(chunk *Chunk)
         f32 LowNoise = Lerp(64.0f, 80.0f, Noise_FBM2D(GlobalWorldGen.LowNoise, p, 16));
         f32 HighNoise = Lerp(96.0f, 128.0f, Noise_FBM2D(GlobalWorldGen.HighNoise, p, 16));
         
-        for (u32 zz = 0; zz < CHUNK_HEIGHT; ++zz)
+        // f32 SurfaceFloor = F
+        for (u32 zz = 0; zz < (u32)LowNoise; ++zz)
+            Chunk->Blocks[zz][yy][xx].Id = BLOCK_ID_STONE;
+
+        for (u32 zz = (u32)LowNoise; zz < (u32)HighNoise; ++zz)
         {
         	vec3 pp = (vec3){ (f32)(Chunk->Position.x * CHUNK_WIDTH + xx),
             	              (f32)(Chunk->Position.y * CHUNK_WIDTH + yy),
@@ -180,12 +181,8 @@ void WorldGen_GenerateChunk(chunk *Chunk)
         	pp = Vec3_Div(pp, (vec3){128.0f,128.0f,256.0f});
 
         	f32 SelectorNoise = Clamp((Noise_FBM3D(GlobalWorldGen.SelectorNoise, pp, 4) - 0.0f) * 2.0f, 0, 1);
-        	f32 Surface = Lerp(LowNoise, HighNoise, F32_Smootherstep(SelectorNoise));
+        	f32 Surface = Lerp(LowNoise, HighNoise, SmootherStep(SelectorNoise));
         	if (zz < Surface) CurrentBlock->Id = BLOCK_ID_STONE;
-
-
-			MINIMUM_LOW = Min(MINIMUM_LOW, LowNoise);
-			MINIMUM_HIGH = Min(MINIMUM_HIGH, HighNoise);
         }
 
         for (i32 zz = CHUNK_HEIGHT - 1; zz >= 64; --zz)
