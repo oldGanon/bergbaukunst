@@ -85,33 +85,33 @@ inline i32 Log2(u64 n)
 inline f32 F32_Abs(f32 A)        { return _mm_cvtss_f32(_mm_and_ps(_mm_set_ss(A), _mm_castsi128_ps(_mm_set1_epi32(0x7FFFFFFF)))); }
 inline f32 F32_Sign(f32 A)       { return _mm_cvtss_f32(_mm_or_ps(_mm_and_ps(_mm_set_ss(A), _mm_set_ss(-0.0f)), _mm_set_ss(1.0f))); }
 inline f32 F32_Negate(f32 A)     { return _mm_cvtss_f32(_mm_xor_ps(_mm_set_ss(A), _mm_set_ss(-0.0f))); }
-inline f32 F32_Min(f32 A, f32 B) { return _mm_cvtss_f32(_mm_min_ps(_mm_set_ss(A), _mm_set_ss(B))); }
-inline f32 F32_Max(f32 A, f32 B) { return _mm_cvtss_f32(_mm_max_ps(_mm_set_ss(A), _mm_set_ss(B))); }
-inline f32 F32_Clamp(f32 A, f32 min, f32 max) { return _mm_cvtss_f32(_mm_min_ps(_mm_max_ps(_mm_set_ss(A), _mm_set_ss(min)), _mm_set_ss(max))); }
-inline f32 F32_Modulo(f32 N, f32 D) { __m128 mN = _mm_set_ss(N); __m128 mD = _mm_set_ss(D); return _mm_cvtss_f32(_mm_sub_ps(mN, _mm_mul_ps(mD, _mm_floor_ps(_mm_div_ps(mN, mD))))); }
+inline f32 F32_Min(f32 A, f32 B) { return _mm_cvtss_f32(_mm_min_ss(_mm_set_ss(A), _mm_set_ss(B))); }
+inline f32 F32_Max(f32 A, f32 B) { return _mm_cvtss_f32(_mm_max_ss(_mm_set_ss(A), _mm_set_ss(B))); }
+inline f32 F32_Clamp(f32 A, f32 min, f32 max) { return _mm_cvtss_f32(_mm_min_ss(_mm_max_ss(_mm_set_ss(A), _mm_set_ss(min)), _mm_set_ss(max))); }
+inline f32 F32_Modulo(f32 N, f32 D) { __m128 mN = _mm_set_ss(N); __m128 mD = _mm_set_ss(D); return _mm_cvtss_f32(_mm_sub_ss(mN, _mm_mul_ss(mD, _mm_floor_ps(_mm_div_ss(mN, mD))))); }
 
 // FLOATING POINT FUNCTIONS
-inline f32 F32_Round(f32 A) { return _mm_cvtss_f32(_mm_round_ps(_mm_set_ss(A), _MM_FROUND_TO_NEAREST_INT|_MM_FROUND_NO_EXC)); }
-inline f32 F32_Trunc(f32 A) { return _mm_cvtss_f32(_mm_round_ps(_mm_set_ss(A), _MM_FROUND_TO_ZERO|_MM_FROUND_NO_EXC)); }
-inline f32 F32_Ceil(f32 A)  { return _mm_cvtss_f32(_mm_ceil_ps(_mm_set_ss(A))); }
-inline f32 F32_Floor(f32 A) { return _mm_cvtss_f32(_mm_floor_ps(_mm_set_ss(A))); }
-inline f32 F32_Sqrt(f32 A) { return _mm_cvtss_f32(_mm_sqrt_ps(_mm_set_ss(A)));}
+inline f32 F32_Round(f32 A) { return _mm_cvtss_f32(_mm_round_ss(_mm_undefined_ps(), _mm_set_ss(A), _MM_FROUND_TO_NEAREST_INT|_MM_FROUND_NO_EXC)); }
+inline f32 F32_Trunc(f32 A) { return _mm_cvtss_f32(_mm_round_ss(_mm_undefined_ps(), _mm_set_ss(A), _MM_FROUND_TO_ZERO|_MM_FROUND_NO_EXC)); }
+inline f32 F32_Ceil(f32 A)  { return _mm_cvtss_f32(_mm_ceil_ss(_mm_undefined_ps(), _mm_set_ss(A))); }
+inline f32 F32_Floor(f32 A) { return _mm_cvtss_f32(_mm_floor_ss(_mm_undefined_ps(), _mm_set_ss(A))); }
+inline f32 F32_Sqrt(f32 A) { return _mm_cvtss_f32(_mm_sqrt_ss(_mm_set_ss(A)));}
 inline f32 F32_Lerp(f32 A, f32 B, f32 t) { return _mm_cvtss_f32(_mm_add_ss(_mm_mul_ss(_mm_sub_ss(_mm_set_ss(1),_mm_set_ss(t)),_mm_set_ss(A)),_mm_mul_ss(_mm_set_ss(t),_mm_set_ss(B)))); }
 inline f32 F32_Fract(f32 A) { __m128 mA = _mm_set_ss(A); return _mm_cvtss_f32(_mm_sub_ss(mA, _mm_floor_ps(mA))); }
-inline f32 F32_Inverse(f32 A) { return _mm_cvtss_f32(_mm_div_ps(_mm_set_ss(1), _mm_set_ss(A)));}
+inline f32 F32_Inverse(f32 A) { return _mm_cvtss_f32(_mm_div_ss(_mm_set_ss(1), _mm_set_ss(A)));}
 
 inline f32 F32_SmoothStep(f32 A)
 {
     __m128 x = _mm_set_ss(A);
-    x = _mm_mul_ps(x, _mm_mul_ps(x, _mm_sub_ps(_mm_set_ss(3), _mm_mul_ps(_mm_set_ss(2), x))));
-    return _mm_cvtss_f32(_mm_min_ps(_mm_max_ps(x, _mm_set_ss(0)), _mm_set_ss(1)));
+    x = _mm_mul_ss(x, _mm_mul_ss(x, _mm_sub_ss(_mm_set_ss(3), _mm_mul_ss(_mm_set_ss(2), x))));
+    return _mm_cvtss_f32(_mm_min_ss(_mm_max_ss(x, _mm_set_ss(0)), _mm_set_ss(1)));
 }
 
 inline f32 F32_SmootherStep(f32 A)
 {
     __m128 x = _mm_set_ss(A);
-    x = _mm_mul_ps(x, _mm_mul_ps(x, _mm_mul_ps(x, _mm_add_ps(_mm_mul_ps(x, _mm_sub_ps(_mm_mul_ps(x, _mm_set_ss(6)), _mm_set_ss(15))), _mm_set_ss(10)))));
-    return _mm_cvtss_f32(_mm_min_ps(_mm_max_ps(x, _mm_set_ss(0)), _mm_set_ss(1)));
+    x = _mm_mul_ss(x, _mm_mul_ss(x, _mm_mul_ss(x, _mm_add_ss(_mm_mul_ss(x, _mm_sub_ss(_mm_mul_ss(x, _mm_set_ss(6)), _mm_set_ss(15))), _mm_set_ss(10)))));
+    return _mm_cvtss_f32(_mm_min_ss(_mm_max_ss(x, _mm_set_ss(0)), _mm_set_ss(1)));
 }
 
 f32 Sin(f32 x)
@@ -145,10 +145,10 @@ f32 Cos(f32 x)
 /***************/
 /* F32 <-> I32 */
 /***************/
-inline i32 F32_RoundToI32(f32 A) { return _mm_cvt_ss2si(_mm_round_ps(_mm_set_ss(A), _MM_FROUND_TO_NEAREST_INT|_MM_FROUND_NO_EXC)); }
-inline i32 F32_TruncToI32(f32 A) { return _mm_cvt_ss2si(_mm_round_ps(_mm_set_ss(A), _MM_FROUND_TO_ZERO|_MM_FROUND_NO_EXC)); }
-inline i32 F32_CeilToI32(f32 A)  { return _mm_cvt_ss2si(_mm_ceil_ps(_mm_set_ss(A))); }
-inline i32 F32_FloorToI32(f32 A) { return _mm_cvt_ss2si(_mm_floor_ps(_mm_set_ss(A))); }
+inline i32 F32_RoundToI32(f32 A) { return _mm_cvt_ss2si(_mm_round_ss(_mm_undefined_ps(), _mm_set_ss(A),_MM_FROUND_TO_NEAREST_INT|_MM_FROUND_NO_EXC)); }
+inline i32 F32_TruncToI32(f32 A) { return _mm_cvt_ss2si(_mm_round_ss(_mm_undefined_ps(), _mm_set_ss(A), _MM_FROUND_TO_ZERO|_MM_FROUND_NO_EXC)); }
+inline i32 F32_CeilToI32(f32 A)  { return _mm_cvt_ss2si(_mm_ceil_ss(_mm_undefined_ps(), _mm_set_ss(A))); }
+inline i32 F32_FloorToI32(f32 A) { return _mm_cvt_ss2si(_mm_floor_ss(_mm_undefined_ps(), _mm_set_ss(A))); }
 inline i32 F32_FloatToI32(f32 A) { return _mm_cvt_ss2si(_mm_set_ss(A)); }
 
 /***********/
@@ -165,6 +165,9 @@ inline i32 I32_Modulo(i32 N, i32 D) { return N % D; }
 /***********/
 /*   U32   */
 /***********/
+inline u32 U32_Abs(u32 A) { return A; }
+inline u32 U32_Sign(u32 A) { return 1; }
+// inline u32 U32_Negate(u32 A) { /* IMPOSSIBLE */ }
 inline u32 U32_Max(u32 A, u32 B) { return _mm_cvtsi128_si32(_mm_max_epu32(_mm_cvtsi32_si128(A),_mm_cvtsi32_si128(B))); }
 inline u32 U32_Min(u32 A, u32 B) { return _mm_cvtsi128_si32(_mm_min_epu32(_mm_cvtsi32_si128(A),_mm_cvtsi32_si128(B))); }
 inline u32 U32_Clamp(u32 A, u32 min, u32 max) { return U32_Min(U32_Max(A, min), max); }
