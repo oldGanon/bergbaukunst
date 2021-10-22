@@ -13,6 +13,7 @@ typedef struct world
 {
     chunk_map ChunkMap;
     entity_manager EntityManager;
+    world_gen Generator;
 } world;
 
 // typedef enum world_direction
@@ -29,29 +30,37 @@ void World_Init(world *World)
 {
     World->ChunkMap = ChunkMap_Create();
     World->EntityManager = EntityManager_Create();
-    WorldGen_Init();
+    World->Generator = WorldGen_Create(__rdtsc()); // 0xDEADBEEFDEADBEEF
     
     entity Test = (entity){ .Type = ENTITY_MOB, .Position = (vec3){ 0,0,70 } };
     Entity_Spawn(&World->EntityManager, Test);
 }
 
-void World_Update(world* World, vec3 PlayerPosition)
+chunk *World_GetChunk(world *World, ivec2 ChunkPosition)
+{
+    return ChunkMap_GetChunk(&World->ChunkMap, ChunkPosition);
+}
+
+const chunk *World_GetConstChunk(const world *World, ivec2 ChunkPosition)
+{
+    return ChunkMap_GetChunk(&World->ChunkMap, ChunkPosition);
+}
+
+void World_Update(world *World, vec3 PlayerPosition)
 {
     // chunks
     ivec2 CenterChunk = World_ToChunkPosition(Vec3_FloorToIVec3(PlayerPosition));
     ivec2 LoadedChunkDist = iVec2_Set1(LOADED_CHUNKS_DIST);
     ivec2 MinPos = iVec2_Sub(CenterChunk, LoadedChunkDist);
     ivec2 MaxPos = iVec2_Add(CenterChunk, LoadedChunkDist);
-
     for (i32 x = MinPos.x; x < MaxPos.x; x++)
     for (i32 y = MinPos.y; y < MaxPos.y; y++)
     {
         ivec2 ChunkPos = (ivec2){ x, y };
         chunk *Chunk = ChunkMap_GetChunk(&World->ChunkMap, ChunkPos);
-        if (Chunk) continue;
-
-        Chunk = ChunkMap_AllocateChunk(&World->ChunkMap, ChunkPos);
-        WorldGen_GenerateChunk(Chunk);
+        if (!Chunk) Chunk = ChunkMap_AllocateChunk(&World->ChunkMap, ChunkPos);
+        if (!(Chunk->Flags & CHUNK_GENERATED)) WorldGen_GenerateChunk(&World->Generator, Chunk);
+        if (!(Chunk->Flags & CHUNK_DECORATED)) WorldGen_DecorateChunk(World, World_GetChunk, ChunkPos);
     }
 
     // entities
@@ -79,16 +88,6 @@ void World_Update(world* World, vec3 PlayerPosition)
             } break;
         }
     }
-}
-
-chunk *World_GetChunk(world *World, ivec2 ChunkPosition)
-{
-    return ChunkMap_GetChunk(&World->ChunkMap, ChunkPosition);
-}
-
-const chunk *World_GetConstChunk(const world *World, ivec2 ChunkPosition)
-{
-    return ChunkMap_GetChunk(&World->ChunkMap, ChunkPosition);
 }
 
 block World_GetBlock(const world *World, ivec3 WorldPosition)

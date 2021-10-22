@@ -167,7 +167,7 @@ chunk_map ChunkMap_Create(void)
         .Mask = Capacity - 1,
     };
 
-    Map.Chunks[0].Allocated = true;
+    Map.Chunks[0].Flags = CHUNK_ALLOCATED;
 
     return Map;
 }
@@ -188,12 +188,12 @@ chunk *ChunkMap_AllocateChunk(chunk_map *Map, ivec2 Position)
     for (u64 i = 0; i < Map->Capacity; ++i)
     {
         chunk *Chunk = Map->Chunks + i;
-        if (!Chunk->Allocated)
-        {
-            ChunkMap_InsertChunkId(Map, i, Position);
-            Chunk_Init(Chunk, Position);
-            return Chunk;
-        }
+        if (Chunk->Flags & CHUNK_ALLOCATED)
+            continue;
+
+        ChunkMap_InsertChunkId(Map, i, Position);
+        Chunk_Init(Chunk, Position);
+        return Chunk;
     }
 
     assert(false);

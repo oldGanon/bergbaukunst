@@ -34,8 +34,6 @@ typedef struct world_gen
 	u64 SelectorNoise;
 } world_gen;
 
-global world_gen GlobalWorldGen;
-
 f32 WorldGen_Noise(u64 Seed, vec2 Position, f32 Lowest, f32 Highest, f32 MaxIncline)
 {
 	f32 Period = (Highest - Lowest) / MaxIncline;
@@ -47,29 +45,29 @@ f32 WorldGen_Noise(u64 Seed, vec2 Position, f32 Lowest, f32 Highest, f32 MaxIncl
 	return Height;
 }
 
-f32 WorldGen_OceanNoise(vec2 Position)
+f32 WorldGen_OceanNoise(world_gen *WorldGenerator, vec2 Position)
 {
-	return WorldGen_Noise(GlobalWorldGen.OceanSeed, Position, 32, 64, 1);
+	return WorldGen_Noise(WorldGenerator->OceanSeed, Position, 32, 64, 1);
 }
 
-f32 WorldGen_PlainNoise(vec2 Position)
+f32 WorldGen_PlainNoise(world_gen *WorldGenerator, vec2 Position)
 {
-	return WorldGen_Noise(GlobalWorldGen.PlainSeed, Position, 64, 72, 0.25f);
+	return WorldGen_Noise(WorldGenerator->PlainSeed, Position, 64, 72, 0.25f);
 }
 
-f32 WorldGen_ForestNoise(vec2 Position)
+f32 WorldGen_ForestNoise(world_gen *WorldGenerator, vec2 Position)
 {
-	return WorldGen_Noise(GlobalWorldGen.ForestSeed, Position, 64, 72, 0.25f);
+	return WorldGen_Noise(WorldGenerator->ForestSeed, Position, 64, 72, 0.25f);
 }
 
-f32 WorldGen_DesertNoise(vec2 Position)
+f32 WorldGen_DesertNoise(world_gen *WorldGenerator, vec2 Position)
 {
-	return WorldGen_Noise(GlobalWorldGen.DesertSeed, Position, 64, 72, 0.25f);
+	return WorldGen_Noise(WorldGenerator->DesertSeed, Position, 64, 72, 0.25f);
 }
 
-f32 WorldGen_MountainNoise(vec2 Position)
+f32 WorldGen_MountainNoise(world_gen *WorldGenerator, vec2 Position)
 {
-	return WorldGen_Noise(GlobalWorldGen.MountainSeed, Position, 64, 96, 0.25f);
+	return WorldGen_Noise(WorldGenerator->MountainSeed, Position, 64, 96, 0.25f);
 }
 
 u32 WordlGen_CellBiome(ivec2 Cell)
@@ -90,7 +88,7 @@ void WorldGen_Chunk(chunk *Chunk)
 	}
 }
 
-void WorldGen_GenerateChunk(chunk *Chunk)
+void WorldGen_GenerateChunk(world_gen *WorldGenerator, chunk *Chunk)
 {
 	for (i32 yy = 0; yy < CHUNK_WIDTH; yy++)
     for (i32 xx = 0; xx < CHUNK_WIDTH; xx++)
@@ -164,10 +162,9 @@ void WorldGen_GenerateChunk(chunk *Chunk)
 #else
         p = Vec2_Div(p, (vec2){384.0f,384.0f});
 
-        f32 LowNoise = Lerp(64.0f, 80.0f, Noise_FBM2D(GlobalWorldGen.LowNoise, p, 16));
-        f32 HighNoise = Lerp(96.0f, 128.0f, Noise_FBM2D(GlobalWorldGen.HighNoise, p, 16));
+        f32 LowNoise = Lerp(64.0f, 80.0f, Noise_FBM2D(WorldGenerator->LowNoise, p, 16));
+        f32 HighNoise = Lerp(96.0f, 128.0f, Noise_FBM2D(WorldGenerator->HighNoise, p, 16));
         
-        // f32 SurfaceFloor = F
         for (u32 zz = 0; zz < (u32)LowNoise; ++zz)
             Chunk->Blocks[zz][yy][xx].Id = BLOCK_ID_STONE;
 
@@ -180,7 +177,7 @@ void WorldGen_GenerateChunk(chunk *Chunk)
 
         	pp = Vec3_Div(pp, (vec3){128.0f,128.0f,256.0f});
 
-        	f32 SelectorNoise = Clamp((Noise_FBM3D(GlobalWorldGen.SelectorNoise, pp, 4) - 0.0f) * 2.0f, 0, 1);
+        	f32 SelectorNoise = Clamp((Noise_FBM3D(WorldGenerator->SelectorNoise, pp, 4) - 0.0f) * 2.0f, 0, 1);
         	f32 Surface = Lerp(LowNoise, HighNoise, SmootherStep(SelectorNoise));
         	if (zz < Surface) CurrentBlock->Id = BLOCK_ID_STONE;
         }
@@ -197,22 +194,52 @@ void WorldGen_GenerateChunk(chunk *Chunk)
         }
 #endif
     }
+
+    Chunk->Flags |= (CHUNK_GENERATED | CHUNK_CHANGED);
 }
 
-void WorldGen_Init(void)
+void WorldGen_GrowTree(chunk_group *ChunkGroup, ivec2 Tree)
 {
-	u64 Seed = 0xDEADDEADDEADDEAD;
+    for (i32 zz = CHUNK_HEIGHT - 1; zz >= 64; --zz)
+    {
+    	ivec3 BlockPosition = { Tree.x, Tree.y, zz };
+        if (ChunkGroup_GetBlock(ChunkGroup, BlockPosition).Id != BLOCK_ID_GRAS)
+        	continue;
+
+        ChunkGroup_SetBlock(ChunkGroup, (ivec3){ Tree.x, Tree.y, zz+1}, (block){ BLOCK_ID_WOOD });
+        ChunkGroup_SetBlock(ChunkGroup, (ivec3){ Tree.x, Tree.y, zz+2}, (block){ BLOCK_ID_WOOD });
+        ChunkGroup_SetBlock(ChunkGroup, (ivec3){ Tree.x, Tree.y, zz+3}, (block){ BLOCK_ID_WOOD });
+        ChunkGroup_SetBlock(ChunkGroup, (ivec3){ Tree.x, Tree.y, zz+4}, (block){ BLOCK_ID_WOOD });
+        ChunkGroup_SetBlock(ChunkGroup, (ivec3){ Tree.x, Tree.y, zz+5}, (block){ BLOCK_ID_WOOD });
+        break;
+    }
+}
+
+void WorldGen_DecorateChunk(void *Data, get_chunk_func *GetChunk, ivec2 ChunkPosition)
+{
+	chunk_group ChunkGroup = Chunk_Group(Data, GetChunk, ChunkPosition);
+	if (!ChunkGroup_Complete(&ChunkGroup)) return;
+
+	ivec2 ChunkMin = iVec2_ShiftLeft(ChunkPosition, CHUNK_WIDTH_SHIFT);
+    ivec2 TreePosition = iVec2_Add(ChunkMin, (ivec2){7,7});
+	WorldGen_GrowTree(&ChunkGroup, TreePosition);
+    ChunkGroup.Chunks[1][1]->Flags |= CHUNK_DECORATED;
+}
+
+world_gen WorldGen_Create(u64 Seed)
+{
 	rng Rng = Rng_Init(Seed);
+	return (world_gen) {
+		.OceanSeed = Rng_U64(&Rng),
+		.PlainSeed = Rng_U64(&Rng),
+		.ForestSeed = Rng_U64(&Rng),
+		.DesertSeed = Rng_U64(&Rng),
+		.MountainSeed = Rng_U64(&Rng),
+		.BiomeContourSeedX = Rng_U64(&Rng),
+		.BiomeContourSeedY = Rng_U64(&Rng),
 
-	GlobalWorldGen.OceanSeed = Rng_U64(&Rng);
-	GlobalWorldGen.PlainSeed = Rng_U64(&Rng);
-	GlobalWorldGen.ForestSeed = Rng_U64(&Rng);
-	GlobalWorldGen.DesertSeed = Rng_U64(&Rng);
-	GlobalWorldGen.MountainSeed = Rng_U64(&Rng);
-	GlobalWorldGen.BiomeContourSeedX = Rng_U64(&Rng);
-	GlobalWorldGen.BiomeContourSeedY = Rng_U64(&Rng);
-
-	GlobalWorldGen.LowNoise = Rng_U64(&Rng);
-	GlobalWorldGen.HighNoise = Rng_U64(&Rng);
-	GlobalWorldGen.SelectorNoise = Rng_U64(&Rng);
+		.LowNoise = Rng_U64(&Rng),
+		.HighNoise = Rng_U64(&Rng),
+		.SelectorNoise = Rng_U64(&Rng),
+	};
 }

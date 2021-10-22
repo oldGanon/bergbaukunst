@@ -74,6 +74,9 @@ void Server_ClientConnect(server *Server, u32 ClientId)
     {
         ivec2 ChunkPos = (ivec2){ x, y };
         chunk *Chunk = World_GetChunk(&Server->World, ChunkPos);
+        if (!Chunk) continue;
+        if ((Chunk->Flags & CHUNK_COMPLETE) != (CHUNK_COMPLETE)) continue;
+
         Message_ChunkData(&Message, Chunk);
         Network_ServerSendMessage(&Server->Server, ClientId, &Message);
     }
@@ -83,22 +86,12 @@ void Server_ClientConnect(server *Server, u32 ClientId)
     FOREACH_ENTITY(EntityId, Manager)
     {
         entity *Entity = EntityManager_GetEntity(Manager, EntityId);
-        if (Entity->Type == ENTITY_NONE)
-            continue;
+        if (Entity->Type == ENTITY_NONE) continue;
 
         ivec2 Chunk = World_ToChunkPosition(Vec3_FloorToIVec3(Entity->Position));
         Message_SetEntity(&Message, EntityId, Entity);
         Server_SendChunkMessage(Server, Chunk, &Message);
     }
-}
-
-void Server_SetBlock(server *Server, ivec3 Position, block Block)
-{
-    World_SetBlock(&Server->World, Position, Block);
-
-    msg Message;
-    Message_SetBlock(&Message, Position, Block);
-    Server_SendChunkMessage(Server, World_ToChunkPosition(Position), &Message);
 }
 
 void Server_ClientDisconnect(server *Server, u32 ClientId, const msg_disconnect *Disconnect)
@@ -144,7 +137,7 @@ void Server_ClientPlaceBlock(server *Server, u32 ClientId, const msg_place_block
     block Block = (block){ .Id = BLOCK_ID_GRAS };
     box ClientPlayerBox = Entity_Box(Player);
     if (!Block_BoxIntersect(Block, PlaceBlock->Position, ClientPlayerBox))
-        Server_SetBlock(Server, PlaceBlock->Position, Block);
+        World_SetBlock(&Server->World, PlaceBlock->Position, Block);
 }
 
 void Server_ClientBreakBlock(server *Server, u32 ClientId, const msg_break_block *BreakBlock)
@@ -153,14 +146,16 @@ void Server_ClientBreakBlock(server *Server, u32 ClientId, const msg_break_block
     if (!Client) return;
 
     block Block = (block){ .Id = BLOCK_ID_AIR };
-    Server_SetBlock(Server, BreakBlock->Position, Block);
+    World_SetBlock(&Server->World, BreakBlock->Position, Block);
 }
 
 void Server_Update(server *Server)
 {
+    // handle new connections
     u32 NewClient = Network_ServerAcceptClient(&Server->Server);
     if (NewClient) Server_ClientConnect(Server, NewClient);
 
+    // receive messages
     msg Message;
     for (u32 i = 1; i < SERVER_MAX_CLIENTS; ++i)
     {
@@ -176,14 +171,27 @@ void Server_Update(server *Server)
                 default: break;
             }
         }
-        
     }
 
+    // update
     World_Update(&Server->World, Vec3_Zero());
+
+    // send chunks
+    chunk_map *ChunkMap = &Server->World.ChunkMap;
+    for (u32 i = 1; i <= ChunkMap->Capacity; ++i)
+    {
+        chunk *Chunk = ChunkMap->Chunks + i;
+        if ((Chunk->Flags & (CHUNK_COMPLETE | CHUNK_CHANGED)) == (CHUNK_COMPLETE | CHUNK_CHANGED))
+        {
+            Chunk->Flags &= ~CHUNK_CHANGED;
+            Message_ChunkData(&Message, Chunk);
+            Server_SendChunkMessage(Server, Chunk->Position, &Message);
+        }
+    }
 
     // send entities
     entity_manager *Manager = &Server->World.EntityManager;
-    for (u32 i = 0; i <= Manager->Capacity; ++i)
+    for (u32 i = 1; i <= Manager->Capacity; ++i)
     {
         server_entity *Entity = &Manager->Entities[i];
         if (Entity->Flags & ENTITY_CHANGED)
