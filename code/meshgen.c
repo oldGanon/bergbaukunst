@@ -35,10 +35,10 @@ quad Block_LeftFace(vec3 Position, u32 Index, const block_group *BlockGroup)
         { BlockGroup->Shades[2][2][0], BlockGroup->Shades[2][1][0], BlockGroup->Shades[2][0][0], },
     };
     f32 Shadow[4] = {
-        (ShadowValues[0][0] + ShadowValues[0][1] + ShadowValues[1][0] + ShadowValues[1][1]) * (0.25f / 15.0f),
-        (ShadowValues[0][1] + ShadowValues[0][2] + ShadowValues[1][1] + ShadowValues[1][2]) * (0.25f / 15.0f),
-        (ShadowValues[1][1] + ShadowValues[1][2] + ShadowValues[2][1] + ShadowValues[2][2]) * (0.25f / 15.0f),
-        (ShadowValues[1][0] + ShadowValues[1][1] + ShadowValues[2][0] + ShadowValues[2][1]) * (0.25f / 15.0f),
+        (ShadowValues[0][0] + ShadowValues[0][1] + ShadowValues[1][0] + ShadowValues[1][1]) * (0.25f / 15.0f) * (12.0f / 15.0f) + (3.0f / 15.0f),
+        (ShadowValues[0][1] + ShadowValues[0][2] + ShadowValues[1][1] + ShadowValues[1][2]) * (0.25f / 15.0f) * (12.0f / 15.0f) + (3.0f / 15.0f),
+        (ShadowValues[1][1] + ShadowValues[1][2] + ShadowValues[2][1] + ShadowValues[2][2]) * (0.25f / 15.0f) * (12.0f / 15.0f) + (3.0f / 15.0f),
+        (ShadowValues[1][0] + ShadowValues[1][1] + ShadowValues[2][0] + ShadowValues[2][1]) * (0.25f / 15.0f) * (12.0f / 15.0f) + (3.0f / 15.0f),
     };
     vec3 Pos = Vec3_Add(Position, (vec3){0,1,0});
     vec2 UV = { (Index & 7) * 16.0f, (Index >> 3) * 16.0f };
@@ -56,10 +56,10 @@ quad Block_RightFace(vec3 Position, u32 Index, const block_group *BlockGroup)
         { BlockGroup->Shades[2][0][2], BlockGroup->Shades[2][1][2], BlockGroup->Shades[2][2][2], },
     };
     f32 Shadow[4] = {
-        (ShadowValues[0][0] + ShadowValues[0][1] + ShadowValues[1][0] + ShadowValues[1][1]) * (0.25f / 15.0f),
-        (ShadowValues[0][1] + ShadowValues[0][2] + ShadowValues[1][1] + ShadowValues[1][2]) * (0.25f / 15.0f),
-        (ShadowValues[1][1] + ShadowValues[1][2] + ShadowValues[2][1] + ShadowValues[2][2]) * (0.25f / 15.0f),
-        (ShadowValues[1][0] + ShadowValues[1][1] + ShadowValues[2][0] + ShadowValues[2][1]) * (0.25f / 15.0f),
+        (ShadowValues[0][0] + ShadowValues[0][1] + ShadowValues[1][0] + ShadowValues[1][1]) * (0.25f / 15.0f) * (12.0f / 15.0f) + (3.0f / 15.0f),
+        (ShadowValues[0][1] + ShadowValues[0][2] + ShadowValues[1][1] + ShadowValues[1][2]) * (0.25f / 15.0f) * (12.0f / 15.0f) + (3.0f / 15.0f),
+        (ShadowValues[1][1] + ShadowValues[1][2] + ShadowValues[2][1] + ShadowValues[2][2]) * (0.25f / 15.0f) * (12.0f / 15.0f) + (3.0f / 15.0f),
+        (ShadowValues[1][0] + ShadowValues[1][1] + ShadowValues[2][0] + ShadowValues[2][1]) * (0.25f / 15.0f) * (12.0f / 15.0f) + (3.0f / 15.0f),
     };
     vec3 Pos = Vec3_Add(Position, (vec3){1,0,0});
     vec2 UV = { (Index & 7) * 16.0f, (Index >> 3) * 16.0f };
@@ -77,10 +77,10 @@ quad Block_FrontFace(vec3 Position, u32 Index, const block_group *BlockGroup)
         { BlockGroup->Shades[2][0][0], BlockGroup->Shades[2][0][1], BlockGroup->Shades[2][0][2], },
     };
     f32 Shadow[4] = {
-        (ShadowValues[0][0] + ShadowValues[0][1] + ShadowValues[1][0] + ShadowValues[1][1]) * (0.25f / 15.0f),
-        (ShadowValues[0][1] + ShadowValues[0][2] + ShadowValues[1][1] + ShadowValues[1][2]) * (0.25f / 15.0f),
-        (ShadowValues[1][1] + ShadowValues[1][2] + ShadowValues[2][1] + ShadowValues[2][2]) * (0.25f / 15.0f),
-        (ShadowValues[1][0] + ShadowValues[1][1] + ShadowValues[2][0] + ShadowValues[2][1]) * (0.25f / 15.0f),
+        (ShadowValues[0][0] + ShadowValues[0][1] + ShadowValues[1][0] + ShadowValues[1][1]) * (0.25f / 15.0f) * ( 9.0f / 15.0f) + (6.0f / 15.0f),
+        (ShadowValues[0][1] + ShadowValues[0][2] + ShadowValues[1][1] + ShadowValues[1][2]) * (0.25f / 15.0f) * ( 9.0f / 15.0f) + (6.0f / 15.0f),
+        (ShadowValues[1][1] + ShadowValues[1][2] + ShadowValues[2][1] + ShadowValues[2][2]) * (0.25f / 15.0f) * ( 9.0f / 15.0f) + (6.0f / 15.0f),
+        (ShadowValues[1][0] + ShadowValues[1][1] + ShadowValues[2][0] + ShadowValues[2][1]) * (0.25f / 15.0f) * ( 9.0f / 15.0f) + (6.0f / 15.0f),
     };
     vec3 Pos = Vec3_Add(Position, (vec3){0,0,0});
     vec2 UV = { (Index & 7) * 16.0f, (Index >> 3) * 16.0f };
@@ -98,10 +98,10 @@ quad Block_BackFace(vec3 Position, u32 Index, const block_group *BlockGroup)
         { BlockGroup->Shades[2][2][2], BlockGroup->Shades[2][2][1], BlockGroup->Shades[2][2][0], },
     };
     f32 Shadow[4] = {
-        (ShadowValues[0][0] + ShadowValues[0][1] + ShadowValues[1][0] + ShadowValues[1][1]) * (0.25f / 15.0f),
-        (ShadowValues[0][1] + ShadowValues[0][2] + ShadowValues[1][1] + ShadowValues[1][2]) * (0.25f / 15.0f),
-        (ShadowValues[1][1] + ShadowValues[1][2] + ShadowValues[2][1] + ShadowValues[2][2]) * (0.25f / 15.0f),
-        (ShadowValues[1][0] + ShadowValues[1][1] + ShadowValues[2][0] + ShadowValues[2][1]) * (0.25f / 15.0f),
+        (ShadowValues[0][0] + ShadowValues[0][1] + ShadowValues[1][0] + ShadowValues[1][1]) * (0.25f / 15.0f) * ( 9.0f / 15.0f) + (6.0f / 15.0f),
+        (ShadowValues[0][1] + ShadowValues[0][2] + ShadowValues[1][1] + ShadowValues[1][2]) * (0.25f / 15.0f) * ( 9.0f / 15.0f) + (6.0f / 15.0f),
+        (ShadowValues[1][1] + ShadowValues[1][2] + ShadowValues[2][1] + ShadowValues[2][2]) * (0.25f / 15.0f) * ( 9.0f / 15.0f) + (6.0f / 15.0f),
+        (ShadowValues[1][0] + ShadowValues[1][1] + ShadowValues[2][0] + ShadowValues[2][1]) * (0.25f / 15.0f) * ( 9.0f / 15.0f) + (6.0f / 15.0f),
     };
     vec3 Pos = Vec3_Add(Position, (vec3){1,1,0});
     vec2 UV = { (Index & 7) * 16.0f, (Index >> 3) * 16.0f };
@@ -119,10 +119,10 @@ quad Block_BottomFace(vec3 Position, u32 Index, const block_group *BlockGroup)
         { BlockGroup->Shades[0][0][0], BlockGroup->Shades[0][0][1], BlockGroup->Shades[0][0][2], },
     };
     f32 Shadow[4] = {
-        (ShadowValues[0][0] + ShadowValues[0][1] + ShadowValues[1][0] + ShadowValues[1][1]) * (0.25f / 15.0f),
-        (ShadowValues[0][1] + ShadowValues[0][2] + ShadowValues[1][1] + ShadowValues[1][2]) * (0.25f / 15.0f),
-        (ShadowValues[1][1] + ShadowValues[1][2] + ShadowValues[2][1] + ShadowValues[2][2]) * (0.25f / 15.0f),
-        (ShadowValues[1][0] + ShadowValues[1][1] + ShadowValues[2][0] + ShadowValues[2][1]) * (0.25f / 15.0f),
+        (ShadowValues[0][0] + ShadowValues[0][1] + ShadowValues[1][0] + ShadowValues[1][1]) * (0.25f / 15.0f) * ( 7.0f / 15.0f) + (8.0f / 15.0f),
+        (ShadowValues[0][1] + ShadowValues[0][2] + ShadowValues[1][1] + ShadowValues[1][2]) * (0.25f / 15.0f) * ( 7.0f / 15.0f) + (8.0f / 15.0f),
+        (ShadowValues[1][1] + ShadowValues[1][2] + ShadowValues[2][1] + ShadowValues[2][2]) * (0.25f / 15.0f) * ( 7.0f / 15.0f) + (8.0f / 15.0f),
+        (ShadowValues[1][0] + ShadowValues[1][1] + ShadowValues[2][0] + ShadowValues[2][1]) * (0.25f / 15.0f) * ( 7.0f / 15.0f) + (8.0f / 15.0f),
     };
     vec3 Pos = Vec3_Add(Position, (vec3){0,1,0});
     vec2 UV = { (Index & 7) * 16.0f, (Index >> 3) * 16.0f };
@@ -140,10 +140,10 @@ quad Block_TopFace(vec3 Position, u32 Index, const block_group *BlockGroup)
         { BlockGroup->Shades[2][2][0], BlockGroup->Shades[2][2][1], BlockGroup->Shades[2][2][2], },
     };
     f32 Shadow[4] = {
-        (ShadowValues[0][0] + ShadowValues[0][1] + ShadowValues[1][0] + ShadowValues[1][1]) * (0.25f / 15.0f),
-        (ShadowValues[0][1] + ShadowValues[0][2] + ShadowValues[1][1] + ShadowValues[1][2]) * (0.25f / 15.0f),
-        (ShadowValues[1][1] + ShadowValues[1][2] + ShadowValues[2][1] + ShadowValues[2][2]) * (0.25f / 15.0f),
-        (ShadowValues[1][0] + ShadowValues[1][1] + ShadowValues[2][0] + ShadowValues[2][1]) * (0.25f / 15.0f),
+        (ShadowValues[0][0] + ShadowValues[0][1] + ShadowValues[1][0] + ShadowValues[1][1]) * (0.25f / 15.0f) + (0.0f / 15.0f),
+        (ShadowValues[0][1] + ShadowValues[0][2] + ShadowValues[1][1] + ShadowValues[1][2]) * (0.25f / 15.0f) + (0.0f / 15.0f),
+        (ShadowValues[1][1] + ShadowValues[1][2] + ShadowValues[2][1] + ShadowValues[2][2]) * (0.25f / 15.0f) + (0.0f / 15.0f),
+        (ShadowValues[1][0] + ShadowValues[1][1] + ShadowValues[2][0] + ShadowValues[2][1]) * (0.25f / 15.0f) + (0.0f / 15.0f),
     };
     vec3 Pos = Vec3_Add(Position, (vec3){0,0,1});
     vec2 UV = { (Index & 7) * 16.0f, (Index >> 3) * 16.0f };

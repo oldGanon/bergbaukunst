@@ -137,10 +137,10 @@ void Client_Draw(client *Client, bitmap Target, f32 DeltaTime)
     ivec2 Position = Draw_String(Target, Client->Font, COLOR_WHITE, (ivec2){8,16}, "Fps: ");
     Draw_Number(Target, Client->Font, COLOR_WHITE, Position, Client->Fps);
 
-    vec3 A = Camera_WorldToScreen(Client->Camera, Target, (vec3) {  0, 0, 1 });
-    vec3 B = Camera_WorldToScreen(Client->Camera, Target, (vec3) { 16, 0, 1 });
-    vec3 C = Camera_WorldToScreen(Client->Camera, Target, (vec3) { 16,16, 1 });
-    vec3 D = Camera_WorldToScreen(Client->Camera, Target, (vec3) {  0,16, 1 });
+    vec3 A = Camera_WorldToScreen(Client->Camera, Target, (vec3) {  0, 0, 64 });
+    vec3 B = Camera_WorldToScreen(Client->Camera, Target, (vec3) { 16, 0, 64 });
+    vec3 C = Camera_WorldToScreen(Client->Camera, Target, (vec3) { 16,16, 64 });
+    vec3 D = Camera_WorldToScreen(Client->Camera, Target, (vec3) {  0,16, 64 });
     Draw_Line(Target, COLOR_WHITE, A, B);
     Draw_Line(Target, COLOR_WHITE, B, C);
     Draw_Line(Target, COLOR_WHITE, C, D);

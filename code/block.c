@@ -43,6 +43,10 @@ const u8 Block_Opaque[256] = {
     [BLOCK_ID_SAND] = true,
 };
 
+const u8 Block_Transparent[256] = {
+    [BLOCK_ID_AIR] = true,
+};
+
 typedef enum block_face
 {
     BLOCK_FACE_NONE,

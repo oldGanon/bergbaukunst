@@ -1215,10 +1215,6 @@ static void Rasterizer__Rasterize(rasterizer_tile *Tile)
                     __m256i Mask = _mm256_or_si256(DepthMask, EdgeMask);
                     if (!_mm256_test_all_ones(Mask))
                     {
-                        // depth update
-                        Depth = _mm256_blendv_ps(ZZ, Depth, _mm256_castsi256_ps(Mask));
-                        _mm256_storeu_ps(DepthPtr, Depth);
-
                         // interpolation factors
                         __m256 ZZZ = _mm256_div_ps(One, ZZ);
                         __m256 AAA = _mm256_mul_ps(AA, ZZZ);
@@ -1255,6 +1251,10 @@ static void Rasterizer__Rasterize(rasterizer_tile *Tile)
                         Dst = _mm256_shuffle_epi8(Dst, _mm256_set_epi8(0,0,0,0,0,0,0,0,0,0,0,0,12,8,4,0,0,0,0,0,0,0,0,0,0,0,0,0,12,8,4,0));
                         _mm_storeu_si32(Dst0, _mm256_castsi256_si128(Dst));
                         _mm_storeu_si32(Dst1, _mm256_extracti128_si256(Dst, 1));
+
+                        // depth update
+                        Depth = _mm256_blendv_ps(ZZ, Depth, _mm256_castsi256_ps(Mask));
+                        _mm256_storeu_ps(DepthPtr, Depth);
                     }
 
                     Pixel += PACK_WIDTH;

@@ -81,6 +81,7 @@ void Chunk_CalcLight(void *Data, get_chunk_func *GetChunk, ivec2 ChunkPosition)
     // read values
     u8 Shades[CHUNK_HEIGHT][CHUNK_WIDTH * 3][CHUNK_WIDTH * 3] = { 0 };
     u8 Opaque[CHUNK_HEIGHT][CHUNK_WIDTH * 3][CHUNK_WIDTH * 3] = { 0 };
+    u8 Transp[CHUNK_HEIGHT][CHUNK_WIDTH * 3][CHUNK_WIDTH * 3] = { 0 };
     for (u32 cy = 0; cy < 3; ++cy)
     for (u32 cx = 0; cx < 3; ++cx)
     {
@@ -93,6 +94,7 @@ void Chunk_CalcLight(void *Data, get_chunk_func *GetChunk, ivec2 ChunkPosition)
             u8 Block = Chunk->Blocks[bz][by][bx].Id;
             Shades[bz][cy * CHUNK_WIDTH + by][cx * CHUNK_WIDTH + bx] = Chunk->Shades[bz][by][bx];
             Opaque[bz][cy * CHUNK_WIDTH + by][cx * CHUNK_WIDTH + bx] = (Block_Opaque[Block]) ? 0xF : 0x0;
+            Transp[bz][cy * CHUNK_WIDTH + by][cx * CHUNK_WIDTH + bx] = (Block_Transparent[Block]) ? 0x0 : 0xF;
         }
     }
 
@@ -103,8 +105,8 @@ void Chunk_CalcLight(void *Data, get_chunk_func *GetChunk, ivec2 ChunkPosition)
         __m256i S1 = _mm256_set1_epi8(0);
         for (i32 z = CHUNK_HEIGHT - 1; z >= 0; --z)
         {
-            __m256i O0 = _mm256_loadu_si256((__m256i*)&Opaque[z][y][1]);
-            __m256i O1 = _mm256_loadu_si256((__m256i*)&Opaque[z][y][15]);
+            __m256i O0 = _mm256_loadu_si256((__m256i*)&Transp[z][y][1]);
+            __m256i O1 = _mm256_loadu_si256((__m256i*)&Transp[z][y][15]);
             S0 = _mm256_or_si256(S0, O0);
             S1 = _mm256_or_si256(S1, O1);
             _mm256_store_si256((__m256i*)&Shades[z][y][1], S0);
@@ -269,7 +271,7 @@ block ChunkGroup_GetBlock(const chunk_group *ChunkGroup, ivec3 WorldPosition)
         GroupPosition.y < -1 || GroupPosition.y > 1)
         return DEFAULT_BLOCK;
 
-    chunk *Chunk = ChunkGroup->Chunks[GroupPosition.x + 1][GroupPosition.y + 1];
+    chunk *Chunk = ChunkGroup->Chunks[GroupPosition.y + 1][GroupPosition.x + 1];
     return Chunk_GetBlock(Chunk, WorldPosition);
 }
 
@@ -280,7 +282,7 @@ void ChunkGroup_SetBlock(const chunk_group *ChunkGroup, ivec3 WorldPosition, blo
         GroupPosition.y < -1 || GroupPosition.y > 1)
         return;
 
-    chunk *Chunk = ChunkGroup->Chunks[GroupPosition.x + 1][GroupPosition.y + 1];
+    chunk *Chunk = ChunkGroup->Chunks[GroupPosition.y + 1][GroupPosition.x + 1];
     Chunk_SetBlock(Chunk, WorldPosition, Block);
 }
 
