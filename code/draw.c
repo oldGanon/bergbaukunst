@@ -941,7 +941,7 @@ typedef struct rasterizer_tile
     event Start;
     event Finish;
 
-    u8 ColorBuffer[RASTERIZER_TILE_WIDTH * RASTERIZER_TILE_HEIGHT];
+    u32 ColorBuffer[RASTERIZER_TILE_WIDTH * RASTERIZER_TILE_HEIGHT];
     f32 DepthBuffer[RASTERIZER_TILE_WIDTH * RASTERIZER_TILE_HEIGHT];
 } rasterizer_tile;
 
@@ -968,7 +968,7 @@ global rasterizer GlobalRasterizer;
 static void Rasterizer__Rasterize(rasterizer_tile *Tile)
 {
     const u8 *Texture = (u8 *)Tile->Texture.Pixels;
-    u8 *ColorBuffer = Tile->ColorBuffer;
+    u32 *ColorBuffer = Tile->ColorBuffer;
     f32 *DepthBuffer = Tile->DepthBuffer;
 
     if (!Tile->TriangleCount) return;
@@ -1189,7 +1189,7 @@ static void Rasterizer__Rasterize(rasterizer_tile *Tile)
 
             i32 PixelX = (iMinX - OffsetX);
             i32 PixelY = (iMinY - OffsetY);
-            i32 RowPixel = PixelY * TilePitch + PixelX;
+            i32 RowPixel = PixelY * TilePitch + PixelX * PACK_HEIGHT;
             i32 RowDepthPixel = PixelY * TilePitch + PixelX * PACK_HEIGHT;
 
             for(i32 y = iMinY; y < iMaxY; y += PACK_HEIGHT)
@@ -1209,11 +1209,11 @@ static void Rasterizer__Rasterize(rasterizer_tile *Tile)
                 for(i32 x = iMinX; x < iMaxX; x += PACK_WIDTH)
                 {
                     f32 *DepthPtr = DepthBuffer + DepthPixel;
-                    __m256 Depth = _mm256_loadu_ps(DepthPtr);
-                    __m256i DepthMask = _mm256_castps_si256(_mm256_cmp_ps(ZZ, Depth, _CMP_LE_OQ));   
-                    __m256i EdgeMask = _mm256_srai_epi32(_mm256_castps_si256(_mm256_or_ps(_mm256_or_ps(Alpha, Beta), Gamma)), 32);
-                    __m256i Mask = _mm256_or_si256(DepthMask, EdgeMask);
-                    if (!_mm256_test_all_ones(Mask))
+                    __m256 Depth = _mm256_load_ps(DepthPtr);
+                    __m256i DepthMask = _mm256_castps_si256(_mm256_cmp_ps(Depth, ZZ, _CMP_LT_OQ));
+                    __m256i EdgeMask = _mm256_srai_epi32(_mm256_castps_si256(_mm256_or_ps(_mm256_or_ps(Alpha, Beta), Gamma)), 31);
+                    __m256i Mask = _mm256_andnot_si256(EdgeMask, DepthMask);
+                    if (!_mm256_test_all_zeros(Mask, Mask))
                     {
                         // interpolation factors
                         __m256 ZZZ = _mm256_div_ps(One, ZZ);
@@ -1232,32 +1232,25 @@ static void Rasterizer__Rasterize(rasterizer_tile *Tile)
                         __m256i iVVV = _mm256_and_si256(_mm256_cvttps_epi32(VVV), VMask);
                         __m256i iSSS = _mm256_and_si256(_mm256_cvttps_epi32(SSS), SMask);
 
-                        __m256i iUU8 = _mm256_add_epi32(iUUU, _mm256_mullo_epi32(VMul, iVVV));
+                        __m256i iUV8 = _mm256_add_epi32(iUUU, _mm256_mullo_epi32(VMul, iVVV));
 
                         // gather
-                        u8 *Dst0 = ColorBuffer + Pixel;
-                        u8 *Dst1 = Dst0 + TilePitch;
-                        __m256i Dst = _mm256_set_m128i(_mm_loadu_si32(Dst1), _mm_loadu_si32(Dst0));
-                        Dst = _mm256_shuffle_epi8(Dst, _mm256_set_epi8(3,3,3,3,2,2,2,2,1,1,1,1,0,0,0,0,3,3,3,3,2,2,2,2,1,1,1,1,0,0,0,0));
+                        int *DstPtr = (int *)(ColorBuffer + Pixel);
 
                         // shade
-                        __m256i Tex = _mm256_i32gather_epi32((const int *)Texture, iUU8, 1);
+                        __m256i Tex = _mm256_i32gather_epi32((const int *)Texture, iUV8, 1);
                         Tex = _mm256_and_si256(Tex, _mm256_set1_epi32(0xF8));
-                        Mask = _mm256_or_si256(Mask, _mm256_cmpeq_epi32(Tex, _mm256_setzero_si256()));
+                        Mask = _mm256_andnot_si256(_mm256_cmpeq_epi32(Tex, _mm256_setzero_si256()), Mask);
                         Tex = _mm256_or_si256(Tex, iSSS);
-                        Dst = _mm256_blendv_epi8(Tex, Dst, Mask);
 
                         // scatter
-                        Dst = _mm256_shuffle_epi8(Dst, _mm256_set_epi8(0,0,0,0,0,0,0,0,0,0,0,0,12,8,4,0,0,0,0,0,0,0,0,0,0,0,0,0,12,8,4,0));
-                        _mm_storeu_si32(Dst0, _mm256_castsi256_si128(Dst));
-                        _mm_storeu_si32(Dst1, _mm256_extracti128_si256(Dst, 1));
+                        _mm256_maskstore_epi32(DstPtr, Mask, Tex);
 
                         // depth update
-                        Depth = _mm256_blendv_ps(ZZ, Depth, _mm256_castsi256_ps(Mask));
-                        _mm256_storeu_ps(DepthPtr, Depth);
+                        _mm256_maskstore_ps(DepthPtr, Mask, ZZ);
                     }
 
-                    Pixel += PACK_WIDTH;
+                    Pixel += PACK_WIDTH * PACK_HEIGHT;
                     DepthPixel += PACK_WIDTH * PACK_HEIGHT;
                     Alpha = _mm256_add_ps(Alpha, F12_dx8);
                     Beta  = _mm256_add_ps(Beta,  F20_dx8);
@@ -1523,7 +1516,7 @@ void Rasterizer_Clear(color Color)
     u32 PixelCount = RASTERIZER_TILE_WIDTH * RASTERIZER_TILE_HEIGHT;
     for (u32 i = 0; i < RASTERIZER_TILE_COUNT; ++i)
     {
-        memset(Rasterizer->Tiles[i].ColorBuffer, Color.Value, PixelCount * sizeof(u8));
+        memset(Rasterizer->Tiles[i].ColorBuffer, Color.Value, PixelCount * sizeof(u32));
         memset(Rasterizer->Tiles[i].DepthBuffer, 0, PixelCount * sizeof(f32));
     }
 }
@@ -1564,17 +1557,27 @@ void Rasterizer_Blit(bitmap Target)
         i32 Width = MaxX - MinX;
         i32 Height = MaxY - MinY;
 
-        u8 *SrcRow = Tile->ColorBuffer;
+        u32 *SrcRow = Tile->ColorBuffer;
         u8 *DstRow = &Target.Pixels->Value + MinY * Target.Pitch + MinX;
 
-        for (i32 y = 0; y < Height; ++y)
+        for (i32 y = 0; y < Height / PACK_HEIGHT; ++y)
         {
-            u8 *Src = SrcRow;
-            u8 *Dst = DstRow;
-            for (i32 x = 0; x < Width; ++x)
-                *Dst++ = *Src++;
-            SrcRow += RASTERIZER_TILE_WIDTH;
-            DstRow += Target.Pitch;
+            u32 *Src = SrcRow;
+            u8 *Dst0 = DstRow;
+            u8 *Dst1 = DstRow + Target.Pitch;
+            for (i32 x = 0; x < Width / PACK_WIDTH; ++x)
+            {
+                *Dst0++ = (u8)*Src++;
+                *Dst0++ = (u8)*Src++;
+                *Dst0++ = (u8)*Src++;
+                *Dst0++ = (u8)*Src++;
+                *Dst1++ = (u8)*Src++;
+                *Dst1++ = (u8)*Src++;
+                *Dst1++ = (u8)*Src++;
+                *Dst1++ = (u8)*Src++;
+            }
+            SrcRow += RASTERIZER_TILE_WIDTH * PACK_HEIGHT;
+            DstRow += Target.Pitch * PACK_HEIGHT;
         }
     }
 }
