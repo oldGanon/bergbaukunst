@@ -468,14 +468,28 @@ inline ivec3 iVec3_Sub(ivec3 A, ivec3 B) { STORE_IVEC3(A, _mm_sub_epi32(LOAD_IVE
 inline ivec3 iVec3_Mul(ivec3 A, ivec3 B) { STORE_IVEC3(A, _mm_mul_epi32(LOAD_IVEC3(A), LOAD_IVEC3(B))); return A; }
 inline ivec3 iVec3_Div(ivec3 A, ivec3 B) { STORE_IVEC3(A, _mm_div_epi32(LOAD_IVEC3(A), LOAD_IVEC3(B))); return A; }
 
+// GENERAL FUNCTIONS
+inline ivec3 iVec3_Abs(ivec3 A)          { STORE_IVEC3(A, _mm_abs_epi32(LOAD_IVEC3(A))); return A; }
+inline ivec3 iVec3_Min(ivec3 A, ivec3 B) { STORE_IVEC3(A, _mm_min_epi32(LOAD_IVEC3(A), LOAD_IVEC3(B))); return A; }
+inline ivec3 iVec3_Max(ivec3 A, ivec3 B) { STORE_IVEC3(A, _mm_max_epi32(LOAD_IVEC3(A), LOAD_IVEC3(B))); return A; }
+
+// INTEGER FUNCTIONS
 inline ivec3 iVec3_ShiftLeft(ivec3 A, i32 S) { STORE_IVEC3(A, _mm_slli_epi32(LOAD_IVEC3(A), S)); return A; }
 inline ivec3 iVec3_ShiftRight(ivec3 A, i32 S) { STORE_IVEC3(A, _mm_srai_epi32(LOAD_IVEC3(A), S)); return A; }
 inline ivec3 iVec3_And(ivec3 A, ivec3 B) { STORE_IVEC3(A, _mm_and_si128(LOAD_IVEC3(A), LOAD_IVEC3(B))); return A; }
 inline ivec3 iVec3_Or(ivec3 A, ivec3 B) { STORE_IVEC3(A, _mm_or_si128(LOAD_IVEC3(A), LOAD_IVEC3(B))); return A; }
 inline ivec3 iVec3_Xor(ivec3 A, ivec3 B) { STORE_IVEC3(A, _mm_xor_si128(LOAD_IVEC3(A), LOAD_IVEC3(B))); return A; }
 
-inline ivec3 iVec3_Min(ivec3 A, ivec3 B) { STORE_IVEC3(A, _mm_min_epi32(LOAD_IVEC3(A), LOAD_IVEC3(B))); return A; }
-inline ivec3 iVec3_Max(ivec3 A, ivec3 B) { STORE_IVEC3(A, _mm_max_epi32(LOAD_IVEC3(A), LOAD_IVEC3(B))); return A; }
+// VECTOR FUNCTIONS
+inline i32 iVec3_Sum(ivec3 A)
+{
+    __m128i V = LOAD_IVEC3(A);
+    
+    __m128i Sum = V;
+    Sum = _mm_add_epi32(Sum, _mm_shuffle_epi32(V, _MM_SHUFFLE(0,0,0,1)));
+    Sum = _mm_add_epi32(Sum, _mm_shuffle_epi32(V, _MM_SHUFFLE(0,0,0,2)));
+    return _mm_cvtsi128_si32(Sum);
+}
 
 /******************/
 /* Vec3 <-> iVec3 */

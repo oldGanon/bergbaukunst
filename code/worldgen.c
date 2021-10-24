@@ -206,14 +206,22 @@ void WorldGen_GrowTree(chunk_group *ChunkGroup, ivec2 Tree)
 {
     for (i32 zz = CHUNK_HEIGHT - 1; zz >= 64; --zz)
     {
-        ivec3 BlockPosition = { Tree.x, Tree.y, zz };
-        if (ChunkGroup_GetBlock(ChunkGroup, BlockPosition).Id != BLOCK_ID_GRAS)
+        ivec3 GrasPosition = { Tree.x, Tree.y, zz };
+        if (ChunkGroup_GetBlock(ChunkGroup, GrasPosition).Id != BLOCK_ID_GRAS)
             continue;
 
+        ivec3 LeaveCenter = (ivec3){ Tree.x, Tree.y, zz+5 };
         for (i32 x = -2; x <= 2; ++x)
         for (i32 y = -2; y <= 2; ++y)
         for (i32 z = -2; z <= 2; ++z)
-            ChunkGroup_SetBlock(ChunkGroup, (ivec3){ Tree.x+x, Tree.y+y, zz+5+z}, (block){ BLOCK_ID_LEAVES });
+        {
+            ivec3 LeavePosition = (ivec3){ Tree.x+x, Tree.y+y, zz+5+z };
+            i32 LeaveDist = iVec3_Sum(iVec3_Abs(iVec3_Sub(LeavePosition, LeaveCenter)));
+            if (LeaveDist > 3) continue;
+            if (ChunkGroup_GetBlock(ChunkGroup, LeavePosition).Id != BLOCK_ID_AIR)
+                continue;
+            ChunkGroup_SetBlock(ChunkGroup, LeavePosition, (block){ BLOCK_ID_LEAVES });
+        }
 
         ChunkGroup_SetBlock(ChunkGroup, (ivec3){ Tree.x, Tree.y, zz+1}, (block){ BLOCK_ID_WOOD });
         ChunkGroup_SetBlock(ChunkGroup, (ivec3){ Tree.x, Tree.y, zz+2}, (block){ BLOCK_ID_WOOD });
@@ -254,10 +262,10 @@ void WorldGen_DecorateChunk(void *Data, get_chunk_func *GetChunk, ivec2 ChunkPos
     for (u32 y = 4; y < 8; ++y)
     for (u32 x = 4; x < 8; ++x)
     {
-        if (Vec2_Dist(Trees[y][x], Trees[y  ][x+1]) < 4.0f) continue;
-        if (Vec2_Dist(Trees[y][x], Trees[y+1][x-1]) < 4.0f) continue;
-        if (Vec2_Dist(Trees[y][x], Trees[y+1][x  ]) < 4.0f) continue;
-        if (Vec2_Dist(Trees[y][x], Trees[y+1][x+1]) < 4.0f) continue;
+        if (Vec2_Dist(Trees[y][x], Trees[y  ][x+1]) < 3.0f) continue;
+        if (Vec2_Dist(Trees[y][x], Trees[y+1][x-1]) < 3.0f) continue;
+        if (Vec2_Dist(Trees[y][x], Trees[y+1][x  ]) < 3.0f) continue;
+        if (Vec2_Dist(Trees[y][x], Trees[y+1][x+1]) < 3.0f) continue;
         WorldGen_GrowTree(&ChunkGroup, Vec2_FloorToIVec2(Trees[y][x]));
     }
     
