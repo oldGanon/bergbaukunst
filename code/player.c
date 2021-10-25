@@ -28,7 +28,7 @@ vec3 Player_ViewDirection(player *Player)
 box Player_Box(player *Player)
 {
     return (box){
-        .Min = Vec3_Sub(Player->Position, (vec3){ 0.25f, 0.25f, 1.85f }),
+        .Min = Vec3_Sub(Player->Position, (vec3){ 0.25f, 0.25f, 1.75f }),
         .Max = Vec3_Add(Player->Position, (vec3){ 0.25f, 0.25f, 0.15f }),
     };
 }

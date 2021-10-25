@@ -36,7 +36,7 @@ typedef struct world_gen
     u64 BiomeContourSeedY;
 
     // decoration noise
-    u64 TreeNoise;
+    u64 TreeSeed;
 } world_gen;
 
 f32 WorldGen_Noise(u64 Seed, vec2 Position, f32 Lowest, f32 Highest, f32 MaxIncline)
@@ -186,7 +186,8 @@ void WorldGen_GenerateChunk(world_gen *WorldGenerator, chunk *Chunk)
             if (zz < Surface) CurrentBlock->Id = BLOCK_ID_STONE;
         }
 
-        for (i32 zz = CHUNK_HEIGHT - 1; zz >= 64; --zz)
+        // Gras
+        for (i32 zz = CHUNK_HEIGHT - 1; zz > 65; --zz)
         {
             if (Chunk->Blocks[zz][yy][xx].Id != BLOCK_ID_STONE) continue;
             Chunk->Blocks[zz][yy][xx].Id = BLOCK_ID_GRAS;
@@ -195,6 +196,19 @@ void WorldGen_GenerateChunk(world_gen *WorldGenerator, chunk *Chunk)
             if (Chunk->Blocks[zz-2][yy][xx].Id != BLOCK_ID_STONE) break;
             Chunk->Blocks[zz-2][yy][xx].Id = BLOCK_ID_DIRT;
             break;
+        }
+        // Sand
+        if (Chunk->Blocks[66][yy][xx].Id == BLOCK_ID_AIR &&
+            Chunk->Blocks[65][yy][xx].Id == BLOCK_ID_STONE)
+            Chunk->Blocks[65][yy][xx].Id = BLOCK_ID_SAND;
+        if (Chunk->Blocks[65][yy][xx].Id == BLOCK_ID_AIR &&
+            Chunk->Blocks[64][yy][xx].Id == BLOCK_ID_STONE)
+            Chunk->Blocks[64][yy][xx].Id = BLOCK_ID_SAND;
+        // Water
+        for (i32 zz = 64; zz >= 0; --zz)
+        {
+            if (Chunk->Blocks[zz][yy][xx].Id == BLOCK_ID_AIR)
+                Chunk->Blocks[zz][yy][xx].Id = BLOCK_ID_WATER;
         }
 #endif
     }
@@ -232,21 +246,21 @@ void WorldGen_GrowTree(chunk_group *ChunkGroup, ivec2 Tree)
     }
 }
 
-void WorldGen_DecorateChunk(void *Data, get_chunk_func *GetChunk, ivec2 ChunkPosition)
+void WorldGen_DecorateChunk(world_gen *WorldGenerator, void *Data, get_chunk_func *GetChunk, ivec2 ChunkPosition)
 {
     // get chunk group
     chunk_group ChunkGroup = Chunk_Group(Data, GetChunk, ChunkPosition);
     if (!ChunkGroup_Complete(&ChunkGroup)) return;
 
     // get tree positions
-    vec2 Trees[12][12];
+    vec3 Trees[12][12];
     for (u32 y = 0; y < 3; ++y)
     for (u32 x = 0; x < 3; ++x)
     {
         ivec2 iOffset = { x - 1, y - 1 };
         ivec2 iChunkPos = iVec2_Add(ChunkPosition, iOffset);
         vec2 ChunkPos = Vec2_Mul(iVec2_toVec2(iChunkPos), Vec2_Set1(4));
-        rng Rng = Rng_Init(Hash_IVec2(iChunkPos));
+        rng Rng = Rng_Init(Hash_IVec2Seeded(WorldGenerator->TreeSeed, iChunkPos));
         for (u32 yy = 0; yy < 4; ++yy)
         for (u32 xx = 0; xx < 4; ++xx)
         {
@@ -254,7 +268,8 @@ void WorldGen_DecorateChunk(void *Data, get_chunk_func *GetChunk, ivec2 ChunkPos
             Tree = Vec2_Add(Tree, Rng_Vec2(&Rng));
             Tree = Vec2_Add(Tree, (vec2){ (f32)xx, (f32)yy });
             Tree = Vec2_Mul(Tree, Vec2_Set1(4));
-            Trees[y * 4 + yy][x * 4 + xx] = Tree;
+            Trees[y * 4 + yy][x * 4 + xx].xy = Tree;
+            Trees[y * 4 + yy][x * 4 + xx].z = Rng_F32(&Rng);
         }
     }
 
@@ -262,11 +277,14 @@ void WorldGen_DecorateChunk(void *Data, get_chunk_func *GetChunk, ivec2 ChunkPos
     for (u32 y = 4; y < 8; ++y)
     for (u32 x = 4; x < 8; ++x)
     {
-        if (Vec2_Dist(Trees[y][x], Trees[y  ][x+1]) < 3.0f) continue;
-        if (Vec2_Dist(Trees[y][x], Trees[y+1][x-1]) < 3.0f) continue;
-        if (Vec2_Dist(Trees[y][x], Trees[y+1][x  ]) < 3.0f) continue;
-        if (Vec2_Dist(Trees[y][x], Trees[y+1][x+1]) < 3.0f) continue;
-        WorldGen_GrowTree(&ChunkGroup, Vec2_FloorToIVec2(Trees[y][x]));
+        vec2 NoisePos = Vec2_Div(Trees[y][x].xy, Vec2_Set1(256.0f));
+        f32 Density = Noise_Simplex2D(WorldGenerator->TreeSeed, NoisePos, 0);
+        if (Trees[y][x].z > Abs(Density)) continue;
+        if (Vec2_Dist(Trees[y][x].xy, Trees[y-1][x-1].xy) < 3.0f) continue;
+        if (Vec2_Dist(Trees[y][x].xy, Trees[y-1][x  ].xy) < 3.0f) continue;
+        if (Vec2_Dist(Trees[y][x].xy, Trees[y-1][x+1].xy) < 3.0f) continue;
+        if (Vec2_Dist(Trees[y][x].xy, Trees[y  ][x-1].xy) < 3.0f) continue;
+        WorldGen_GrowTree(&ChunkGroup, Vec2_FloorToIVec2(Trees[y][x].xy));
     }
     
     ChunkGroup.Chunks[1][1]->Flags |= CHUNK_DECORATED;
@@ -291,6 +309,6 @@ world_gen WorldGen_Create(u64 Seed)
         .BiomeContourSeedY = Rng_U64(&Rng),
 
         // decoration noise
-        .TreeNoise = Rng_U64(&Rng),
+        .TreeSeed = Rng_U64(&Rng),
     };
 }

@@ -22,6 +22,7 @@ enum
     BLOCK_ID_WOOD = 5,
     BLOCK_ID_LEAVES = 6,
     BLOCK_ID_SAND = 7,
+    BLOCK_ID_WATER = 8,
 } block_id;
 
 const u8 Block_Solid[256] = {

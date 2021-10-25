@@ -38,7 +38,7 @@ box Entity_Box(const entity *Entity)
         case ENTITY_PLAYER:
         {
             Box = (box) {
-                .Min = (vec3){-0.25f,-0.25f,-1.85f },
+                .Min = (vec3){-0.25f,-0.25f,-1.75f },
                 .Max = (vec3){ 0.25f, 0.25f, 0.15f },
             };
         } break;

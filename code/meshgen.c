@@ -193,6 +193,28 @@ void Block_AddQuadsToMesh(quad_mesh *Mesh, vec3 Position, const block_group *Blo
     }
 }
 
+void Block_AddWaterQuadsToMesh(quad_mesh *Mesh, vec3 Position, const block_group *BlockGroup)
+{
+    // Top
+    if (BlockGroup->Blocks[2][1][1].Id != BLOCK_ID_WATER)
+    {
+        quad Face = Block_TopFace(Position, 8, BlockGroup);
+        Face.Verts[0].Position.z -= 1.0f / 16.0f;
+        Face.Verts[1].Position.z -= 1.0f / 16.0f;
+        Face.Verts[2].Position.z -= 1.0f / 16.0f;
+        Face.Verts[3].Position.z -= 1.0f / 16.0f;
+        Mesh_AddQuad(Mesh, Face);
+
+        vertex T = Face.Verts[0];
+        Face.Verts[0] = Face.Verts[3];
+        Face.Verts[3] = T;
+        T = Face.Verts[1];
+        Face.Verts[1] = Face.Verts[2];
+        Face.Verts[2] = T;
+        Mesh_AddQuad(Mesh, Face);
+    }
+}
+
 void View_GenerateChunkMesh(view *View, ivec2 ChunkPosition)
 {
     view_chunk *Chunk = View_GetViewChunk(View, ChunkPosition);
@@ -254,6 +276,11 @@ void View_GenerateChunkMesh(view *View, ivec2 ChunkPosition)
             case BLOCK_ID_SAND:
             {
                 Block_AddQuadsToMesh(&Chunk->Mesh, BlockPosition, &BlockGroup, 6, 6, 6, 6, 6, 6);
+            } break;
+
+            case BLOCK_ID_WATER:
+            {
+                Block_AddWaterQuadsToMesh(&Chunk->Mesh, BlockPosition, &BlockGroup);
             } break;
         }
     }

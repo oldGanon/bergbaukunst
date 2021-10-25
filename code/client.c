@@ -45,6 +45,7 @@ typedef struct client
 
     /* RESOURCES */
     palette Palette;
+    palette PaletteWater;
     bitmap Terrain;
     bitmap Font;
 
@@ -70,6 +71,7 @@ void Client_Init(client *Client, const char *Ip)
     Client->Terrain = Win32_LoadBitmap("TERRAIN");
     Client->Font = Win32_LoadBitmap("FONT");
     Client->Palette = Win32_LoadPalette("PALETTE");
+    Client->PaletteWater = Win32_LoadPalette("PALETTE_WATER");
     Win32_SetPalette(&Client->Palette);
 
     /* STATE */
@@ -124,7 +126,21 @@ void Client_Update(client *Client, const input Input, f32 DeltaTime)
 
 void Client_Draw(client *Client, bitmap Target, f32 DeltaTime)
 {
-    Rasterizer_Clear(COLOR_SKYBLUE);
+    block CameraBlock = View_GetBlock(&Client->View, Vec3_FloorToIVec3(Client->Camera.Position));
+    if (CameraBlock.Id == BLOCK_ID_AIR)
+    {
+        Rasterizer_Clear(COLOR_SKYBLUE);
+        Win32_SetPalette(&Client->Palette);
+    }
+    else if (CameraBlock.Id == BLOCK_ID_WATER)
+    {
+        Rasterizer_Clear(COLOR_BLUE);
+        Win32_SetPalette(&Client->PaletteWater);
+    }
+    else
+    {
+        Rasterizer_Clear(COLOR_BLACK);
+    }
     Player_Draw(&Client->Player, Client, &Client->Camera, DeltaTime);
     View_Draw(&Client->View, Target, Client->Terrain, Client->Camera);
     Rasterizer_Rasterize();

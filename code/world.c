@@ -60,7 +60,7 @@ void World_Update(world *World, vec3 PlayerPosition)
         chunk *Chunk = ChunkMap_GetChunk(&World->ChunkMap, ChunkPos);
         if (!Chunk) Chunk = ChunkMap_AllocateChunk(&World->ChunkMap, ChunkPos);
         if (!(Chunk->Flags & CHUNK_GENERATED)) WorldGen_GenerateChunk(&World->Generator, Chunk);
-        if (!(Chunk->Flags & CHUNK_DECORATED)) WorldGen_DecorateChunk(World, World_GetChunk, ChunkPos);
+        if (!(Chunk->Flags & CHUNK_DECORATED)) WorldGen_DecorateChunk(&World->Generator, World, World_GetChunk, ChunkPos);
     }
 
     // entities
