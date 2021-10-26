@@ -329,9 +329,9 @@ void Mob_AddMesh(quad_mesh *Mesh)
 
 void View_GenerateMobMesh(view_entity *Entity)
 {
-    if (ENTITY_NONE == Entity->Entity.Type) return;
+    if (ENTITY_NONE == Entity->Base.Type) return;
 
-    switch (Entity->Entity.Type)
+    switch (Entity->Base.Type)
     {
         case(ENTITY_MOB): Mob_AddMesh(&Entity->Mesh); break;
     }

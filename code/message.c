@@ -44,7 +44,9 @@ typedef struct msg_view_position
 typedef struct msg_chunk_data
 {
     ivec2 Position;
-    u8 Blocks[CHUNK_HEIGHT][CHUNK_WIDTH][CHUNK_WIDTH];
+    ivec3 MinBlock;
+    ivec3 MaxBlock;
+    u8 Blocks[CHUNK_HEIGHT * CHUNK_WIDTH * CHUNK_WIDTH];
 } msg_chunk_data;
 
 typedef struct msg_set_block
@@ -138,19 +140,25 @@ void Message_ViewPosition(msg *Message, ivec2 ViewPosition)
     Message->ViewPosition.Position = ViewPosition;
 }
 
-void Message_ChunkData(msg *Message, chunk *Chunk)
+void Message_ChunkData(msg *Message, chunk *Chunk, ivec3 MinBlock, ivec3 MaxBlock)
 {
     Message->Header.Type = MSG_CHUNK_DATA;
     Message->Header.Size = sizeof(msg_header) + sizeof(msg_chunk_data);
 
     Message->ChunkData.Position = Chunk->Position;
 
-    for (u32 z = 0; z < CHUNK_HEIGHT; ++z)
-    for (u32 y = 0; y < CHUNK_WIDTH; ++y)
-    for (u32 x = 0; x < CHUNK_WIDTH; ++x)
-    {
-        Message->ChunkData.Blocks[z][y][x] = Chunk->Blocks[z][y][x].Id;
-    }
+    ivec3 ChunkMin = (ivec3){ 0, 0, 0 };
+    ivec3 ChunkMax = (ivec3){ CHUNK_WIDTH_MASK, CHUNK_WIDTH_MASK, CHUNK_HEIGHT_MASK };
+    ivec3 Min = iVec3_Max(ChunkMin, iVec3_Min(MinBlock, MaxBlock));
+    ivec3 Max = iVec3_Min(ChunkMax, iVec3_Max(MinBlock, MaxBlock));
+    Message->ChunkData.MinBlock = Min;
+    Message->ChunkData.MaxBlock = Max;
+    ivec3 Dim = iVec3_Sub(Max, Min);
+    u8 *BlockPtr = Message->ChunkData.Blocks;
+    for (i32 z = 0; z <= Dim.z; ++z)
+    for (i32 y = 0; y <= Dim.y; ++y)
+    for (i32 x = 0; x <= Dim.x; ++x)
+        *BlockPtr++ = Chunk->Blocks[Min.z+z][Min.y+y][Min.x+x].Id;
 }
 
 void Message_SetBlock(msg *Message, ivec3 Position, block Block)

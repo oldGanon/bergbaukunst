@@ -73,11 +73,11 @@ void Server_ClientConnect(server *Server, u32 ClientId)
     for (i32 y = MinPos.y; y < MaxPos.y; y++)
     {
         ivec2 ChunkPos = (ivec2){ x, y };
-        chunk *Chunk = World_GetChunk(&Server->World, ChunkPos);
+        world_chunk *Chunk = World_GetChunk(&Server->World, ChunkPos);
         if (!Chunk) continue;
         if ((Chunk->Flags & CHUNK_COMPLETE) != (CHUNK_COMPLETE)) continue;
 
-        Message_ChunkData(&Message, Chunk);
+        Message_ChunkData(&Message, &Chunk->Base, (ivec3){0,0,0}, (ivec3){CHUNK_WIDTH_MASK,CHUNK_WIDTH_MASK,CHUNK_HEIGHT_MASK});
         Network_ServerSendMessage(&Server->Server, ClientId, &Message);
     }
 
@@ -151,10 +151,6 @@ void Server_ClientBreakBlock(server *Server, u32 ClientId, const msg_break_block
 
 void Server_Update(server *Server)
 {
-    // handle new connections
-    u32 NewClient = Network_ServerAcceptClient(&Server->Server);
-    if (NewClient) Server_ClientConnect(Server, NewClient);
-
     // receive messages
     msg Message;
     for (u32 i = 1; i < SERVER_MAX_CLIENTS; ++i)
@@ -177,15 +173,17 @@ void Server_Update(server *Server)
     World_Update(&Server->World, Vec3_Zero());
 
     // send chunks
-    chunk_map *ChunkMap = &Server->World.ChunkMap;
+    world_chunk_map *ChunkMap = &Server->World.ChunkMap;
     for (u32 i = 1; i <= ChunkMap->Capacity; ++i)
     {
-        chunk *Chunk = ChunkMap->Chunks + i;
+        world_chunk *Chunk = ChunkMap->Chunks + i;
         if ((Chunk->Flags & (CHUNK_COMPLETE | CHUNK_CHANGED)) == (CHUNK_COMPLETE | CHUNK_CHANGED))
         {
+            Message_ChunkData(&Message, &Chunk->Base, Chunk->ChangedMin, Chunk->ChangedMax);
+            Server_SendChunkMessage(Server, Chunk->Base.Position, &Message);
+            Chunk->ChangedMin = (ivec3){CHUNK_WIDTH_MASK,CHUNK_WIDTH_MASK,CHUNK_HEIGHT_MASK};
+            Chunk->ChangedMax = (ivec3){0,0,0};
             Chunk->Flags &= ~CHUNK_CHANGED;
-            Message_ChunkData(&Message, Chunk);
-            Server_SendChunkMessage(Server, Chunk->Position, &Message);
         }
     }
 
@@ -202,4 +200,8 @@ void Server_Update(server *Server)
             Server_SendChunkMessage(Server, Chunk, &Message);
         }
     }
+
+    // handle new connections
+    u32 NewClient = Network_ServerAcceptClient(&Server->Server);
+    if (NewClient) Server_ClientConnect(Server, NewClient);
 }

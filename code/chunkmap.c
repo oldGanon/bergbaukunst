@@ -1,31 +1,31 @@
 
-typedef struct chunk_map
+typedef struct world_chunk_map
 {
-    struct chunk *Chunks;
-    struct chunk_map_value *Values;
+    struct world_chunk *Chunks;
+    struct world_chunk_map_value *Values;
     u64 Capacity;
     u64 Count;
     u64 Mask;  
-} chunk_map;
+} world_chunk_map;
 
-chunk_map ChunkMap_Create(void);
-void ChunkMap_Destroy(chunk_map *Map);
-chunk *ChunkMap_AllocateChunk(chunk_map *Map, ivec2 Position);
-void ChunkMap_DestroyChunk(chunk_map *Map, ivec2 Position);
-chunk *ChunkMap_GetChunkById(const chunk_map *Map, u64 ChunkId);
-chunk *ChunkMap_GetChunk(const chunk_map *Map, ivec2 Position);
-u64 ChunkMap_GetChunkId(const chunk_map *Map, ivec2 Position);
+world_chunk_map ChunkMap_Create(void);
+void ChunkMap_Destroy(world_chunk_map *Map);
+world_chunk *ChunkMap_AllocateChunk(world_chunk_map *Map, ivec2 Position);
+void ChunkMap_DestroyChunk(world_chunk_map *Map, ivec2 Position);
+world_chunk *ChunkMap_GetChunkById(const world_chunk_map *Map, u64 ChunkId);
+world_chunk *ChunkMap_GetChunk(const world_chunk_map *Map, ivec2 Position);
+u64 ChunkMap_GetChunkId(const world_chunk_map *Map, ivec2 Position);
 
 /******************/
 /* IMPLEMENTATION */
 /******************/
 
-typedef struct chunk_map_value
+typedef struct world_chunk_map_value
 {
     u64 ChunkId;
     u64 Hash;
     u64 Coord;
-} chunk_map_value;
+} world_chunk_map_value;
 
 #define CHUNK_MAP_MAXLOAD_PERCENT 90
 
@@ -40,17 +40,17 @@ inline u64 ChunkMap_Hash(u64 Coord)
     return Hash;
 }
 
-inline index ChunkMap_HashIndex(const chunk_map *Map, u64 Hash)
+inline index ChunkMap_HashIndex(const world_chunk_map *Map, u64 Hash)
 {
     return Hash & Map->Mask;
 }
 
-inline u64 ChunkMap_ProbeDist(const chunk_map *Map, u64 Pos)
+inline u64 ChunkMap_ProbeDist(const world_chunk_map *Map, u64 Pos)
 {
     return (Pos - ChunkMap_HashIndex(Map, Map->Values[Pos].Hash)) & Map->Mask;
 }
 
-inline u64 ChunkMap_GetIndex(const chunk_map *Map, ivec2 Position)
+inline u64 ChunkMap_GetIndex(const world_chunk_map *Map, ivec2 Position)
 {
     u64 Coord = ChunkMap_Coord(Position);
     u64 Hash = ChunkMap_Hash(Coord);
@@ -72,7 +72,7 @@ inline u64 ChunkMap_GetIndex(const chunk_map *Map, ivec2 Position)
     }
 }
 
-inline void ChunkMap_RemoveIndexMasked(chunk_map *Map, u64 Index, u64 Mask)
+inline void ChunkMap_RemoveIndexMasked(world_chunk_map *Map, u64 Index, u64 Mask)
 {
     for (;;)
     {
@@ -86,16 +86,16 @@ inline void ChunkMap_RemoveIndexMasked(chunk_map *Map, u64 Index, u64 Mask)
         Index = Next;
     }
 
-    Map->Values[Index] = (chunk_map_value){ 0 };
+    Map->Values[Index] = (world_chunk_map_value){ 0 };
     --Map->Count;
 }
 
-inline void ChunkMap_RemoveIndex(chunk_map *Map, u64 Index)
+inline void ChunkMap_RemoveIndex(world_chunk_map *Map, u64 Index)
 {
     ChunkMap_RemoveIndexMasked(Map, Index, Map->Mask);
 }
 
-inline void ChunkMap_InsertValue(chunk_map *Map, chunk_map_value Value)
+inline void ChunkMap_InsertValue(world_chunk_map *Map, world_chunk_map_value Value)
 {
     u64 Pos = ChunkMap_HashIndex(Map, Value.Hash);
     u64 Dist = 0;
@@ -111,7 +111,7 @@ inline void ChunkMap_InsertValue(chunk_map *Map, chunk_map_value Value)
         u64 Probe = ChunkMap_ProbeDist(Map, Pos);
         if (Probe < Dist)
         {
-            chunk_map_value T = Map->Values[Pos];
+            world_chunk_map_value T = Map->Values[Pos];
             Map->Values[Pos] = Value;
             Value = T;
             
@@ -123,27 +123,27 @@ inline void ChunkMap_InsertValue(chunk_map *Map, chunk_map_value Value)
     }
 }
 
-inline void ChunkMap_InsertChunkId(chunk_map *Map, u64 ChunkId, ivec2 Position)
+inline void ChunkMap_InsertChunkId(world_chunk_map *Map, u64 ChunkId, ivec2 Position)
 {
     u64 Coord = ChunkMap_Coord(Position);
     u64 Hash = ChunkMap_Hash(Coord);
-    ChunkMap_InsertValue(Map, (chunk_map_value){ ChunkId, Hash, Coord });
+    ChunkMap_InsertValue(Map, (world_chunk_map_value){ ChunkId, Hash, Coord });
 }
 
-inline void ChunkMap_Grow(chunk_map *Map)
+inline void ChunkMap_Grow(world_chunk_map *Map)
 {
     if ((((Map->Count * 100) / CHUNK_MAP_MAXLOAD_PERCENT) < Map->Capacity))
         return;
 
     u64 OldCapacity = Map->Capacity;
     u64 OldMask = Map->Mask;
-    chunk_map_value *OldValues = Map->Values;
+    world_chunk_map_value *OldValues = Map->Values;
 
     Map->Count = 0;
     Map->Capacity <<= 1;
     Map->Mask = Map->Capacity - 1;
-    Map->Chunks = realloc(Map->Chunks, sizeof(chunk) * Map->Capacity);
-    Map->Values = malloc(sizeof(chunk_map_value) * Map->Capacity);
+    Map->Chunks = realloc(Map->Chunks, sizeof(world_chunk) * (Map->Capacity + 1));
+    Map->Values = malloc(sizeof(world_chunk_map_value) * Map->Capacity);
 
     for (index i = 0; i < OldCapacity; ++i)
         if (OldValues[i].ChunkId)
@@ -156,12 +156,12 @@ inline void ChunkMap_Grow(chunk_map *Map)
 //
 //
 
-chunk_map ChunkMap_Create(void)
+world_chunk_map ChunkMap_Create(void)
 {
     u64 Capacity = 16 * 16 * 4;
-    chunk_map Map = {
-        .Chunks = malloc(sizeof(chunk) * Capacity),
-        .Values = malloc(sizeof(chunk_map_value) * Capacity),
+    world_chunk_map Map = {
+        .Chunks = malloc(sizeof(world_chunk) * (Capacity + 1)),
+        .Values = malloc(sizeof(world_chunk_map_value) * Capacity),
         .Capacity = Capacity,
         .Count = 0,
         .Mask = Capacity - 1,
@@ -172,14 +172,13 @@ chunk_map ChunkMap_Create(void)
     return Map;
 }
 
-void ChunkMap_Destroy(chunk_map *Map)
+void ChunkMap_Destroy(world_chunk_map *Map)
 {
     free(Map->Chunks);
     free(Map->Values);
 }
 
-
-chunk *ChunkMap_AllocateChunk(chunk_map *Map, ivec2 Position)
+world_chunk *ChunkMap_AllocateChunk(world_chunk_map *Map, ivec2 Position)
 {
     assert(ChunkMap_GetIndex(Map, Position) == SIZE_MAX);
 
@@ -187,12 +186,12 @@ chunk *ChunkMap_AllocateChunk(chunk_map *Map, ivec2 Position)
 
     for (u64 i = 0; i < Map->Capacity; ++i)
     {
-        chunk *Chunk = Map->Chunks + i;
+        world_chunk *Chunk = Map->Chunks + i;
         if (Chunk->Flags & CHUNK_ALLOCATED)
             continue;
 
         ChunkMap_InsertChunkId(Map, i, Position);
-        Chunk_Init(Chunk, Position);
+        WorldChunk_Init(Chunk, Position);
         return Chunk;
     }
 
@@ -200,32 +199,86 @@ chunk *ChunkMap_AllocateChunk(chunk_map *Map, ivec2 Position)
     return 0;
 }
 
-void ChunkMap_DestroyChunk(chunk_map *Map, ivec2 Position)
+void ChunkMap_DestroyChunk(world_chunk_map *Map, ivec2 Position)
 {
     u64 Index = ChunkMap_GetIndex(Map, Position);
 
-    chunk *Chunk = Map->Chunks + Map->Values[Index].ChunkId;
-    Chunk_Clear(Chunk, Position);
+    world_chunk *Chunk = Map->Chunks + Map->Values[Index].ChunkId;
+    WorldChunk_Clear(Chunk, Position);
 
     ChunkMap_RemoveIndex(Map, Index);
 }
 
-chunk *ChunkMap_GetChunkById(const chunk_map *Map, u64 ChunkId)
+world_chunk *ChunkMap_GetChunkById(const world_chunk_map *Map, u64 ChunkId)
 {
     if (!ChunkId) return 0;
     return Map->Chunks + ChunkId;
 }
 
-u64 ChunkMap_GetChunkId(const chunk_map *Map, ivec2 Position)
+u64 ChunkMap_GetChunkId(const world_chunk_map *Map, ivec2 Position)
 {
     u64 Index = ChunkMap_GetIndex(Map, Position);
     if (Index == SIZE_MAX) return 0;
     return Map->Values[Index].ChunkId;
 }
 
-chunk *ChunkMap_GetChunk(const chunk_map *Map, ivec2 Position)
+world_chunk *ChunkMap_GetChunk(const world_chunk_map *Map, ivec2 Position)
 {
     u64 ChunkId = ChunkMap_GetChunkId(Map, Position);
     if (!ChunkId) return 0;
     return ChunkMap_GetChunkById(Map, ChunkId);
+}
+
+/*********************/
+/* WORLD CHUNK GROUP */
+/*********************/
+
+typedef struct world_chunk_group
+{
+    ivec2 Position;
+    world_chunk *Chunks[3][3];
+} world_chunk_group;
+
+world_chunk_group ChunkMap_GetGroup(world_chunk_map *Map, ivec2 ChunkPosition)
+{
+    world_chunk_group ChunkGroup = { .Position = ChunkPosition };
+    for (u32 y = 0; y < 3; ++y)
+    for (u32 x = 0; x < 3; ++x)
+    {
+        ivec2 Offset = { x - 1, y - 1 };
+        ivec2 ChunkPos = iVec2_Add(ChunkPosition, Offset);
+        ChunkGroup.Chunks[y][x] = ChunkMap_GetChunk(Map, ChunkPos);
+    }
+    return ChunkGroup;
+}
+
+bool ChunkGroup_Complete(const world_chunk_group *ChunkGroup)
+{
+    for (u32 y = 0; y < 3; ++y)
+    for (u32 x = 0; x < 3; ++x)
+        if (!ChunkGroup->Chunks[y][x])
+            return false;
+    return true;
+}
+
+block ChunkGroup_GetBlock(const world_chunk_group *ChunkGroup, ivec3 WorldPosition)
+{
+    ivec2 GroupPosition = iVec2_Sub(iVec2_ShiftRight(WorldPosition.xy, CHUNK_WIDTH_SHIFT), ChunkGroup->Position);
+    if (GroupPosition.x < -1 || GroupPosition.x > 1 || 
+        GroupPosition.y < -1 || GroupPosition.y > 1)
+        return DEFAULT_BLOCK;
+
+    world_chunk *Chunk = ChunkGroup->Chunks[GroupPosition.y + 1][GroupPosition.x + 1];
+    return WorldChunk_GetBlock(Chunk, WorldPosition);
+}
+
+void ChunkGroup_SetBlock(const world_chunk_group *ChunkGroup, ivec3 WorldPosition, block Block)
+{
+    ivec2 GroupPosition = iVec2_Sub(iVec2_ShiftRight(WorldPosition.xy, CHUNK_WIDTH_SHIFT), ChunkGroup->Position);
+    if (GroupPosition.x < -1 || GroupPosition.x > 1 || 
+        GroupPosition.y < -1 || GroupPosition.y > 1)
+        return;
+
+    world_chunk *Chunk = ChunkGroup->Chunks[GroupPosition.y + 1][GroupPosition.x + 1];
+    WorldChunk_SetBlock(Chunk, WorldPosition, Block);
 }

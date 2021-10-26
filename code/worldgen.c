@@ -82,24 +82,24 @@ u32 WordlGen_CellBiome(ivec2 Cell)
     return 0;
 }
 
-void WorldGen_Chunk(chunk *Chunk)
+void WorldGen_Chunk(world_chunk *Chunk)
 {
     u32 CellBiomes[5][5];
     for (u32 y = 0; y < 5; ++y)
     for (u32 x = 0; x < 5; ++x)
     {
-        ivec2 Cell = iVec2_Add(iVec2_Sub(Chunk->Position, iVec2_Set1(2)), (ivec2){x,y});
+        ivec2 Cell = iVec2_Add(iVec2_Sub(Chunk->Base.Position, iVec2_Set1(2)), (ivec2){x,y});
         CellBiomes[y][x] = WordlGen_CellBiome(Cell);
     }
 }
 
-void WorldGen_GenerateChunk(world_gen *WorldGenerator, chunk *Chunk)
+void WorldGen_GenerateChunk(world_gen *WorldGenerator, world_chunk *Chunk)
 {
     for (i32 yy = 0; yy < CHUNK_WIDTH; yy++)
     for (i32 xx = 0; xx < CHUNK_WIDTH; xx++)
     {
-        vec2 p = (vec2){ (f32)(Chunk->Position.x * CHUNK_WIDTH + xx),
-                         (f32)(Chunk->Position.y * CHUNK_WIDTH + yy) };
+        vec2 p = (vec2){ (f32)(Chunk->Base.Position.x * CHUNK_WIDTH + xx),
+                         (f32)(Chunk->Base.Position.y * CHUNK_WIDTH + yy) };
 #if 0
         u32 BiomeSize = 64;
         vec2 BiomeSize2 = Vec2_Set1((f32)BiomeSize);
@@ -171,13 +171,13 @@ void WorldGen_GenerateChunk(world_gen *WorldGenerator, chunk *Chunk)
         f32 HighNoise = Lerp(96.0f, 128.0f, Noise_FBM2D(WorldGenerator->HighNoise, p, 16));
         
         for (u32 zz = 0; zz < (u32)LowNoise; ++zz)
-            Chunk->Blocks[zz][yy][xx].Id = BLOCK_ID_STONE;
+            Chunk->Base.Blocks[zz][yy][xx].Id = BLOCK_ID_STONE;
 
         for (u32 zz = (u32)LowNoise; zz < (u32)HighNoise; ++zz)
         {
-            block *CurrentBlock = &Chunk->Blocks[zz][yy][xx];
-            vec3 pp = (vec3){ (f32)(Chunk->Position.x * CHUNK_WIDTH + xx),
-                              (f32)(Chunk->Position.y * CHUNK_WIDTH + yy),
+            block *CurrentBlock = &Chunk->Base.Blocks[zz][yy][xx];
+            vec3 pp = (vec3){ (f32)(Chunk->Base.Position.x * CHUNK_WIDTH + xx),
+                              (f32)(Chunk->Base.Position.y * CHUNK_WIDTH + yy),
                               (f32)zz };
             pp = Vec3_Div(pp, (vec3){128.0f,128.0f,256.0f});
             f32 SelectorNoise = Noise_FBM3D(WorldGenerator->SelectorNoise, pp, 4);
@@ -189,34 +189,35 @@ void WorldGen_GenerateChunk(world_gen *WorldGenerator, chunk *Chunk)
         // Gras
         for (i32 zz = CHUNK_HEIGHT - 1; zz > 65; --zz)
         {
-            if (Chunk->Blocks[zz][yy][xx].Id != BLOCK_ID_STONE) continue;
-            Chunk->Blocks[zz][yy][xx].Id = BLOCK_ID_GRAS;
-            if (Chunk->Blocks[zz-1][yy][xx].Id != BLOCK_ID_STONE) break;
-            Chunk->Blocks[zz-1][yy][xx].Id = BLOCK_ID_DIRT;
-            if (Chunk->Blocks[zz-2][yy][xx].Id != BLOCK_ID_STONE) break;
-            Chunk->Blocks[zz-2][yy][xx].Id = BLOCK_ID_DIRT;
+            if (Chunk->Base.Blocks[zz][yy][xx].Id != BLOCK_ID_STONE) continue;
+            Chunk->Base.Blocks[zz][yy][xx].Id = BLOCK_ID_GRAS;
+            if (Chunk->Base.Blocks[zz-1][yy][xx].Id != BLOCK_ID_STONE) break;
+            Chunk->Base.Blocks[zz-1][yy][xx].Id = BLOCK_ID_DIRT;
+            if (Chunk->Base.Blocks[zz-2][yy][xx].Id != BLOCK_ID_STONE) break;
+            Chunk->Base.Blocks[zz-2][yy][xx].Id = BLOCK_ID_DIRT;
             break;
         }
         // Sand
-        if (Chunk->Blocks[66][yy][xx].Id == BLOCK_ID_AIR &&
-            Chunk->Blocks[65][yy][xx].Id == BLOCK_ID_STONE)
-            Chunk->Blocks[65][yy][xx].Id = BLOCK_ID_SAND;
-        if (Chunk->Blocks[65][yy][xx].Id == BLOCK_ID_AIR &&
-            Chunk->Blocks[64][yy][xx].Id == BLOCK_ID_STONE)
-            Chunk->Blocks[64][yy][xx].Id = BLOCK_ID_SAND;
+        if (Chunk->Base.Blocks[66][yy][xx].Id == BLOCK_ID_AIR &&
+            Chunk->Base.Blocks[65][yy][xx].Id == BLOCK_ID_STONE)
+            Chunk->Base.Blocks[65][yy][xx].Id = BLOCK_ID_SAND;
+        if (Chunk->Base.Blocks[65][yy][xx].Id == BLOCK_ID_AIR &&
+            Chunk->Base.Blocks[64][yy][xx].Id == BLOCK_ID_STONE)
+            Chunk->Base.Blocks[64][yy][xx].Id = BLOCK_ID_SAND;
         // Water
         for (i32 zz = 64; zz >= 0; --zz)
         {
-            if (Chunk->Blocks[zz][yy][xx].Id == BLOCK_ID_AIR)
-                Chunk->Blocks[zz][yy][xx].Id = BLOCK_ID_WATER;
+            if (Chunk->Base.Blocks[zz][yy][xx].Id == BLOCK_ID_AIR)
+                Chunk->Base.Blocks[zz][yy][xx].Id = BLOCK_ID_WATER;
         }
 #endif
     }
-
+    Chunk->ChangedMin = (ivec3){0,0,0};
+    Chunk->ChangedMax = (ivec3){CHUNK_WIDTH_MASK,CHUNK_WIDTH_MASK,CHUNK_HEIGHT_MASK};
     Chunk->Flags |= (CHUNK_GENERATED | CHUNK_CHANGED);
 }
 
-void WorldGen_GrowTree(chunk_group *ChunkGroup, ivec2 Tree)
+void WorldGen_GrowTree(world_chunk_group *ChunkGroup, ivec2 Tree)
 {
     for (i32 zz = CHUNK_HEIGHT - 1; zz >= 64; --zz)
     {
@@ -246,10 +247,8 @@ void WorldGen_GrowTree(chunk_group *ChunkGroup, ivec2 Tree)
     }
 }
 
-void WorldGen_DecorateChunk(world_gen *WorldGenerator, void *Data, get_chunk_func *GetChunk, ivec2 ChunkPosition)
+void WorldGen_DecorateChunk(world_gen *WorldGenerator, world_chunk_group ChunkGroup, ivec2 ChunkPosition)
 {
-    // get chunk group
-    chunk_group ChunkGroup = Chunk_Group(Data, GetChunk, ChunkPosition);
     if (!ChunkGroup_Complete(&ChunkGroup)) return;
 
     // get tree positions

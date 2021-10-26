@@ -1,4 +1,53 @@
 
+typedef struct world_chunk
+{
+    chunk Base;
+
+    ivec3 ChangedMin;
+    ivec3 ChangedMax;
+    u32 Flags;
+} world_chunk;
+
+void WorldChunk_Init(world_chunk *Chunk, ivec2 Position)
+{
+    Chunk_Init(&Chunk->Base, Position);
+    
+    Chunk->ChangedMin = (ivec3){CHUNK_WIDTH_MASK,CHUNK_WIDTH_MASK,CHUNK_HEIGHT_MASK};
+    Chunk->ChangedMax = (ivec3){0,0,0};
+    Chunk->Flags = CHUNK_ALLOCATED;
+}
+
+void WorldChunk_Clear(world_chunk *Chunk, ivec2 Position)
+{
+    Chunk_Clear(&Chunk->Base, Position);
+    
+    Chunk->ChangedMin = (ivec3){CHUNK_WIDTH_MASK,CHUNK_WIDTH_MASK,CHUNK_HEIGHT_MASK};
+    Chunk->ChangedMax = (ivec3){0,0,0};
+    Chunk->Flags = CHUNK_EMPTY;
+}
+
+block WorldChunk_GetBlock(const world_chunk *Chunk, ivec3 WorldPosition)
+{
+    if (WorldPosition.z < 0)                return DEFAULT_SKY_BLOCK;
+    if (WorldPosition.z > CHUNK_HEIGHT - 1) return DEFAULT_HELL_BLOCK;
+
+    ivec3 BlockPosition = World_ToBlockPosition(WorldPosition);
+    return Chunk_GetBlock(&Chunk->Base, BlockPosition);
+}
+
+void WorldChunk_SetBlock(world_chunk *Chunk, ivec3 WorldPosition, block Block)
+{
+    if ((WorldPosition.z < 0) || (WorldPosition.z > CHUNK_HEIGHT - 1))
+        return;
+
+    ivec3 BlockPosition = World_ToBlockPosition(WorldPosition);
+    Chunk_SetBlock(&Chunk->Base, BlockPosition, Block);
+    
+    Chunk->ChangedMin = iVec3_Min(Chunk->ChangedMin, BlockPosition);
+    Chunk->ChangedMax = iVec3_Max(Chunk->ChangedMax, BlockPosition);
+    Chunk->Flags |= CHUNK_CHANGED;
+}
+
 #include "chunkmap.c"
 #include "worldgen.c"
 
@@ -11,7 +60,7 @@
 
 typedef struct world
 {
-    chunk_map ChunkMap;
+    world_chunk_map ChunkMap;
     entity_manager EntityManager;
     world_gen Generator;
 } world;
@@ -36,14 +85,33 @@ void World_Init(world *World)
     Entity_Spawn(&World->EntityManager, Test);
 }
 
-chunk *World_GetChunk(world *World, ivec2 ChunkPosition)
+world_chunk *World_GetChunk(world *World, ivec2 ChunkPosition)
 {
     return ChunkMap_GetChunk(&World->ChunkMap, ChunkPosition);
 }
 
-const chunk *World_GetConstChunk(const world *World, ivec2 ChunkPosition)
+const world_chunk *World_GetConstChunk(const world *World, ivec2 ChunkPosition)
 {
     return ChunkMap_GetChunk(&World->ChunkMap, ChunkPosition);
+}
+
+chunk *World_GetBaseChunk(world *World, ivec2 ChunkPosition)
+{
+    world_chunk *Chunk = World_GetChunk(World, ChunkPosition);
+    if (!Chunk) return 0;
+    return &Chunk->Base;
+}
+
+const chunk *World_GetConstBaseChunk(const world *World, ivec2 ChunkPosition)
+{
+    const world_chunk *Chunk = World_GetConstChunk(World, ChunkPosition);
+    if (!Chunk) return 0;
+    return &Chunk->Base;
+}
+
+world_chunk_group World_GetChunkGroup(world *World, ivec2 ChunkPosition)
+{
+    return ChunkMap_GetGroup(&World->ChunkMap, ChunkPosition);
 }
 
 void World_Update(world *World, vec3 PlayerPosition)
@@ -57,10 +125,11 @@ void World_Update(world *World, vec3 PlayerPosition)
     for (i32 y = MinPos.y; y < MaxPos.y; y++)
     {
         ivec2 ChunkPos = (ivec2){ x, y };
-        chunk *Chunk = ChunkMap_GetChunk(&World->ChunkMap, ChunkPos);
+        world_chunk *Chunk = ChunkMap_GetChunk(&World->ChunkMap, ChunkPos);
         if (!Chunk) Chunk = ChunkMap_AllocateChunk(&World->ChunkMap, ChunkPos);
         if (!(Chunk->Flags & CHUNK_GENERATED)) WorldGen_GenerateChunk(&World->Generator, Chunk);
-        if (!(Chunk->Flags & CHUNK_DECORATED)) WorldGen_DecorateChunk(&World->Generator, World, World_GetChunk, ChunkPos);
+        world_chunk_group ChunkGroup = World_GetChunkGroup(World, ChunkPos);
+        if (!(Chunk->Flags & CHUNK_DECORATED)) WorldGen_DecorateChunk(&World->Generator, ChunkGroup, ChunkPos);
     }
 
     // entities
@@ -92,24 +161,18 @@ void World_Update(world *World, vec3 PlayerPosition)
 
 block World_GetBlock(const world *World, ivec3 WorldPosition)
 {
-    if (WorldPosition.z < 0)                return DEFAULT_SKY_BLOCK;
-    if (WorldPosition.z > CHUNK_HEIGHT - 1) return DEFAULT_HELL_BLOCK;
-
     ivec2 ChunkPosition = World_ToChunkPosition(WorldPosition);
-    const chunk *Chunk = World_GetConstChunk(World, ChunkPosition);
+    const world_chunk *Chunk = World_GetConstChunk(World, ChunkPosition);
     if (!Chunk) return DEFAULT_BLOCK; // maybe generate chunk instead?
-    return Chunk_GetBlock(Chunk, WorldPosition);
+    return WorldChunk_GetBlock(Chunk, WorldPosition);
 }
 
 void World_SetBlock(world *World, ivec3 WorldPosition, block Block)
 {
-    if ((WorldPosition.z < 0) || (WorldPosition.z > CHUNK_HEIGHT - 1))
-        return;
-
     ivec2 ChunkPosition = World_ToChunkPosition(WorldPosition);
-    chunk *Chunk = World_GetChunk(World, ChunkPosition);
+    world_chunk *Chunk = World_GetChunk(World, ChunkPosition);
     if (!Chunk) return; // maybe generate chunk instead?
-    Chunk_SetBlock(Chunk, WorldPosition, Block);
+    WorldChunk_SetBlock(Chunk, WorldPosition, Block);
 }
 
 

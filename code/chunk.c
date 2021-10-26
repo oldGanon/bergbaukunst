@@ -26,8 +26,6 @@ typedef struct block_group
 typedef struct chunk
 {
     ivec2 Position;
-    u32 Flags;
-
     block Blocks[CHUNK_HEIGHT][CHUNK_WIDTH][CHUNK_WIDTH];
     u8 Shades[CHUNK_HEIGHT][CHUNK_WIDTH][CHUNK_WIDTH];
 } chunk;
@@ -181,15 +179,12 @@ void Chunk_SetBlock(chunk *Chunk, ivec3 WorldPosition, block Block)
 
     ivec3 BlockPosition = World_ToBlockPosition(WorldPosition);
     Chunk->Blocks[BlockPosition.z][BlockPosition.y][BlockPosition.x] = Block;
-
-    Chunk->Flags |= CHUNK_CHANGED;
 }
 
 void Chunk_Init(chunk *Chunk, ivec2 Position)
 {
     memset(Chunk, 0, sizeof(chunk));
 
-    Chunk->Flags |= CHUNK_ALLOCATED;
     Chunk->Position = Position;
 }
 
@@ -197,8 +192,6 @@ void Chunk_Clear(chunk *Chunk, ivec2 Position)
 {
     assert(Chunk->Position.x == Position.x);
     assert(Chunk->Position.y == Position.y);
-
-    Chunk->Flags = CHUNK_EMPTY;
 }
 
 box Chunk_Box(chunk *Chunk)
@@ -232,59 +225,7 @@ box Chunk_BoxIntersection(chunk *Chunk, const box Box)
     return Intersection;
 }
 
-/******************/
-/*  CHUNK GROUP   */
-/******************/
 
-typedef struct chunk_group
-{
-    ivec2 Position;
-    chunk *Chunks[3][3];
-} chunk_group;
-
-chunk_group Chunk_Group(void *Data, get_chunk_func *GetChunk, ivec2 ChunkPosition)
-{
-    chunk_group ChunkGroup = { .Position = ChunkPosition };
-    for (u32 y = 0; y < 3; ++y)
-    for (u32 x = 0; x < 3; ++x)
-    {
-        ivec2 Offset = { x - 1, y - 1 };
-        ivec2 ChunkPos = iVec2_Add(ChunkPosition, Offset);
-        ChunkGroup.Chunks[y][x] = GetChunk(Data, ChunkPos);
-    }
-    return ChunkGroup;
-}
-
-bool ChunkGroup_Complete(const chunk_group *ChunkGroup)
-{
-    for (u32 y = 0; y < 3; ++y)
-    for (u32 x = 0; x < 3; ++x)
-        if (!ChunkGroup->Chunks[y][x])
-            return false;
-    return true;
-}
-
-block ChunkGroup_GetBlock(const chunk_group *ChunkGroup, ivec3 WorldPosition)
-{
-    ivec2 GroupPosition = iVec2_Sub(iVec2_ShiftRight(WorldPosition.xy, CHUNK_WIDTH_SHIFT), ChunkGroup->Position);
-    if (GroupPosition.x < -1 || GroupPosition.x > 1 || 
-        GroupPosition.y < -1 || GroupPosition.y > 1)
-        return DEFAULT_BLOCK;
-
-    chunk *Chunk = ChunkGroup->Chunks[GroupPosition.y + 1][GroupPosition.x + 1];
-    return Chunk_GetBlock(Chunk, WorldPosition);
-}
-
-void ChunkGroup_SetBlock(const chunk_group *ChunkGroup, ivec3 WorldPosition, block Block)
-{
-    ivec2 GroupPosition = iVec2_Sub(iVec2_ShiftRight(WorldPosition.xy, CHUNK_WIDTH_SHIFT), ChunkGroup->Position);
-    if (GroupPosition.x < -1 || GroupPosition.x > 1 || 
-        GroupPosition.y < -1 || GroupPosition.y > 1)
-        return;
-
-    chunk *Chunk = ChunkGroup->Chunks[GroupPosition.y + 1][GroupPosition.x + 1];
-    Chunk_SetBlock(Chunk, WorldPosition, Block);
-}
 
 /******************/
 /*  PADDED CHUNK  */

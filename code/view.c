@@ -3,31 +3,33 @@
 
 typedef struct view_chunk
 {
-	chunk Chunk;
+	chunk Base;
+
 	quad_mesh Mesh;
 	bool Dirty;
 } view_chunk;
 
 typedef struct view_entity
 {
-    entity Entity;
+    entity Base;
+
     quad_mesh Mesh;
     quad_mesh RotatedMesh;
 } view_entity;
 
-typedef struct view_entity_map
+typedef struct view_entity_table
 {
     u32 Count;
     u32 Capacity;
     view_entity *Entities;
-} view_entity_map;
+} view_entity_table;
 
 typedef struct view
 {
 	ivec2 Position;
 	view_chunk Chunks[LOADED_CHUNKS_DIM][LOADED_CHUNKS_DIM];
 
-    view_entity_map EntityMap;
+    view_entity_table EntityTable;
 } view;
 
 void View_DrawLineBox(bitmap Target, camera Camera, box Box)
@@ -171,14 +173,14 @@ const view_chunk *View_GetConstViewChunk(const view *View, ivec2 ChunkPosition)
 chunk *View_GetChunk(view *View, ivec2 ChunkPosition)
 {
     view_chunk *ViewChunk = View_GetViewChunk(View, ChunkPosition);
-    if (ViewChunk) return &ViewChunk->Chunk;
+    if (ViewChunk) return &ViewChunk->Base;
     return 0;
 }
 
 const chunk *View_GetConstChunk(const view *View, ivec2 ChunkPosition)
 {
     const view_chunk *ViewChunk = View_GetConstViewChunk(View, ChunkPosition);
-    if (ViewChunk) return &ViewChunk->Chunk;
+    if (ViewChunk) return &ViewChunk->Base;
     return 0;
 }
 
@@ -229,7 +231,7 @@ void View_DrawChunk(view *View, ivec2 ChunkPosition, const bitmap Target, bitmap
 	if (!Chunk) return;
     if (Chunk->Dirty) View_GenerateChunkMesh(View, ChunkPosition);
 
-    box ChunkBox = Chunk_Box(&Chunk->Chunk);
+    box ChunkBox = Chunk_Box(&Chunk->Base);
     if (!Camera_BoxVisible(Camera, Target, ChunkBox)) return;
     vec3 ChunkPos = ChunkBox.Min;
     Mesh_Draw(Target, Camera, TerrainTexture, ChunkPos, &Chunk->Mesh);
@@ -240,9 +242,9 @@ void View_DrawEntity(view_entity *Entity, const bitmap Target, bitmap TerrainTex
 {
     if (Entity->Mesh.Count == 0) return;
 
-    Mesh_Rotate(Entity->Entity.Yaw, &Entity->Mesh, &Entity->RotatedMesh);
+    Mesh_Rotate(Entity->Base.Yaw, &Entity->Mesh, &Entity->RotatedMesh);
 
-    Mesh_Draw(Target, Camera, TerrainTexture, Entity->Entity.Position, &Entity->RotatedMesh);
+    Mesh_Draw(Target, Camera, TerrainTexture, Entity->Base.Position, &Entity->RotatedMesh);
 }
 
 void View_Draw(view *View, const bitmap Target, bitmap TerrainTexture, const camera Camera)
@@ -266,19 +268,19 @@ void View_Draw(view *View, const bitmap Target, bitmap TerrainTexture, const cam
     }
 
     // draw entity
-    for (u32 i = 0; i < View->EntityMap.Capacity; ++i)
+    for (u32 i = 0; i < View->EntityTable.Capacity; ++i)
     {
-        view_entity *Entity = &View->EntityMap.Entities[i];
-        if (Entity->Entity.Type == ENTITY_NONE) continue;
+        view_entity *Entity = &View->EntityTable.Entities[i];
+        if (Entity->Base.Type == ENTITY_NONE) continue;
         View_DrawEntity(Entity, Target, TerrainTexture, Camera);
     }
 }
 
 void View_DrawEntityBoxes(view *View, const bitmap Target, const camera Camera)
 {
-    for (u32 i = 0; i < View->EntityMap.Capacity; ++i)
+    for (u32 i = 0; i < View->EntityTable.Capacity; ++i)
     {
-        entity *Entity = &View->EntityMap.Entities[i].Entity;
+        entity *Entity = &View->EntityTable.Entities[i].Base;
         if (Entity->Type == ENTITY_NONE) continue;
         box EntityBox = Entity_Box(Entity);
         View_DrawLineBox(Target, Camera, EntityBox);
@@ -296,10 +298,10 @@ void View_SetPosition(view *View, ivec2 Position)
         ivec2 ChunkPosition = (ivec2){ x, y };
         ivec2 ViewPosition = iVec2_And(ChunkPosition, iVec2_Set1(LOADED_CHUNKS_DIM_MASK));
         view_chunk *Chunk = &View->Chunks[ViewPosition.y][ViewPosition.x];
-        if (Chunk->Chunk.Position.x == ChunkPosition.x ||
-            Chunk->Chunk.Position.y == ChunkPosition.y)
+        if (Chunk->Base.Position.x == ChunkPosition.x ||
+            Chunk->Base.Position.y == ChunkPosition.y)
             continue;
-        Chunk_Init(&Chunk->Chunk, ViewPosition);
+        Chunk_Init(&Chunk->Base, ViewPosition);
         Mesh_Clear(&Chunk->Mesh);
     }
 }
@@ -310,11 +312,19 @@ void View_SetChunk(view *View, const msg_chunk_data *ChunkData)
     ivec2 ChunkPosition = ChunkData->Position;
     chunk *Chunk = View_GetChunk(View, ChunkPosition);
     if (!Chunk) return;
-    for (u32 z = 0; z < CHUNK_HEIGHT; ++z)
-    for (u32 y = 0; y < CHUNK_WIDTH; ++y)
-    for (u32 x = 0; x < CHUNK_WIDTH; ++x)
-        Chunk->Blocks[z][y][x].Id = ChunkData->Blocks[z][y][x];
+
     Chunk->Position = ChunkPosition;
+
+    ivec3 ChunkMin = (ivec3){ 0, 0, 0 };
+    ivec3 ChunkMax = (ivec3){ CHUNK_WIDTH_MASK, CHUNK_WIDTH_MASK, CHUNK_HEIGHT_MASK };
+    ivec3 Min = iVec3_Max(ChunkMin, iVec3_Min(ChunkData->MinBlock, ChunkData->MaxBlock));
+    ivec3 Max = iVec3_Min(ChunkMax, iVec3_Max(ChunkData->MinBlock, ChunkData->MaxBlock));
+    ivec3 Dim = iVec3_Sub(Max, Min);
+    const u8 *BlockPtr = ChunkData->Blocks;
+    for (i32 z = 0; z <= Dim.z; ++z)
+    for (i32 y = 0; y <= Dim.y; ++y)
+    for (i32 x = 0; x <= Dim.x; ++x)
+        Chunk->Blocks[Min.z+z][Min.y+y][Min.x+x].Id = *BlockPtr++;
 
     Chunk_CalcLight(View, View_GetChunk, ChunkPosition);
 
@@ -328,31 +338,31 @@ void View_SetChunk(view *View, const msg_chunk_data *ChunkData)
     }
 }
 
-void View_SetEntityMapCapacity(view_entity_map *EntityMap, u32 NewCapacity)
+void View_SetEntityTableCapacity(view_entity_table *EntityTable, u32 NewCapacity)
 {
-    if (NewCapacity <= EntityMap->Capacity)
+    if (NewCapacity <= EntityTable->Capacity)
         return;
 
-    u32 OldCapacity = EntityMap->Capacity;
-    EntityMap->Capacity = NewCapacity;
-    EntityMap->Entities = realloc(EntityMap->Entities, NewCapacity * sizeof(view_entity));
+    u32 OldCapacity = EntityTable->Capacity;
+    EntityTable->Capacity = NewCapacity;
+    EntityTable->Entities = realloc(EntityTable->Entities, NewCapacity * sizeof(view_entity));
     for (u32 i = OldCapacity; i < NewCapacity; ++i)
     {
-        EntityMap->Entities[i].Mesh = Mesh_Create();
-        EntityMap->Entities[i].RotatedMesh = Mesh_Create();
+        EntityTable->Entities[i].Mesh = Mesh_Create();
+        EntityTable->Entities[i].RotatedMesh = Mesh_Create();
     }    
 }
 
 void View_SetEntity(view *View, const msg_set_entity *SetEntity)
 {
-    while (SetEntity->Id >= View->EntityMap.Capacity)
+    while (SetEntity->Id >= View->EntityTable.Capacity)
     {
-        u32 NewCapacity = View->EntityMap.Capacity << 1;
-        View_SetEntityMapCapacity(&View->EntityMap, NewCapacity);
+        u32 NewCapacity = View->EntityTable.Capacity << 1;
+        View_SetEntityTableCapacity(&View->EntityTable, NewCapacity);
     }
 
-    view_entity *ViewEntity = &View->EntityMap.Entities[SetEntity->Id];
-    ViewEntity->Entity = SetEntity->Entity;
+    view_entity *ViewEntity = &View->EntityTable.Entities[SetEntity->Id];
+    ViewEntity->Base = SetEntity->Entity;
     View_GenerateMobMesh(ViewEntity);
 }
 
@@ -366,7 +376,7 @@ void View_Init(view *View)
         View->Chunks[y][x].Mesh = Mesh_Create();
     }
 
-    View_SetEntityMapCapacity(&View->EntityMap, 256);
+    View_SetEntityTableCapacity(&View->EntityTable, 256);
 }
 
 f32 View_TraceRay(view *View, vec3 RayOrigin, vec3 RayDirection, f32 RayLength, trace_result *Result)
