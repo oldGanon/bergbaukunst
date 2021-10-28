@@ -1,10 +1,21 @@
 
+enum world_chunk_flags
+{
+    CHUNK_EMPTY     = 0,
+    CHUNK_ALLOCATED = 1 << 0,
+    CHUNK_GENERATED = 1 << 1,
+    CHUNK_DECORATED = 1 << 2,
+    CHUNK_DIRTY     = 1 << 3,
+
+    CHUNK_COMPLETE  = (CHUNK_ALLOCATED | CHUNK_GENERATED | CHUNK_DECORATED),
+};
+
 typedef struct world_chunk
 {
     chunk Base;
 
-    ivec3 ChangedMin;
-    ivec3 ChangedMax;
+    ivec3 DirtyMin;
+    ivec3 DirtyMax;
     u32 Flags;
 } world_chunk;
 
@@ -12,8 +23,8 @@ void WorldChunk_Init(world_chunk *Chunk, ivec2 Position)
 {
     Chunk_Init(&Chunk->Base, Position);
     
-    Chunk->ChangedMin = (ivec3){CHUNK_WIDTH_MASK,CHUNK_WIDTH_MASK,CHUNK_HEIGHT_MASK};
-    Chunk->ChangedMax = (ivec3){0,0,0};
+    Chunk->DirtyMin = (ivec3){CHUNK_WIDTH_MASK,CHUNK_WIDTH_MASK,CHUNK_HEIGHT_MASK};
+    Chunk->DirtyMax = (ivec3){0,0,0};
     Chunk->Flags = CHUNK_ALLOCATED;
 }
 
@@ -21,8 +32,8 @@ void WorldChunk_Clear(world_chunk *Chunk, ivec2 Position)
 {
     Chunk_Clear(&Chunk->Base, Position);
     
-    Chunk->ChangedMin = (ivec3){CHUNK_WIDTH_MASK,CHUNK_WIDTH_MASK,CHUNK_HEIGHT_MASK};
-    Chunk->ChangedMax = (ivec3){0,0,0};
+    Chunk->DirtyMin = (ivec3){CHUNK_WIDTH_MASK,CHUNK_WIDTH_MASK,CHUNK_HEIGHT_MASK};
+    Chunk->DirtyMax = (ivec3){0,0,0};
     Chunk->Flags = CHUNK_EMPTY;
 }
 
@@ -43,11 +54,25 @@ void WorldChunk_SetBlock(world_chunk *Chunk, ivec3 WorldPosition, block Block)
     ivec3 BlockPosition = World_ToBlockPosition(WorldPosition);
     Chunk_SetBlock(&Chunk->Base, BlockPosition, Block);
     
-    Chunk->ChangedMin = iVec3_Min(Chunk->ChangedMin, BlockPosition);
-    Chunk->ChangedMax = iVec3_Max(Chunk->ChangedMax, BlockPosition);
-    Chunk->Flags |= CHUNK_CHANGED;
+    Chunk->DirtyMin = iVec3_Min(Chunk->DirtyMin, BlockPosition);
+    Chunk->DirtyMax = iVec3_Max(Chunk->DirtyMax, BlockPosition);
+    Chunk->Flags |= CHUNK_DIRTY;
 }
 
+enum world_entity_flags
+{
+    ENTITY_NO_FLAGS,
+    ENTITY_DIRTY = 1 << 0,
+};
+
+typedef struct world_entity
+{
+    entity Base;
+
+    u32 Flags;
+} world_entity;
+
+#include "entityman.c"
 #include "chunkmap.c"
 #include "worldgen.c"
 
@@ -61,7 +86,7 @@ void WorldChunk_SetBlock(world_chunk *Chunk, ivec3 WorldPosition, block Block)
 typedef struct world
 {
     world_chunk_map ChunkMap;
-    entity_manager EntityManager;
+    world_entity_manager EntityManager;
     world_gen Generator;
 } world;
 
@@ -79,7 +104,7 @@ void World_Init(world *World)
 {
     World->ChunkMap = ChunkMap_Create();
     World->EntityManager = EntityManager_Create();
-    World->Generator = WorldGen_Create(__rdtsc()); // 0xDEADBEEFDEADBEEF
+    World->Generator = WorldGen_Create(__rdtsc());
     
     entity Test = (entity){ .Type = ENTITY_MOB, .Position = (vec3){ 0,0,70 } };
     Entity_Spawn(&World->EntityManager, Test);
@@ -133,7 +158,7 @@ void World_Update(world *World, vec3 PlayerPosition)
     }
 
     // entities
-    entity_manager *Manager = &World->EntityManager;
+    world_entity_manager *Manager = &World->EntityManager;
     FOREACH_ENTITY(EntityId, Manager)
     {
         entity *Entity = EntityManager_GetEntity(Manager, EntityId);
@@ -151,7 +176,7 @@ void World_Update(world *World, vec3 PlayerPosition)
                     if(Distance < 10)
                     {
                         Entity->Yaw += 0.1f;
-                        EntityManager_EntityChanged(&World->EntityManager, EntityId);
+                        EntityManager_EntityDirty(&World->EntityManager, EntityId);
                     }
                 }
             } break;

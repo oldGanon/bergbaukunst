@@ -12,17 +12,21 @@ f32 Block_TraceRay(block Block, ivec3 BlockPosition, vec3 RayOrigin, vec3 RayDir
 /* IMPLEMENTATION */
 /******************/
 
+#define BLOCK_OPAQUE (1 << 7)
 enum
 {
-    BLOCK_ID_AIR = 0,
-    BLOCK_ID_DIRT = 1,
-    BLOCK_ID_GRAS = 2,
-    BLOCK_ID_STONE = 3,
-    BLOCK_ID_COBBLE = 4,
-    BLOCK_ID_WOOD = 5,
-    BLOCK_ID_LEAVES = 6,
-    BLOCK_ID_SAND = 7,
-    BLOCK_ID_WATER = 8,
+    //
+    BLOCK_ID_AIR    = 0,
+    BLOCK_ID_WATER  = 1,
+    BLOCK_ID_LEAVES = 2,
+
+    //
+    BLOCK_ID_DIRT   = 0 | BLOCK_OPAQUE,
+    BLOCK_ID_GRAS   = 1 | BLOCK_OPAQUE,
+    BLOCK_ID_STONE  = 2 | BLOCK_OPAQUE,
+    BLOCK_ID_COBBLE = 3 | BLOCK_OPAQUE,
+    BLOCK_ID_WOOD   = 4 | BLOCK_OPAQUE,
+    BLOCK_ID_SAND   = 5 | BLOCK_OPAQUE,
 } block_id;
 
 const u8 Block_Solid[256] = {

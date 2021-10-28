@@ -212,9 +212,9 @@ void WorldGen_GenerateChunk(world_gen *WorldGenerator, world_chunk *Chunk)
         }
 #endif
     }
-    Chunk->ChangedMin = (ivec3){0,0,0};
-    Chunk->ChangedMax = (ivec3){CHUNK_WIDTH_MASK,CHUNK_WIDTH_MASK,CHUNK_HEIGHT_MASK};
-    Chunk->Flags |= (CHUNK_GENERATED | CHUNK_CHANGED);
+    Chunk->DirtyMin = (ivec3){0,0,0};
+    Chunk->DirtyMax = (ivec3){CHUNK_WIDTH_MASK,CHUNK_WIDTH_MASK,CHUNK_HEIGHT_MASK};
+    Chunk->Flags |= (CHUNK_GENERATED | CHUNK_DIRTY);
 }
 
 void WorldGen_GrowTree(world_chunk_group *ChunkGroup, ivec2 Tree)

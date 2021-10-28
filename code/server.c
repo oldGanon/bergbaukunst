@@ -82,7 +82,7 @@ void Server_ClientConnect(server *Server, u32 ClientId)
     }
 
     // send entity data
-    entity_manager *Manager = &Server->World.EntityManager;
+    world_entity_manager *Manager = &Server->World.EntityManager;
     FOREACH_ENTITY(EntityId, Manager)
     {
         entity *Entity = EntityManager_GetEntity(Manager, EntityId);
@@ -177,26 +177,26 @@ void Server_Update(server *Server)
     for (u32 i = 1; i <= ChunkMap->Capacity; ++i)
     {
         world_chunk *Chunk = ChunkMap->Chunks + i;
-        if ((Chunk->Flags & (CHUNK_COMPLETE | CHUNK_CHANGED)) == (CHUNK_COMPLETE | CHUNK_CHANGED))
+        if ((Chunk->Flags & (CHUNK_COMPLETE | CHUNK_DIRTY)) == (CHUNK_COMPLETE | CHUNK_DIRTY))
         {
-            Message_ChunkData(&Message, &Chunk->Base, Chunk->ChangedMin, Chunk->ChangedMax);
+            Chunk->Flags &= ~CHUNK_DIRTY;
+            Message_ChunkData(&Message, &Chunk->Base, Chunk->DirtyMin, Chunk->DirtyMax);
             Server_SendChunkMessage(Server, Chunk->Base.Position, &Message);
-            Chunk->ChangedMin = (ivec3){CHUNK_WIDTH_MASK,CHUNK_WIDTH_MASK,CHUNK_HEIGHT_MASK};
-            Chunk->ChangedMax = (ivec3){0,0,0};
-            Chunk->Flags &= ~CHUNK_CHANGED;
+            Chunk->DirtyMin = (ivec3){CHUNK_WIDTH_MASK,CHUNK_WIDTH_MASK,CHUNK_HEIGHT_MASK};
+            Chunk->DirtyMax = (ivec3){0,0,0};
         }
     }
 
     // send entities
-    entity_manager *Manager = &Server->World.EntityManager;
+    world_entity_manager *Manager = &Server->World.EntityManager;
     for (u32 i = 1; i <= Manager->Capacity; ++i)
     {
-        server_entity *Entity = &Manager->Entities[i];
-        if (Entity->Flags & ENTITY_CHANGED)
+        world_entity *Entity = &Manager->Entities[i];
+        if (Entity->Flags & ENTITY_DIRTY)
         {
-            Entity->Flags &= ~ENTITY_CHANGED;
-            ivec2 Chunk = World_ToChunkPosition(Vec3_FloorToIVec3(Entity->Entity.Position));
-            Message_SetEntity(&Message, i, &Entity->Entity);
+            Entity->Flags &= ~ENTITY_DIRTY;
+            ivec2 Chunk = World_ToChunkPosition(Vec3_FloorToIVec3(Entity->Base.Position));
+            Message_SetEntity(&Message, i, &Entity->Base);
             Server_SendChunkMessage(Server, Chunk, &Message);
         }
     }

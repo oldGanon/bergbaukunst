@@ -6,17 +6,6 @@
 #define CHUNK_HEIGHT (1 << CHUNK_HEIGHT_SHIFT)
 #define CHUNK_HEIGHT_MASK (CHUNK_HEIGHT - 1)
 
-enum chunk_flags
-{
-    CHUNK_EMPTY     = 0,
-    CHUNK_ALLOCATED = 1 << 0,
-    CHUNK_GENERATED = 1 << 1,
-    CHUNK_DECORATED = 1 << 2,
-    CHUNK_CHANGED   = 1 << 3,
-
-    CHUNK_COMPLETE  = (CHUNK_ALLOCATED | CHUNK_GENERATED | CHUNK_DECORATED),
-};
-
 typedef struct block_group
 {
     block Blocks[3][3][3];
@@ -77,6 +66,7 @@ void Chunk_CalcLight(void *Data, get_chunk_func *GetChunk, ivec2 ChunkPosition)
     }
 
     // read values
+    __m128i Mask = _mm_set1_epi8(0xF);
     u8 Shades[CHUNK_HEIGHT][CHUNK_WIDTH * 3][CHUNK_WIDTH * 3] = { 0 };
     u8 Opaque[CHUNK_HEIGHT][CHUNK_WIDTH * 3][CHUNK_WIDTH * 3] = { 0 };
     u8 Transp[CHUNK_HEIGHT][CHUNK_WIDTH * 3][CHUNK_WIDTH * 3] = { 0 };
@@ -87,12 +77,19 @@ void Chunk_CalcLight(void *Data, get_chunk_func *GetChunk, ivec2 ChunkPosition)
         if (!Chunk) continue;
         for (u32 bz = 0; bz < CHUNK_HEIGHT; ++bz)
         for (u32 by = 0; by < CHUNK_WIDTH; ++by)
-        for (u32 bx = 0; bx < CHUNK_WIDTH; ++bx)
         {
-            u8 Block = Chunk->Blocks[bz][by][bx].Id;
-            Shades[bz][cy * CHUNK_WIDTH + by][cx * CHUNK_WIDTH + bx] = Chunk->Shades[bz][by][bx];
-            Opaque[bz][cy * CHUNK_WIDTH + by][cx * CHUNK_WIDTH + bx] = (Block_Opaque[Block]) ? 0xF : 0x0;
-            Transp[bz][cy * CHUNK_WIDTH + by][cx * CHUNK_WIDTH + bx] = (Block_Transparent[Block]) ? 0x0 : 0xF;
+            __m128i S = _mm_loadu_si128((__m128i*)&Chunk->Shades[bz][by][0]);
+            _mm_storeu_si128((__m128i*)&Shades[bz][cy * CHUNK_WIDTH + by][cx * CHUNK_WIDTH], S);
+
+            __m128i Id = _mm_loadu_si128((__m128i*)&Chunk->Blocks[bz][by][0].Id);
+
+            __m128i T = Id;
+            T = _mm_xor_si128(_mm_and_si128(_mm_cmpeq_epi8(T, _mm_setzero_si128()), Mask), Mask);
+            _mm_storeu_si128((__m128i*)&Transp[bz][cy * CHUNK_WIDTH + by][cx * CHUNK_WIDTH], T);
+
+            __m128i O = Id;
+            O = _mm_and_si128(_mm_cmplt_epi8(O, _mm_setzero_si128()), Mask);
+            _mm_storeu_si128((__m128i*)&Opaque[bz][cy * CHUNK_WIDTH + by][cx * CHUNK_WIDTH], O);
         }
     }
 
@@ -103,10 +100,10 @@ void Chunk_CalcLight(void *Data, get_chunk_func *GetChunk, ivec2 ChunkPosition)
         __m256i S1 = _mm256_set1_epi8(0);
         for (i32 z = CHUNK_HEIGHT - 1; z >= 0; --z)
         {
-            __m256i O0 = _mm256_loadu_si256((__m256i*)&Transp[z][y][1]);
-            __m256i O1 = _mm256_loadu_si256((__m256i*)&Transp[z][y][15]);
-            S0 = _mm256_or_si256(S0, O0);
-            S1 = _mm256_or_si256(S1, O1);
+            __m256i T0 = _mm256_loadu_si256((__m256i*)&Transp[z][y][1]);
+            __m256i T1 = _mm256_loadu_si256((__m256i*)&Transp[z][y][15]);
+            S0 = _mm256_or_si256(S0, T0);
+            S1 = _mm256_or_si256(S1, T1);
             _mm256_store_si256((__m256i*)&Shades[z][y][1], S0);
             _mm256_store_si256((__m256i*)&Shades[z][y][15], S1);
         }
@@ -121,30 +118,26 @@ void Chunk_CalcLight(void *Data, get_chunk_func *GetChunk, ivec2 ChunkPosition)
     for (i32 y = 1; y < CHUNK_WIDTH * 3 - 1; ++y)
     for (i32 z = 1; z < CHUNK_HEIGHT - 1; ++z)
     {
-        __m256i Dst0 = _mm256_loadu_si256((__m256i*)&Shades[z][y][ 1]);
-        __m256i Dst1 = _mm256_loadu_si256((__m256i*)&Shades[z][y][15]);
-
-        Dst0 = _mm256_sub_epi8(Dst0, One);
-        Dst0 = _mm256_min_epi8(Dst0, _mm256_loadu_si256((__m256i*)&Shades[z  ][y  ][0]));
-        Dst0 = _mm256_min_epi8(Dst0, _mm256_loadu_si256((__m256i*)&Shades[z  ][y-1][1]));
-        Dst0 = _mm256_min_epi8(Dst0, _mm256_loadu_si256((__m256i*)&Shades[z-1][y  ][1]));
-        Dst0 = _mm256_min_epi8(Dst0, _mm256_loadu_si256((__m256i*)&Shades[z+1][y  ][1]));
-        Dst0 = _mm256_min_epi8(Dst0, _mm256_loadu_si256((__m256i*)&Shades[z  ][y+1][1]));
-        Dst0 = _mm256_min_epi8(Dst0, _mm256_loadu_si256((__m256i*)&Shades[z  ][y  ][2]));
-        Dst0 = _mm256_add_epi8(Dst0, One);
+        __m256i Dst0 =               _mm256_loadu_si256((__m256i*)&Shades[z  ][y  ][0]);
+        Dst0 = _mm256_min_epu8(Dst0, _mm256_loadu_si256((__m256i*)&Shades[z  ][y-1][1]));
+        Dst0 = _mm256_min_epu8(Dst0, _mm256_loadu_si256((__m256i*)&Shades[z-1][y  ][1]));
+        Dst0 = _mm256_min_epu8(Dst0, _mm256_loadu_si256((__m256i*)&Shades[z+1][y  ][1]));
+        Dst0 = _mm256_min_epu8(Dst0, _mm256_loadu_si256((__m256i*)&Shades[z  ][y+1][1]));
+        Dst0 = _mm256_min_epu8(Dst0, _mm256_loadu_si256((__m256i*)&Shades[z  ][y  ][2]));
+        Dst0 = _mm256_adds_epu8(Dst0, One);
+        Dst0 = _mm256_min_epu8(Dst0, _mm256_loadu_si256((__m256i*)&Shades[z][y][1]));
         Dst0 = _mm256_or_si256(Dst0, _mm256_loadu_si256((__m256i*)&Opaque[z][y][1]));
+        _mm256_store_si256((__m256i*)&Shades[z][y][1], Dst0);
 
-        Dst1 = _mm256_sub_epi8(Dst1, One);
-        Dst1 = _mm256_min_epi8(Dst1, _mm256_loadu_si256((__m256i*)&Shades[z  ][y  ][14]));
-        Dst1 = _mm256_min_epi8(Dst1, _mm256_loadu_si256((__m256i*)&Shades[z  ][y-1][15]));
-        Dst1 = _mm256_min_epi8(Dst1, _mm256_loadu_si256((__m256i*)&Shades[z-1][y  ][15]));
-        Dst1 = _mm256_min_epi8(Dst1, _mm256_loadu_si256((__m256i*)&Shades[z+1][y  ][15]));
-        Dst1 = _mm256_min_epi8(Dst1, _mm256_loadu_si256((__m256i*)&Shades[z  ][y+1][15]));
-        Dst1 = _mm256_min_epi8(Dst1, _mm256_loadu_si256((__m256i*)&Shades[z  ][y  ][16]));
-        Dst1 = _mm256_add_epi8(Dst1, One);
+        __m256i Dst1 =               _mm256_loadu_si256((__m256i*)&Shades[z  ][y  ][14]);
+        Dst1 = _mm256_min_epu8(Dst1, _mm256_loadu_si256((__m256i*)&Shades[z  ][y-1][15]));
+        Dst1 = _mm256_min_epu8(Dst1, _mm256_loadu_si256((__m256i*)&Shades[z-1][y  ][15]));
+        Dst1 = _mm256_min_epu8(Dst1, _mm256_loadu_si256((__m256i*)&Shades[z+1][y  ][15]));
+        Dst1 = _mm256_min_epu8(Dst1, _mm256_loadu_si256((__m256i*)&Shades[z  ][y+1][15]));
+        Dst1 = _mm256_min_epu8(Dst1, _mm256_loadu_si256((__m256i*)&Shades[z  ][y  ][16]));
+        Dst1 = _mm256_adds_epu8(Dst1, One);
+        Dst1 = _mm256_min_epu8(Dst1, _mm256_loadu_si256((__m256i*)&Shades[z][y][15]));
         Dst1 = _mm256_or_si256(Dst1, _mm256_loadu_si256((__m256i*)&Opaque[z][y][15]));
-
-        _mm256_store_si256((__m256i*)&Shades[z][y][ 1], Dst0);
         _mm256_store_si256((__m256i*)&Shades[z][y][15], Dst1);
     }
 
@@ -156,9 +149,9 @@ void Chunk_CalcLight(void *Data, get_chunk_func *GetChunk, ivec2 ChunkPosition)
         if (!Chunk) continue;
         for (u32 bz = 0; bz < CHUNK_HEIGHT; ++bz)
         for (u32 by = 0; by < CHUNK_WIDTH; ++by)
-        for (u32 bx = 0; bx < CHUNK_WIDTH; ++bx)
         {
-            Chunk->Shades[bz][by][bx] = Shades[bz][cy * CHUNK_WIDTH + by][cx * CHUNK_WIDTH + bx];
+            __m128i S = _mm_loadu_si128((__m128i*)&Shades[bz][cy * CHUNK_WIDTH + by][cx * CHUNK_WIDTH]);
+            _mm_storeu_si128((__m128i*)&Chunk->Shades[bz][by][0], S);
         }
     }
 }
@@ -224,8 +217,6 @@ box Chunk_BoxIntersection(chunk *Chunk, const box Box)
 
     return Intersection;
 }
-
-
 
 /******************/
 /*  PADDED CHUNK  */

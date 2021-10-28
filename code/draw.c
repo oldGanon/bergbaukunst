@@ -1213,7 +1213,7 @@ static void Rasterizer__Rasterize(rasterizer_tile *Tile)
                     __m256i DepthMask = _mm256_castps_si256(_mm256_cmp_ps(Depth, ZZ, _CMP_LT_OQ));
                     __m256i EdgeMask = _mm256_srai_epi32(_mm256_castps_si256(_mm256_or_ps(_mm256_or_ps(Alpha, Beta), Gamma)), 31);
                     __m256i Mask = _mm256_andnot_si256(EdgeMask, DepthMask);
-                    if (!_mm256_test_all_zeros(Mask, Mask))
+                    if (!_mm256_testz_si256(Mask, Mask))
                     {
                         // interpolation factors
                         __m256 ZZZ = _mm256_div_ps(One, ZZ);
@@ -1230,7 +1230,7 @@ static void Rasterizer__Rasterize(rasterizer_tile *Tile)
 
                         __m256i iUUU = _mm256_and_si256(_mm256_cvttps_epi32(UUU), UMask);
                         __m256i iVVV = _mm256_and_si256(_mm256_cvttps_epi32(VVV), VMask);
-                        __m256i iSSS = _mm256_and_si256(_mm256_cvttps_epi32(SSS), SMask);
+                        __m256i iSSS = _mm256_min_epi32(_mm256_cvttps_epi32(SSS), SMask);
 
                         __m256i iUV8 = _mm256_add_epi32(iUUU, _mm256_mullo_epi32(VMul, iVVV));
 
@@ -1320,13 +1320,13 @@ static bool Rasterizer__QuadIsVisible(const rasterizer_tile *Tile, vertex A, ver
     __m128 X1 = _mm_max_ps(X, X0);
     X0 = _mm_movehl_ps(X0, X1);
     X1 = _mm_max_ss(X1, X0);
-    f32 MaxX = _mm_cvtss_f32(X1);
+    f32 MaxX = _mm_cvtss_f32(_mm_floor_ps(X1));
     X0 = _mm_movehdup_ps(X);
     X1 = _mm_min_ps(X, X0);
     X0 = _mm_movehl_ps(X0, X1);
     X1 = _mm_min_ss(X1, X0);
-    f32 MinX = _mm_cvtss_f32(X1);
-    if (Floor(MinX) == Floor(MaxX))
+    f32 MinX = _mm_cvtss_f32(_mm_floor_ps(X1));
+    if (MinX == MaxX)
         return false;
 
     // quad between pixels
@@ -1336,13 +1336,13 @@ static bool Rasterizer__QuadIsVisible(const rasterizer_tile *Tile, vertex A, ver
     __m128 Y1 = _mm_max_ps(Y, Y0);
     Y0 = _mm_movehl_ps(Y0, Y1);
     Y1 = _mm_max_ss(Y1, Y0);
-    f32 MaxY = _mm_cvtss_f32(Y1);
+    f32 MaxY = _mm_cvtss_f32(_mm_floor_ps(Y1));
     Y0 = _mm_movehdup_ps(Y);
     Y1 = _mm_min_ps(Y, Y0);
     Y0 = _mm_movehl_ps(Y0, Y1);
     Y1 = _mm_min_ss(Y1, Y0);
-    f32 MinY = _mm_cvtss_f32(Y1);
-    if (Floor(MinX) == Floor(MaxX))
+    f32 MinY = _mm_cvtss_f32(_mm_floor_ps(Y1));
+    if (MinX == MaxX)
         return false;
 
     // check winding order

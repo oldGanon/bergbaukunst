@@ -266,7 +266,7 @@ inline f32 Vec2_Dist(vec2 A, vec2 B)
 inline vec2 Vec2_Normalize(vec2 A)
 {
     __m128 V = LOAD_VEC2(A);
-    if (_mm_test_all_zeros(_mm_castps_si128(V), _mm_set1_epi32(0x7FFFFFFF))) return A;
+    if (_mm_testz_si128(_mm_castps_si128(V), _mm_set1_epi32(0x7FFFFFFF))) return A;
     __m128 VV = _mm_mul_ps(V, V);
     __m128 Shf = _mm_movehdup_ps(VV);
     __m128 Sum = _mm_add_ps(VV, Shf);
@@ -379,7 +379,7 @@ inline vec3 Vec3_Normalize(vec3 A)
 {
     __m128 V = LOAD_VEC3(A);
     V = _mm_and_ps(V, _mm_castsi128_ps(_mm_set_epi32(0,0xFFFFFFFF,0xFFFFFFFF,0xFFFFFFFF)));
-    if (_mm_test_all_zeros(_mm_castps_si128(V), _mm_set1_epi32(0x7FFFFFFF))) return A;
+    if (_mm_testz_si128(_mm_castps_si128(V), _mm_set1_epi32(0x7FFFFFFF))) return A;
     __m128 VV = _mm_mul_ps(V, V);
     __m128 Shf = _mm_movehdup_ps(VV);
     __m128 Sum = _mm_add_ps(VV, Shf);
