@@ -80,10 +80,31 @@ u32 EntityManager_Last(world_entity_manager *Manager)
     return Manager->Capacity;
 }
 
+u32 EntityManager_FirstType(world_entity_manager *Manager, u32 EntityType)
+{
+    for (u32 i = 1; i <= Manager->Capacity; ++i)
+        if (Manager->Entities[i].Base.Type == EntityType)
+            return i;
+    return Manager->Capacity + 1;
+}
+
+u32 EntityManager_NextType(world_entity_manager *Manager, u32 EntityId, u32 EntityType)
+{
+    for (u32 i = EntityId + 1; i <= Manager->Capacity; ++i)
+        if (Manager->Entities[i].Base.Type == EntityType)
+            return i;
+    return Manager->Capacity + 1;
+}
+
 #define FOREACH_ENTITY(ENTITY_ID, MANAGER) \
-    for (u32 ENTITY_ID = EntityManager_First(MANAGER); \
-         ENTITY_ID <= EntityManager_Last(MANAGER); \
-         ENTITY_ID = EntityManager_Next(MANAGER, ENTITY_ID))
+    for (u32 ENTITY_ID = EntityManager_First((MANAGER)); \
+         ENTITY_ID <= EntityManager_Last((MANAGER)); \
+         ENTITY_ID = EntityManager_Next((MANAGER), (ENTITY_ID)))
+
+#define FOREACH_ENTITY_OF_TYPE(ENTITY_ID, MANAGER, ENTITY_TYPE) \
+    for (u32 ENTITY_ID = EntityManager_FirstType((MANAGER), (ENTITY_TYPE)); \
+         ENTITY_ID <= EntityManager_Last((MANAGER)); \
+         ENTITY_ID = EntityManager_NextType((MANAGER), (ENTITY_ID), (ENTITY_TYPE)))
 
 
 entity *EntityManager_GetEntity(world_entity_manager *Manager, u32 EntityId)

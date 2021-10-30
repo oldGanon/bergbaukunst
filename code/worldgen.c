@@ -212,9 +212,9 @@ void WorldGen_GenerateChunk(world_gen *WorldGenerator, world_chunk *Chunk)
         }
 #endif
     }
-    Chunk->DirtyMin = (ivec3){0,0,0};
-    Chunk->DirtyMax = (ivec3){CHUNK_WIDTH_MASK,CHUNK_WIDTH_MASK,CHUNK_HEIGHT_MASK};
-    Chunk->Flags |= (CHUNK_GENERATED | CHUNK_DIRTY);
+    
+    WorldChunk_MarkDirty(Chunk);
+    Chunk->Flags |= CHUNK_GENERATED;
 }
 
 void WorldGen_GrowTree(world_chunk_group *ChunkGroup, ivec2 Tree)
@@ -250,6 +250,7 @@ void WorldGen_GrowTree(world_chunk_group *ChunkGroup, ivec2 Tree)
 void WorldGen_DecorateChunk(world_gen *WorldGenerator, world_chunk_group ChunkGroup, ivec2 ChunkPosition)
 {
     if (!ChunkGroup_Complete(&ChunkGroup)) return;
+    world_chunk *Chunk = ChunkGroup.Chunks[1][1];
 
     // get tree positions
     vec3 Trees[12][12];
@@ -286,7 +287,8 @@ void WorldGen_DecorateChunk(world_gen *WorldGenerator, world_chunk_group ChunkGr
         WorldGen_GrowTree(&ChunkGroup, Vec2_FloorToIVec2(Trees[y][x].xy));
     }
     
-    ChunkGroup.Chunks[1][1]->Flags |= CHUNK_DECORATED;
+    WorldChunk_MarkDirty(Chunk);
+    Chunk->Flags |= CHUNK_DECORATED;
 }
 
 world_gen WorldGen_Create(u64 Seed)

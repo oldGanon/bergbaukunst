@@ -289,19 +289,16 @@ void View_DrawEntityBoxes(view *View, const bitmap Target, const camera Camera)
 
 void View_SetPosition(view *View, ivec2 Position)
 {
-    ivec2 Min = iVec2_Sub(Position, iVec2_Set1(DRAW_DISTANCE));
-    ivec2 Max = iVec2_Add(Position, iVec2_Set1(DRAW_DISTANCE));
-
-    for (i32 y = Min.y; y <= Max.y; ++y)
-    for (i32 x = Min.x; x <= Max.x; ++x)
+    View->Position = Position;
+    for (i32 y = 0; y < LOADED_CHUNKS_DIM; ++y)
+    for (i32 x = 0; x < LOADED_CHUNKS_DIM; ++x)
     {
-        ivec2 ChunkPosition = (ivec2){ x, y };
-        ivec2 ViewPosition = iVec2_And(ChunkPosition, iVec2_Set1(LOADED_CHUNKS_DIM_MASK));
-        view_chunk *Chunk = &View->Chunks[ViewPosition.y][ViewPosition.x];
-        if (Chunk->Base.Position.x == ChunkPosition.x ||
-            Chunk->Base.Position.y == ChunkPosition.y)
-            continue;
-        Chunk_Init(&Chunk->Base, ViewPosition);
+        view_chunk *Chunk = &View->Chunks[y][x];
+        if (View_ChunkIsLoaded(View, Chunk->Base.Position)) continue;
+
+        ivec2 ChunkPosition = { Position.x + x - LOADED_CHUNKS_DIST, Position.y + y - LOADED_CHUNKS_DIST };
+        // ivec2 ViewPosition = iVec2_And(ChunkPosition, iVec2_Set1(LOADED_CHUNKS_DIM_MASK));
+        Chunk_Init(&Chunk->Base, ChunkPosition);
         Mesh_Clear(&Chunk->Mesh);
     }
 }
@@ -315,16 +312,15 @@ void View_SetChunk(view *View, const msg_chunk_data *ChunkData)
 
     Chunk->Position = ChunkPosition;
 
-    ivec3 ChunkMin = (ivec3){ 0, 0, 0 };
-    ivec3 ChunkMax = (ivec3){ CHUNK_WIDTH_MASK, CHUNK_WIDTH_MASK, CHUNK_HEIGHT_MASK };
-    ivec3 Min = iVec3_Max(ChunkMin, iVec3_Min(ChunkData->MinBlock, ChunkData->MaxBlock));
-    ivec3 Max = iVec3_Min(ChunkMax, iVec3_Max(ChunkData->MinBlock, ChunkData->MaxBlock));
-    ivec3 Dim = iVec3_Sub(Max, Min);
+    ivec3 Min = (ivec3){ 0, 0, 0 };
+    ivec3 Max = (ivec3){ CHUNK_WIDTH_MASK, CHUNK_WIDTH_MASK, CHUNK_HEIGHT_MASK };
+    Min = iVec3_Max(Min, iVec3_Min(ChunkData->MinBlock, ChunkData->MaxBlock));
+    Max = iVec3_Min(Max, iVec3_Max(ChunkData->MinBlock, ChunkData->MaxBlock));
     const u8 *BlockPtr = ChunkData->Blocks;
-    for (i32 z = 0; z <= Dim.z; ++z)
-    for (i32 y = 0; y <= Dim.y; ++y)
-    for (i32 x = 0; x <= Dim.x; ++x)
-        Chunk->Blocks[Min.z+z][Min.y+y][Min.x+x].Id = *BlockPtr++;
+    for (i32 z = Min.z; z <= Max.z; ++z)
+    for (i32 y = Min.y; y <= Max.y; ++y)
+    for (i32 x = Min.x; x <= Max.x; ++x)
+        Chunk->Blocks[z][y][x].Id = *BlockPtr++;
 
     Chunk_CalcLight(View, View_GetChunk, ChunkPosition);
 
@@ -368,12 +364,15 @@ void View_SetEntity(view *View, const msg_set_entity *SetEntity)
 
 void View_Init(view *View)
 {
-    View_SetPosition(View, (ivec2){ 0 });
-
+    View->Position = (ivec2){ 0 };
     for (i32 y = 0; y < LOADED_CHUNKS_DIM; ++y)
     for (i32 x = 0; x < LOADED_CHUNKS_DIM; ++x)
     {
-        View->Chunks[y][x].Mesh = Mesh_Create();
+        ivec2 ChunkPosition = { x - LOADED_CHUNKS_DIST, y - LOADED_CHUNKS_DIST };
+        ivec2 ViewPosition = iVec2_And(ChunkPosition, iVec2_Set1(LOADED_CHUNKS_DIM_MASK));
+        view_chunk *Chunk = &View->Chunks[ViewPosition.y][ViewPosition.x];
+        Chunk_Init(&Chunk->Base, ChunkPosition);
+        Chunk->Mesh = Mesh_Create();
     }
 
     View_SetEntityTableCapacity(&View->EntityTable, 256);

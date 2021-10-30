@@ -19,21 +19,38 @@ typedef struct world_chunk
     u32 Flags;
 } world_chunk;
 
+void WorldChunk_MarkClean(world_chunk *Chunk)
+{
+    Chunk->DirtyMin = (ivec3){CHUNK_WIDTH_MASK,CHUNK_WIDTH_MASK,CHUNK_HEIGHT_MASK};
+    Chunk->DirtyMax = (ivec3){0,0,0};
+    Chunk->Flags &= ~CHUNK_DIRTY;
+}
+
+void WorldChunk_MarkDirty(world_chunk *Chunk)
+{
+    Chunk->DirtyMin = (ivec3){0,0,0};
+    Chunk->DirtyMax = (ivec3){CHUNK_WIDTH_MASK,CHUNK_WIDTH_MASK,CHUNK_HEIGHT_MASK};
+    Chunk->Flags |= CHUNK_DIRTY;
+}
+
+void WorldChunk_MarkBlockDirty(world_chunk *Chunk, ivec3 BlockPosition)
+{
+    Chunk->DirtyMin = iVec3_Min(Chunk->DirtyMin, BlockPosition);
+    Chunk->DirtyMax = iVec3_Max(Chunk->DirtyMax, BlockPosition);
+    Chunk->Flags |= CHUNK_DIRTY;
+}
+
 void WorldChunk_Init(world_chunk *Chunk, ivec2 Position)
 {
     Chunk_Init(&Chunk->Base, Position);
-    
-    Chunk->DirtyMin = (ivec3){CHUNK_WIDTH_MASK,CHUNK_WIDTH_MASK,CHUNK_HEIGHT_MASK};
-    Chunk->DirtyMax = (ivec3){0,0,0};
+    WorldChunk_MarkClean(Chunk);
     Chunk->Flags = CHUNK_ALLOCATED;
 }
 
 void WorldChunk_Clear(world_chunk *Chunk, ivec2 Position)
 {
     Chunk_Clear(&Chunk->Base, Position);
-    
-    Chunk->DirtyMin = (ivec3){CHUNK_WIDTH_MASK,CHUNK_WIDTH_MASK,CHUNK_HEIGHT_MASK};
-    Chunk->DirtyMax = (ivec3){0,0,0};
+    WorldChunk_MarkClean(Chunk);
     Chunk->Flags = CHUNK_EMPTY;
 }
 
@@ -54,14 +71,12 @@ void WorldChunk_SetBlock(world_chunk *Chunk, ivec3 WorldPosition, block Block)
     ivec3 BlockPosition = World_ToBlockPosition(WorldPosition);
     Chunk_SetBlock(&Chunk->Base, BlockPosition, Block);
     
-    Chunk->DirtyMin = iVec3_Min(Chunk->DirtyMin, BlockPosition);
-    Chunk->DirtyMax = iVec3_Max(Chunk->DirtyMax, BlockPosition);
-    Chunk->Flags |= CHUNK_DIRTY;
+    WorldChunk_MarkBlockDirty(Chunk, BlockPosition);
 }
 
 enum world_entity_flags
 {
-    ENTITY_NO_FLAGS,
+    ENTITY_EMPTY,
     ENTITY_DIRTY = 1 << 0,
 };
 
@@ -139,25 +154,34 @@ world_chunk_group World_GetChunkGroup(world *World, ivec2 ChunkPosition)
     return ChunkMap_GetGroup(&World->ChunkMap, ChunkPosition);
 }
 
-void World_Update(world *World, vec3 PlayerPosition)
+void World_Update(world *World)
 {
-    // chunks
-    ivec2 CenterChunk = World_ToChunkPosition(Vec3_FloorToIVec3(PlayerPosition));
-    ivec2 LoadedChunkDist = iVec2_Set1(LOADED_CHUNKS_DIST);
-    ivec2 MinPos = iVec2_Sub(CenterChunk, LoadedChunkDist);
-    ivec2 MaxPos = iVec2_Add(CenterChunk, LoadedChunkDist);
-    for (i32 x = MinPos.x; x < MaxPos.x; x++)
-    for (i32 y = MinPos.y; y < MaxPos.y; y++)
+    // load chunks
+    FOREACH_ENTITY_OF_TYPE(PlayerId, &World->EntityManager, ENTITY_PLAYER)
     {
-        ivec2 ChunkPos = (ivec2){ x, y };
-        world_chunk *Chunk = ChunkMap_GetChunk(&World->ChunkMap, ChunkPos);
-        if (!Chunk) Chunk = ChunkMap_AllocateChunk(&World->ChunkMap, ChunkPos);
-        if (!(Chunk->Flags & CHUNK_GENERATED)) WorldGen_GenerateChunk(&World->Generator, Chunk);
-        world_chunk_group ChunkGroup = World_GetChunkGroup(World, ChunkPos);
-        if (!(Chunk->Flags & CHUNK_DECORATED)) WorldGen_DecorateChunk(&World->Generator, ChunkGroup, ChunkPos);
+        entity *Player = EntityManager_GetEntity(&World->EntityManager, PlayerId);
+        ivec2 CenterChunk = World_ToChunkPosition(Vec3_FloorToIVec3(Player->Position));
+        ivec2 LoadedChunkDist = iVec2_Set1(LOADED_CHUNKS_DIST);
+        ivec2 MinPos = iVec2_Sub(CenterChunk, LoadedChunkDist);
+        ivec2 MaxPos = iVec2_Add(CenterChunk, LoadedChunkDist);
+        for (i32 x = MinPos.x; x < MaxPos.x; x++)
+        for (i32 y = MinPos.y; y < MaxPos.y; y++)
+        {
+            ivec2 ChunkPos = (ivec2){ x, y };
+            world_chunk *Chunk = ChunkMap_GetChunk(&World->ChunkMap, ChunkPos);
+            if (!Chunk) Chunk = ChunkMap_AllocateChunk(&World->ChunkMap, ChunkPos);
+            if (!(Chunk->Flags & CHUNK_GENERATED)) WorldGen_GenerateChunk(&World->Generator, Chunk);
+            world_chunk_group ChunkGroup = World_GetChunkGroup(World, ChunkPos);
+            if (!(Chunk->Flags & CHUNK_DECORATED)) WorldGen_DecorateChunk(&World->Generator, ChunkGroup, ChunkPos);
+        }
     }
 
-    // entities
+    // update chunks
+    {
+
+    }
+
+    // update entities
     world_entity_manager *Manager = &World->EntityManager;
     FOREACH_ENTITY(EntityId, Manager)
     {
@@ -166,11 +190,9 @@ void World_Update(world *World, vec3 PlayerPosition)
         {
             case ENTITY_MOB:
             {
-                FOREACH_ENTITY(PlayerId, Manager)
+                FOREACH_ENTITY_OF_TYPE(PlayerId, Manager, ENTITY_PLAYER)
                 {
                     entity *Player = EntityManager_GetEntity(&World->EntityManager, PlayerId);
-                    if (!Player || Player->Type != ENTITY_PLAYER) continue;
-
                     vec3 MobToPlayer = Vec3_Sub(Player->Position, Entity->Position);
                     f32 Distance = Vec3_Length(MobToPlayer);
                     if(Distance < 10)

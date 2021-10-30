@@ -4,8 +4,8 @@
 typedef struct server_client
 {
     u32 EntityId;
+    ivec2 ViewPosition;
 
-    // ViewPosition;
     // ViewDistance;
     // LookYaw;
     // LookPitch;
@@ -37,11 +37,23 @@ void Server_BroadcastMessage(server *Server, msg *Message)
     Network_ServerBroadcastMessage(&Server->Server, Message);
 }
 
+bool ChunkInView(ivec2 ViewPosition, ivec2 ChunkPosition)
+{
+    if (ChunkPosition.x >= (ViewPosition.x - LOADED_CHUNKS_DIST) &&
+        ChunkPosition.y >= (ViewPosition.y - LOADED_CHUNKS_DIST) &&
+        ChunkPosition.x < (ViewPosition.x + LOADED_CHUNKS_DIST) &&
+        ChunkPosition.y < (ViewPosition.y + LOADED_CHUNKS_DIST))
+        return true;
+    return false;
+}
+
 void Server_SendChunkMessage(server *Server, ivec2 ChunkPosition, msg *Message)
 {
     for (u32 i = 1; i < SERVER_MAX_CLIENTS; ++i)
     {
-        Network_ServerSendMessage(&Server->Server, i, Message);
+        server_client *Client = Server_GetClient(Server, i);
+        if (ChunkInView(Client->ViewPosition, ChunkPosition))
+            Network_ServerSendMessage(&Server->Server, i, Message);
     }
 }
 
@@ -51,8 +63,11 @@ void Server_ClientConnect(server *Server, u32 ClientId)
     if (!Client) return;
 
     vec3 PlayerSpawnPosition = (vec3){ 0 };
-    ivec2 SpawnChunk = World_ToChunkPosition(Vec3_FloorToIVec3(PlayerSpawnPosition));
+
+    *Client = (server_client){ 0 };
     Client->EntityId = World_SpawnPlayer(&Server->World, PlayerSpawnPosition);
+    Client->ViewPosition = World_ToChunkPosition(Vec3_FloorToIVec3(PlayerSpawnPosition));
+
     entity *Player = EntityManager_GetEntity(&Server->World.EntityManager, Client->EntityId);
 
     msg Message;
@@ -62,13 +77,13 @@ void Server_ClientConnect(server *Server, u32 ClientId)
     Network_ServerSendMessage(&Server->Server, ClientId, &Message);
 
     // set client view position
-    Message_ViewPosition(&Message, SpawnChunk);
+    Message_ViewPosition(&Message, Client->ViewPosition);
     Network_ServerSendMessage(&Server->Server, ClientId, &Message);
 
     // send chunk data
     ivec2 LoadedChunkDist = iVec2_Set1(LOADED_CHUNKS_DIST);
-    ivec2 MinPos = iVec2_Sub(SpawnChunk, LoadedChunkDist);
-    ivec2 MaxPos = iVec2_Add(SpawnChunk, LoadedChunkDist);
+    ivec2 MinPos = iVec2_Sub(Client->ViewPosition, LoadedChunkDist);
+    ivec2 MaxPos = iVec2_Add(Client->ViewPosition, LoadedChunkDist);
     for (i32 x = MinPos.x; x < MaxPos.x; x++)
     for (i32 y = MinPos.y; y < MaxPos.y; y++)
     {
@@ -118,12 +133,44 @@ void Server_ClientUpdatePlayerState(server *Server, u32 ClientId, const msg_play
     entity *Player = EntityManager_GetEntity(&Server->World.EntityManager, Client->EntityId);
     if (!Player) return;
 
-    ivec2 Chunk = World_ToChunkPosition(Vec3_FloorToIVec3(Player->Position));
-    Player->Position = PlayerState->Position;
+    ivec2 PlayerChunk = World_ToChunkPosition(Vec3_FloorToIVec3(Player->Position));
 
     msg Message;
+
+    // update client view
+    ivec2 NewViewPosition = PlayerChunk;
+    ivec2 OldViewPosition = Client->ViewPosition;
+    if ((NewViewPosition.x != OldViewPosition.x) ||
+        (NewViewPosition.y != OldViewPosition.y))
+    {
+        Client->ViewPosition = NewViewPosition;
+        Message_ViewPosition(&Message, Client->ViewPosition);
+        Network_ServerSendMessage(&Server->Server, ClientId, &Message);
+
+        i32 MinX = Min(NewViewPosition.x, OldViewPosition.x) - LOADED_CHUNKS_DIST;
+        i32 MaxX = Max(NewViewPosition.x, OldViewPosition.x) + LOADED_CHUNKS_DIST;
+        i32 MinY = Min(NewViewPosition.y, OldViewPosition.y) - LOADED_CHUNKS_DIST;
+        i32 MaxY = Max(NewViewPosition.y, OldViewPosition.y) + LOADED_CHUNKS_DIST;
+        for (i32 y = MinY; y < MaxY; ++y)
+        for (i32 x = MinX; x < MaxX; ++x)
+        {
+            ivec2 ChunkPos = (ivec2){ x, y };
+            if (ChunkInView(OldViewPosition, ChunkPos))
+                continue;
+
+            world_chunk *Chunk = World_GetChunk(&Server->World, ChunkPos);
+            if (!Chunk) continue;
+            if ((Chunk->Flags & CHUNK_COMPLETE) != (CHUNK_COMPLETE)) continue;
+
+            Message_ChunkData(&Message, &Chunk->Base, (ivec3){0,0,0}, (ivec3){CHUNK_WIDTH_MASK,CHUNK_WIDTH_MASK,CHUNK_HEIGHT_MASK});
+            Network_ServerSendMessage(&Server->Server, ClientId, &Message);
+        }
+    }
+
+    // update player entity
+    Player->Position = PlayerState->Position;
     Message_SetEntity(&Message, Client->EntityId, Player);
-    Server_SendChunkMessage(Server, Chunk, &Message);
+    Server_SendChunkMessage(Server, PlayerChunk, &Message);
 }
 
 void Server_ClientPlaceBlock(server *Server, u32 ClientId, const msg_place_block *PlaceBlock)
@@ -170,7 +217,7 @@ void Server_Update(server *Server)
     }
 
     // update
-    World_Update(&Server->World, Vec3_Zero());
+    World_Update(&Server->World);
 
     // send chunks
     world_chunk_map *ChunkMap = &Server->World.ChunkMap;
