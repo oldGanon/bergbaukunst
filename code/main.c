@@ -545,7 +545,8 @@ LRESULT CALLBACK Win32_WindowCallback(HWND Window, UINT Message, WPARAM WParam, 
                 .right = SCREEN_WIDTH,
                 .bottom = SCREEN_HEIGHT
             };
-            AdjustWindowRect(&MinWindowDim, WS_OVERLAPPEDWINDOW, 0);
+            DWORD Style = GetWindowLong(Window, GWL_STYLE);
+            AdjustWindowRect(&MinWindowDim, Style, 0);
             MINMAXINFO *MinMaxInfo = (MINMAXINFO *)LParam;
             MinMaxInfo->ptMinTrackSize.x = MinWindowDim.right - MinWindowDim.left;
             MinMaxInfo->ptMinTrackSize.y = MinWindowDim.bottom - MinWindowDim.top;

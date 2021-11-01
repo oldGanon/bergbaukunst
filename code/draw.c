@@ -97,6 +97,9 @@ void Draw_TriangleTexturedVerts(bitmap, const bitmap, vertex, vertex, vertex);
 void Draw_QuadVerts(bitmap, color, vertex, vertex, vertex, vertex);
 void Draw_QuadTexturedVerts(bitmap, const bitmap, vertex, vertex, vertex, vertex);
 
+
+
+
 // Generics
 #define Draw_Point(BUFFER, COLOR, X, ...) _Generic((X), \
     vec2: Draw_PointVec2, \
@@ -605,7 +608,7 @@ ivec2 Draw_Number(bitmap Target, const bitmap Font, color Color, ivec2 Position,
 /*   Triangle 2.0   */
 /********************/
 
-inline vertex Vertex_Lerp(vertex A, vertex B, f32 t)
+inline vertex Draw__VertexLerp(vertex A, vertex B, f32 t)
 {
     A.Position = Lerp(A.Position, B.Position, t);
     A.TexCoord = Lerp(A.TexCoord, B.TexCoord, t);
@@ -634,8 +637,8 @@ inline u32 Draw__TriangleClipZ(vertex *V)
         {
             f32 t01 = (CAMERA_NEAR - V[0].Position.z) / (V[1].Position.z - V[0].Position.z);
             f32 t02 = (CAMERA_NEAR - V[0].Position.z) / (V[2].Position.z - V[0].Position.z);
-            vertex V01 = Vertex_Lerp(V[0], V[1], t01);
-            vertex V02 = Vertex_Lerp(V[0], V[2], t02);
+            vertex V01 = Draw__VertexLerp(V[0], V[1], t01);
+            vertex V02 = Draw__VertexLerp(V[0], V[2], t02);
             V[0] = V01; V[3] = V[2]; V[4] = V02; V[5] = V01;
             return 2;
         }
@@ -646,8 +649,8 @@ inline u32 Draw__TriangleClipZ(vertex *V)
         {
             f32 t01 = (CAMERA_NEAR - V[0].Position.z) / (V[1].Position.z - V[0].Position.z);
             f32 t02 = (CAMERA_NEAR - V[0].Position.z) / (V[2].Position.z - V[0].Position.z);
-            V[1] = Vertex_Lerp(V[0], V[1], t01);
-            V[2] = Vertex_Lerp(V[0], V[2], t02);
+            V[1] = Draw__VertexLerp(V[0], V[1], t01);
+            V[2] = Draw__VertexLerp(V[0], V[2], t02);
             return 1;
         }
         
