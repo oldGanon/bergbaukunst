@@ -60,13 +60,11 @@ void Bitmap_Clear(bitmap Bitmap, color Color);
 void Draw_Bitmap(bitmap Target, const bitmap Bitmap, ivec2 Position);
 
 // Rasterizer
-void Raserizer_Rasterize(void);
-void Raserizer_Clear(color Color);
-void Raserizer_Flush(void);
-void Raserizer_SetTexture(bitmap Texture);
-void Raserizer_Blit(bitmap Target);
-void Raserizer_DrawTriangle(vertex A, vertex B, vertex C);
-void Raserizer_DrawQuad(vertex A, vertex B, vertex C, vertex D);
+void Rasterizer_Rasterize(void);
+void Rasterizer_Clear(color Color);
+void Rasterizer_Flush(void);
+void Rasterizer_Blit(bitmap Target);
+void Rasterizer_DrawMesh(const vertex *Quads, u32 QuadCount, const bitmap Texture, mat4 Transform, box BoundingBox);
 
 // Point
 void Draw_PointVec2(bitmap, color, vec2);

@@ -127,7 +127,6 @@ void Win32_SetPalette(const struct palette *);
 global bool GlobalRunning;
 
 #include "audio.c"
-#include "geom.c"
 #include "draw.c"
 #include "camera.c"
 #include "mesh.c"
