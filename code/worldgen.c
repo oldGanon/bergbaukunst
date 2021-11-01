@@ -198,12 +198,17 @@ void WorldGen_GenerateChunk(world_gen *WorldGenerator, world_chunk *Chunk)
             break;
         }
         // Sand
-        if (Chunk->Base.Blocks[66][yy][xx].Id == BLOCK_ID_AIR &&
-            Chunk->Base.Blocks[65][yy][xx].Id == BLOCK_ID_STONE)
-            Chunk->Base.Blocks[65][yy][xx].Id = BLOCK_ID_SAND;
-        if (Chunk->Base.Blocks[65][yy][xx].Id == BLOCK_ID_AIR &&
-            Chunk->Base.Blocks[64][yy][xx].Id == BLOCK_ID_STONE)
-            Chunk->Base.Blocks[64][yy][xx].Id = BLOCK_ID_SAND;
+        for (i32 zz = 65; zz > 1; --zz)
+        {
+            if (Chunk->Base.Blocks[zz + 1][yy][xx].Id != BLOCK_ID_AIR) continue;
+            if (Chunk->Base.Blocks[zz][yy][xx].Id != BLOCK_ID_STONE) continue;
+            Chunk->Base.Blocks[zz][yy][xx].Id = BLOCK_ID_SAND;
+            if (Chunk->Base.Blocks[zz - 1][yy][xx].Id != BLOCK_ID_STONE) break;
+            Chunk->Base.Blocks[zz - 1][yy][xx].Id = BLOCK_ID_SAND;
+            if (Chunk->Base.Blocks[zz - 2][yy][xx].Id != BLOCK_ID_STONE) break;
+            Chunk->Base.Blocks[zz - 2][yy][xx].Id = BLOCK_ID_SAND;
+            break;
+        }
         // Water
         for (i32 zz = 64; zz >= 0; --zz)
         {

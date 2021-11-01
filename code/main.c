@@ -307,6 +307,37 @@ palette Win32_LoadPalette(const char* Name)
     return Palette;
 }
 
+global WINDOWPLACEMENT GlobalWindowPosition;
+
+static void
+Win32_ToggleFullscreen(HWND Window)
+{
+    //see https://devblogs.microsoft.com/oldnewthing/20100412-00/?p=14353
+    DWORD Style = GetWindowLong(Window, GWL_STYLE);
+    if (Style & WS_OVERLAPPEDWINDOW)
+    {
+        MONITORINFO MonitorInfo = {sizeof(MonitorInfo)};
+        if (GetWindowPlacement(Window, &GlobalWindowPosition) && 
+            GetMonitorInfo(MonitorFromWindow(Window, MONITOR_DEFAULTTOPRIMARY), &MonitorInfo))
+        {
+            SetWindowLong(Window, GWL_STYLE, Style & ~WS_OVERLAPPEDWINDOW);
+            SetWindowPos(Window, HWND_TOP,
+                         MonitorInfo.rcMonitor.left, MonitorInfo.rcMonitor.top,
+                         MonitorInfo.rcMonitor.right - MonitorInfo.rcMonitor.left,
+                         MonitorInfo.rcMonitor.bottom - MonitorInfo.rcMonitor.top,
+                         SWP_NOOWNERZORDER | SWP_FRAMECHANGED);
+        }
+    }
+    else
+    {
+        SetWindowLong(Window, GWL_STYLE, Style | WS_OVERLAPPEDWINDOW);
+        SetWindowPlacement(Window, &GlobalWindowPosition);
+        SetWindowPos(Window, 0, 0, 0, 0, 0,
+                     SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER |
+                     SWP_NOOWNERZORDER | SWP_FRAMECHANGED);
+    }
+}
+
 //
 // AUDIO
 //
@@ -669,7 +700,7 @@ int Win32_ClientMain(const char *Ip)
                     if (IsDown && AltDown)
                     {
                         if (Code == VK_F4) GlobalRunning = false;
-                        // if (Code == VK_RETURN) ; // FULLSCREEN
+                        if (Code == VK_RETURN) Win32_ToggleFullscreen(GlobalWindow);
                     }
 
                     if (IsDown && !WasDown)

@@ -153,14 +153,7 @@ void Client_Draw(client *Client, bitmap Target, f32 DeltaTime)
     ivec2 Position = Draw_String(Target, Client->Font, COLOR_WHITE, (ivec2){8,16}, "Fps: ");
     Draw_Number(Target, Client->Font, COLOR_WHITE, Position, Client->Fps);
 
-    vec3 A = Camera_WorldToScreen(Client->Camera, Target, (vec3) {  0, 0, 64 });
-    vec3 B = Camera_WorldToScreen(Client->Camera, Target, (vec3) { 16, 0, 64 });
-    vec3 C = Camera_WorldToScreen(Client->Camera, Target, (vec3) { 16,16, 64 });
-    vec3 D = Camera_WorldToScreen(Client->Camera, Target, (vec3) {  0,16, 64 });
-    Draw_Line(Target, COLOR_WHITE, A, B);
-    Draw_Line(Target, COLOR_WHITE, B, C);
-    Draw_Line(Target, COLOR_WHITE, C, D);
-    Draw_Line(Target, COLOR_WHITE, D, A);
+    View_DrawLineBox(Target, Client->Camera, (box){{0},{CHUNK_WIDTH,CHUNK_WIDTH,CHUNK_HEIGHT}});
 
     trace_result TraceResult;
     if (View_TraceRay(&Client->View, Client->Camera.Position, Camera_Direction(Client->Camera), 5.0f, &TraceResult) < 5.0f)
@@ -169,8 +162,11 @@ void Client_Draw(client *Client, bitmap Target, f32 DeltaTime)
     }
 
     ivec2 Center = (ivec2) { Target.Width / 2, Target.Height / 2 };
-    Draw_RectIVec2(Target, COLOR_WHITE, iVec2_Add(Center, (ivec2){-1,-5 }), (ivec2){ 2, 4 });
-    Draw_RectIVec2(Target, COLOR_WHITE, iVec2_Add(Center, (ivec2){-1, 1 }), (ivec2){ 2, 4 });
-    Draw_RectIVec2(Target, COLOR_WHITE, iVec2_Add(Center, (ivec2){-5,-1 }), (ivec2){ 4, 2 });
-    Draw_RectIVec2(Target, COLOR_WHITE, iVec2_Add(Center, (ivec2){ 1,-1 }), (ivec2){ 4, 2 });
+    i32 Gap = 4;
+    i32 Thickness = 4;
+    i32 Length = 8;
+    Draw_RectIVec2(Target, COLOR_WHITE, iVec2_Add(Center, (ivec2){-(Gap + Length),-(Thickness / 2) }), (ivec2){ Length, Thickness });
+    Draw_RectIVec2(Target, COLOR_WHITE, iVec2_Add(Center, (ivec2){  Gap,          -(Thickness / 2) }), (ivec2){ Length, Thickness });
+    Draw_RectIVec2(Target, COLOR_WHITE, iVec2_Add(Center, (ivec2){-(Thickness / 2),-(Gap + Length) }), (ivec2){ Thickness, Length });
+    Draw_RectIVec2(Target, COLOR_WHITE, iVec2_Add(Center, (ivec2){-(Thickness / 2),  Gap,          }), (ivec2){ Thickness, Length });
 }
