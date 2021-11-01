@@ -134,9 +134,6 @@ global bool GlobalRunning;
 #include "view.c"
 #include "client.c"
 
-global bool GlobalFocus;
-global bitmap GlobalBackbuffer;
-
 //
 // WINDOWS HEADERS
 //
@@ -149,6 +146,10 @@ global bitmap GlobalBackbuffer;
 #include <winuser.h>
 #include <wingdi.h>
 #include <dsound.h>
+
+global bool GlobalFocus;
+global bitmap GlobalBackbuffer;
+global WINDOWPLACEMENT GlobalWindowPosition;
 
 //
 // C STD LIB
@@ -306,8 +307,6 @@ palette Win32_LoadPalette(const char* Name)
 
     return Palette;
 }
-
-global WINDOWPLACEMENT GlobalWindowPosition;
 
 static void
 Win32_ToggleFullscreen(HWND Window)

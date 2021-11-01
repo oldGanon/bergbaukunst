@@ -69,26 +69,23 @@ void Raserizer_DrawTriangle(vertex A, vertex B, vertex C);
 void Raserizer_DrawQuad(vertex A, vertex B, vertex C, vertex D);
 
 // Point
-void Draw_PointStruct(bitmap, color, point);
-void Draw_PointIVec2(bitmap, color, ivec2);
-void Draw_PointVec3(bitmap, color, vec3);
 void Draw_PointVec2(bitmap, color, vec2);
+void Draw_PointVec3(bitmap, color, vec3);
+void Draw_PointIVec2(bitmap, color, ivec2);
 
 // Line
-void Draw_LineStruct(bitmap, color, line);
-void Draw_LineIVec2(bitmap, color, ivec2, ivec2);
-void Draw_LineVec3(bitmap, color, vec3, vec3);
 void Draw_LineVec2(bitmap, color, vec2, vec2);
+void Draw_LineVec3(bitmap, color, vec3, vec3);
+void Draw_LineIVec2(bitmap, color, ivec2, ivec2);
 
 // Triangle
-void Draw_TriangleStruct(bitmap, color, triangle);
-void Draw_TriangleIVec2(bitmap, color, ivec2, ivec2, ivec2);
 void Draw_TriangleVec2(bitmap, color, vec2, vec2, vec2);
 void Draw_TriangleVec3(bitmap, color, vec3, vec3, vec3);
+void Draw_TriangleIVec2(bitmap, color, ivec2, ivec2, ivec2);
 
 // Rect
-void Draw_RectIVec2(bitmap, color, ivec2, ivec2);
 void Draw_RectVec2(bitmap, color, vec2, vec2);
+void Draw_RectIVec2(bitmap, color, ivec2, ivec2);
 
 // String
 ivec2 Draw_Character(bitmap, const bitmap, color, ivec2, char);
@@ -104,32 +101,29 @@ void Draw_QuadTexturedVerts(bitmap, const bitmap, vertex, vertex, vertex, vertex
 
 // Generics
 #define Draw_Point(BUFFER, COLOR, X, ...) _Generic((X), \
-    point: Draw_PointStruct, \
-    ivec2: Draw_PointIVec2, \
+    vec2: Draw_PointVec2, \
     vec3: Draw_PointVec3, \
-    vec2: Draw_PointVec2 \
+    ivec2: Draw_PointIVec2 \
 )(BUFFER, COLOR, X, __VA_ARGS__)
 
 #define Draw_Line(BUFFER, COLOR, X, ...) _Generic((X), \
-    line: Draw_LineStruct, \
-    ivec2: Draw_LineIVec2, \
+    vec2: Draw_LineVec2, \
     vec3: Draw_LineVec3, \
-    vec2: Draw_LineVec2 \
+    ivec2: Draw_LineIVec2 \
 )(BUFFER, COLOR, X, __VA_ARGS__)
 
 #define Draw_Rect(BUFFER, COLOR, X, ...) _Generic((X), \
     rect: Draw_RectStruct, \
-    ivec2: Draw_RectIVec2, \
-    vec2: Draw_RectVec2 \
+    vec2: Draw_RectVec2, \
+    ivec2: Draw_RectIVec2 \
 )(BUFFER, COLOR, X, __VA_ARGS__)
 
 #define Draw_Triangle(BUFFER, COLOR, X, ...) _Generic((COLOR), \
     color: _Generic((X), \
         vertex: Draw_TriangleVerts,\
-        triangle: Draw_TriangleStruct, \
-        ivec2: Draw_TriangleIVec2, \
+        vec2: Draw_TriangleVec2, \
         vec3: Draw_TriangleVec3, \
-        vec2: Draw_TriangleVec2 \
+        ivec2: Draw_TriangleIVec2 \
     ), \
     bitmap: Draw_TriangleTexturedVerts, \
     const bitmap: Draw_TriangleTexturedVerts \
@@ -250,16 +244,6 @@ void Draw_Bitmap(bitmap Target, const bitmap Bitmap, ivec2 Position)
 /*   Point   */
 /*************/
 
-void Draw_PointStruct(bitmap Target, color Color, point Point)
-{
-    Bitmap_SetPixel(Target, Color, F32_FloorToI32(Point.x), F32_FloorToI32(Point.y));
-}
-
-void Draw_PointIVec2(bitmap Target, color Color, ivec2 Point)
-{
-    Bitmap_SetPixel(Target, Color, Point.x, Point.y);
-}
-
 void Draw_PointVec2(bitmap Target, color Color, vec2 Point)
 {
     Bitmap_SetPixel(Target, Color, F32_FloorToI32(Point.x), F32_FloorToI32(Point.y));
@@ -270,6 +254,11 @@ void Draw_PointVec3(bitmap Target, color Color, vec3 Point)
     if (Point.z <= 0) return;
     Point = Draw__PerspectiveDivide(Target.Width, Target.Height, Point);
     Bitmap_SetPixel(Target, Color, F32_FloorToI32(Point.x), F32_FloorToI32(Point.y));
+}
+
+void Draw_PointIVec2(bitmap Target, color Color, ivec2 Point)
+{
+    Bitmap_SetPixel(Target, Color, Point.x, Point.y);
 }
 
 /************/
@@ -321,45 +310,47 @@ inline bool Draw__ClipLine(vec2 Min, vec2 Max, vec2 *A, vec2 *B)
     return true;
 }
 
-void Draw_LineStruct(bitmap Target, color Color, line Line)
+void Draw_LineVec2(bitmap Target, color Color, vec2 A, vec2 B)
 {
-    rect Clip = (rect){ .x = 0.0625f, .y = 0.0625f, .w = (f32)Target.Width-0.125f, .h = (f32)Target.Height-0.125f };
+    vec2 ClipMin = (vec2){ .x = 0.0625f, .y = 0.0625f };
+    vec2 ClipMax = (vec2){ .x = (f32)Target.Width-0.125f, .y = (f32)Target.Height-0.125f };
     
-    if (!Line_Clip(&Line, Clip)) return;
-    
-    Line.a.x -= 0.5f;
-    Line.a.y -= 0.5f;
-    Line.b.x -= 0.5f;
-    Line.b.y -= 0.5f;
+    if (!Draw__ClipLine(ClipMin, ClipMax, &A, &B))
+        return;
+
+    A.x -= 0.5f;
+    A.y -= 0.5f;
+    B.x -= 0.5f;
+    B.y -= 0.5f;
 
     {   // check if vertical or horizontal line
-        const i32 ix0 = F32_CeilToI32(Min(Line.a.x, Line.b.x));
-        const i32 ix1 = F32_CeilToI32(Max(Line.a.x, Line.b.x));
-        const i32 iy0 = F32_CeilToI32(Min(Line.a.y, Line.b.y));
-        const i32 iy1 = F32_CeilToI32(Max(Line.a.y, Line.b.y));
+        const i32 ix0 = F32_CeilToI32(Min(A.x, B.x));
+        const i32 ix1 = F32_CeilToI32(Max(A.x, B.x));
+        const i32 iy0 = F32_CeilToI32(Min(A.y, B.y));
+        const i32 iy1 = F32_CeilToI32(Max(A.y, B.y));
         if (ix0 == ix1) { Draw__VerticalLine(Target, Color, ix0, iy0, iy1); return; }
         if (iy0 == iy1) { Draw__HorizontalLine(Target, Color, ix0, ix1, iy0); return; }
     }
 
-    f32 dx = Line.b.x - Line.a.x;
-    f32 dy = Line.b.y - Line.a.y;
+    f32 dx = B.x - A.x;
+    f32 dy = B.y - A.y;
     if (Abs(dy) <= Abs(dx))
     {
         dy /= dx;
         f32 y, x0, x1;
         if (dx < 0)
         {
-            x0 = Ceil(Line.b.x);
-            x1 = Ceil(Line.a.x);
-            f32 d = dy * (x0 - Line.b.x);
-            y = Line.b.y + d + 0.5f;
+            x0 = Ceil(B.x);
+            x1 = Ceil(A.x);
+            f32 d = dy * (x0 - B.x);
+            y = B.y + d + 0.5f;
         }
         else
         {
-            x0 = Ceil(Line.a.x);
-            x1 = Ceil(Line.b.x);
-            f32 d = dy * (x0 - Line.a.x);
-            y = Line.a.y + d + 0.5f;
+            x0 = Ceil(A.x);
+            x1 = Ceil(B.x);
+            f32 d = dy * (x0 - A.x);
+            y = A.y + d + 0.5f;
         }
         const i32 ix0 = F32_FloatToI32(x0);
         const i32 ix1 = F32_FloatToI32(x1);
@@ -375,17 +366,17 @@ void Draw_LineStruct(bitmap Target, color Color, line Line)
         f32 x, y0, y1;
         if (dy < 0)
         {
-            y0 = Ceil(Line.b.y);
-            y1 = Ceil(Line.a.y);
-            f32 d = dx * (y0 - Line.b.y);
-            x = Line.b.x + d + 0.5f;
+            y0 = Ceil(B.y);
+            y1 = Ceil(A.y);
+            f32 d = dx * (y0 - B.y);
+            x = B.x + d + 0.5f;
         }
         else
         {
-            y0 = Ceil(Line.a.y);
-            y1 = Ceil(Line.b.y);
-            f32 d = dx * (y0 - Line.a.y);
-            x = Line.a.x + d + 0.5f;
+            y0 = Ceil(A.y);
+            y1 = Ceil(B.y);
+            f32 d = dx * (y0 - A.y);
+            x = A.x + d + 0.5f;
         }
         const i32 iy0 = F32_FloatToI32(y0);
         const i32 iy1 = F32_FloatToI32(y1);
@@ -395,22 +386,6 @@ void Draw_LineStruct(bitmap Target, color Color, line Line)
             x += dx;
         }
     }
-}
-
-void Draw_LineIVec2(bitmap Target, color Color, ivec2 A, ivec2 B)
-{
-    Draw_LineStruct(Target, Color, (line){
-        .a = { .x = (A.x + 0.5f), .y = (A.y + 0.5f) },
-        .b = { .x = (B.x + 0.5f), .y = (B.y + 0.5f) }
-    });
-}
-
-void Draw_LineVec2(bitmap Target, color Color, vec2 A, vec2 B)
-{
-    Draw_LineStruct(Target, Color, (line){
-        .a = { .x = A.x, .y = A.y },
-        .b = { .x = B.x, .y = B.y }
-    });
 }
 
 void Draw_LineVec3(bitmap Target, color Color, vec3 A, vec3 B)
@@ -423,43 +398,94 @@ void Draw_LineVec3(bitmap Target, color Color, vec3 A, vec3 B)
     Draw_LineVec2(Target, Color, A.xy, B.xy);
 }
 
+void Draw_LineIVec2(bitmap Target, color Color, ivec2 A, ivec2 B)
+{
+    vec2 PixelCenter = (vec2){ 0.5f, 0.5f };
+    Draw_LineVec2(Target, Color, Vec2_Add(iVec2_toVec2(A), PixelCenter), 
+                                 Vec2_Add(iVec2_toVec2(B), PixelCenter));
+}
+
 /**************/
 /*  Triangle  */
 /**************/
 
-void Draw_TriangleStruct(bitmap Target, color Color, triangle Triangle)
+inline void Draw__SortTriangle(vec2 *A, vec2 *B, vec2 *C)
 {
-    rect Clip = (rect){ .x = 0.0f, .y = 0.0f, .w = (f32)Target.Width, .h = (f32)Target.Height };
+    vec2 a = *A;
+    vec2 b = *B;
+    vec2 c = *C;
+    if (a.y > b.y)
+    {
+        if (b.y > c.y)
+        {// c b a
+            *A = c;
+            *C = a;
+        }
+        else
+        {
+            if (a.y > c.y)
+            {// b c a
+                *A = b;
+                *B = c;
+                *C = a;
+            }
+            else
+            {// b a c
+                *A = b;
+                *B = a;
+            }
+        }
+    }
+    else
+    {
+        if (b.y > c.y)
+        {
+            if (a.y > c.y)
+            {// c a b
+                *A = c;
+                *B = a;
+                *C = b;
+            }
+            else
+            {// a c b
+                *B = c;
+                *C = b;
+            }
+        }
+    }
+}
 
-    Triangle.a.x -= 0.5f;
-    Triangle.a.y -= 0.5f;
-    Triangle.b.x -= 0.5f;
-    Triangle.b.y -= 0.5f;
-    Triangle.c.x -= 0.5f;
-    Triangle.c.y -= 0.5f;
+void Draw_TriangleVec2(bitmap Target, color Color, vec2 A, vec2 B, vec2 C)
+{
+    A.x -= 0.5f;
+    A.y -= 0.5f;
+    B.x -= 0.5f;
+    B.y -= 0.5f;
+    C.x -= 0.5f;
+    C.y -= 0.5f;
 
-    f32 minx = Clip.x;
-    f32 miny = Clip.y;
-    f32 maxx = Clip.x + Clip.w;
-    f32 maxy = Clip.y + Clip.h;
+    f32 minx = 0.0f;
+    f32 miny = 0.0f;
+    f32 maxx = (f32)Target.Width;
+    f32 maxy = (f32)Target.Height;
 
-    const triangle Tri = Triangle_SortY(Triangle);
+    Draw__SortTriangle(&A, &B, &C);
     
-    const i32 iy0 = F32_CeilToI32(Max(Tri.a.y, miny));
-    const i32 iy1 = F32_CeilToI32(Clamp(Tri.b.y, miny, maxy));
-    const i32 iy2 = F32_CeilToI32(Min(Tri.c.y, maxy));
+    const i32 iy0 = F32_CeilToI32(Max(A.y, miny));
+    const i32 iy1 = F32_CeilToI32(Clamp(B.y, miny, maxy));
+    const i32 iy2 = F32_CeilToI32(Min(C.y, maxy));
 
-    const f32 dx01 = (Tri.b.x - Tri.a.x) / (Tri.b.y - Tri.a.y);
-    const f32 dx02 = (Tri.c.x - Tri.a.x) / (Tri.c.y - Tri.a.y);
-    const f32 dx12 = (Tri.c.x - Tri.b.x) / (Tri.c.y - Tri.b.y);
+    const f32 dx01 = (B.x - A.x) / (B.y - A.y);
+    const f32 dx02 = (C.x - A.x) / (C.y - A.y);
+    const f32 dx12 = (C.x - B.x) / (C.y - B.y);
 
-    const f32 da = Max(miny, Ceil(Tri.a.y)) - Tri.a.y;
-    const f32 db = Max(miny, Ceil(Tri.b.y)) - Tri.b.y;
+    const f32 da = Max(miny, Ceil(A.y)) - A.y;
+    const f32 db = Max(miny, Ceil(B.y)) - B.y;
 
     f32 dx0 = Min(dx01, dx02);
     f32 dx1 = Max(dx01, dx02);        
-    f32 x0 = Tri.a.x + (dx0 * da);
-    f32 x1 = Tri.a.x + (dx1 * da);
+    f32 x0 = A.x + (dx0 * da);
+    f32 x1 = A.x + (dx1 * da);
     for (i32 y = iy0; y < iy1; ++y)
     {
         const i32 ix0 = F32_CeilToI32(Max(x0, minx));
@@ -472,8 +498,8 @@ void Draw_TriangleStruct(bitmap Target, color Color, triangle Triangle)
 
     dx0 = Max(dx12, dx02);
     dx1 = Min(dx12, dx02);
-    if (dx01 < dx02) x0 = Tri.b.x + (dx0 * db);
-    else             x1 = Tri.b.x + (dx1 * db);
+    if (dx01 < dx02) x0 = B.x + (dx0 * db);
+    else             x1 = B.x + (dx1 * db);
     for (i32 y = iy1; y < iy2; ++y)
     {
         const i32 ix0 = F32_CeilToI32(Max(x0, minx));
@@ -487,42 +513,15 @@ void Draw_TriangleStruct(bitmap Target, color Color, triangle Triangle)
 
 void Draw_TriangleIVec2(bitmap Target, color Color, ivec2 A, ivec2 B, ivec2 C)
 {
-    triangle Triangle = (triangle){ 
-        .a = { .x = (A.x + 0.5f), .y = (A.y + 0.5f) },
-        .b = { .x = (B.x + 0.5f), .y = (B.y + 0.5f) },
-        .c = { .x = (C.x + 0.5f), .y = (C.y + 0.5f) }
-    };
-    Draw_TriangleStruct(Target, Color, Triangle);
-}
-
-void Draw_TriangleVec2(bitmap Target, color Color, vec2 A, vec2 B, vec2 C)
-{
-    triangle Triangle = (triangle){ 
-        .a = { .x = A.x, .y = A.y },
-        .b = { .x = B.x, .y = B.y },
-        .c = { .x = C.x, .y = C.y }
-    };
-    Draw_TriangleStruct(Target, Color, Triangle);
+    vec2 PixelCenter = (vec2){ 0.5f, 0.5f };
+    Draw_TriangleVec2(Target, Color, Vec2_Add(iVec2_toVec2(A), PixelCenter), 
+                                     Vec2_Add(iVec2_toVec2(B), PixelCenter),
+                                     Vec2_Add(iVec2_toVec2(C), PixelCenter));
 }
 
 /************/
 /*   Rect   */
 /************/
-
-void Draw_RectStruct(bitmap Target, color Color, rect Rect)
-{
-    bitmap ClearRect = Bitmap_Section(Target, F32_FloorToI32(Rect.x), 
-                                              F32_FloorToI32(Rect.y),
-                                              F32_FloorToI32(Rect.w),
-                                              F32_FloorToI32(Rect.h));
-    Bitmap_Clear(ClearRect, Color);
-}
-
-void Draw_RectIVec2(bitmap Target, color Color, ivec2 Min, ivec2 Dim)
-{
-    bitmap ClearRect = Bitmap_Section(Target, Min.x, Min.y, Dim.x, Dim.y);
-    Bitmap_Clear(ClearRect, Color);
-}
 
 void Draw_RectVec2(bitmap Target, color Color, vec2 Min, vec2 Dim)
 {
@@ -530,6 +529,12 @@ void Draw_RectVec2(bitmap Target, color Color, vec2 Min, vec2 Dim)
                                               F32_FloorToI32(Min.y),
                                               F32_FloorToI32(Dim.x),
                                               F32_FloorToI32(Dim.y));
+    Bitmap_Clear(ClearRect, Color);
+}
+
+void Draw_RectIVec2(bitmap Target, color Color, ivec2 Min, ivec2 Dim)
+{
+    bitmap ClearRect = Bitmap_Section(Target, Min.x, Min.y, Dim.x, Dim.y);
     Bitmap_Clear(ClearRect, Color);
 }
 
@@ -689,7 +694,7 @@ inline bool Draw__PrepareTriangleVerts(i32 Width, i32 Height, vertex *A, vertex 
     return true;
 }
 
-void Draw__TriangleTexturedShadedVerts3D(bitmap Target, const bitmap Texture, vertex A, vertex B, vertex C)
+void Draw__TriangleTexturedShadedVerts3D(bitmap Target, const bitmap Texture, vertex V0, vertex V1, vertex V2)
 {
     _mm_setcsr(_mm_getcsr() | 0x8040);
 #define PACK_WIDTH_SHIFT 2
@@ -701,11 +706,11 @@ void Draw__TriangleTexturedShadedVerts3D(bitmap Target, const bitmap Texture, ve
     __m256 RowOffset = _mm256_setr_ps(0, 0, 0, 0, 1, 1, 1, 1);
     __m256 One = _mm256_set1_ps(1);
 
-    __m256i vmul = _mm256_set1_epi32(Texture.Pitch);
-    __m256i umask = _mm256_set1_epi32(Texture.Width - 1);
-    __m256i vmask = _mm256_set1_epi32(Texture.Height - 1);
-    __m256i smask = _mm256_set1_epi32(7);
-    __m256 ssize  = _mm256_set1_ps(7);
+    __m256i VMul = _mm256_set1_epi32(Texture.Pitch);
+    __m256i UMask = _mm256_set1_epi32(Texture.Width - 1);
+    __m256i VMask = _mm256_set1_epi32(Texture.Height - 1);
+    __m256i SMask = _mm256_set1_epi32(7);
+    __m256 SSize  = _mm256_set1_ps(7);
 
     __m256 Bayer[4] = {
         _mm256_set_ps( 0.0f/16.0f, 8.0f/16.0f, 2.0f/16.0f,10.0f/16.0f,
@@ -720,15 +725,15 @@ void Draw__TriangleTexturedShadedVerts3D(bitmap Target, const bitmap Texture, ve
     f32 MaxY = (f32)Target.Height;
 
     {
-        f32 X[3] = { A.Position.x, B.Position.x, C.Position.x };
-        f32 Y[3] = { A.Position.y, B.Position.y, C.Position.y };
+        f32 X[3] = { V0.Position.x, V1.Position.x, V2.Position.x };
+        f32 Y[3] = { V0.Position.y, V1.Position.y, V2.Position.y };
         
-        f32 z[3] = { 1.0f / A.Position.z, 1.0f / B.Position.z, 1.0f / C.Position.z };
-        f32 a[3] = { z[0], 0, 0 };
-        f32 b[3] = { 0, z[1], 0 };
-        f32 s[3] = { A.Shadow, B.Shadow, C.Shadow };
-        f32 u[3] = { A.TexCoord.u, B.TexCoord.u, C.TexCoord.u };
-        f32 v[3] = { A.TexCoord.v, B.TexCoord.v, C.TexCoord.v };
+        f32 Z[3] = { 1.0f / V0.Position.z, 1.0f / V1.Position.z, 1.0f / V2.Position.z };
+        f32 A[3] = { Z[0], 0, 0 };
+        f32 B[3] = { 0, Z[1], 0 };
+        f32 S[3] = { V0.Shadow, V1.Shadow, V2.Shadow };
+        f32 U[3] = { V0.TexCoord.u, V1.TexCoord.u, V2.TexCoord.u };
+        f32 V[3] = { V0.TexCoord.v, V1.TexCoord.v, V2.TexCoord.v };
         
         // barycentric edge functions
         // FAB(x, y) = (A.y - B.y)x + (B.x - A.x)y + (A.x * B.yy - B.x * A.y) = 0
@@ -748,12 +753,12 @@ void Draw__TriangleTexturedShadedVerts3D(bitmap Target, const bitmap Texture, ve
         f32 F01_0 = X[0] * Y[1] - X[1] * Y[0];
 
         f32 invTriArea = 1.0f / (F01_dy * F20_dx - F20_dy * F01_dx);
-        z[1] = (z[1] - z[0]) * invTriArea;
-        z[2] = (z[2] - z[0]) * invTriArea;
-        a[1] = (a[1] - a[0]) * invTriArea;
-        a[2] = (a[2] - a[0]) * invTriArea;
-        b[1] = (b[1] - b[0]) * invTriArea;
-        b[2] = (b[2] - b[0]) * invTriArea;
+        Z[1] = (Z[1] - Z[0]) * invTriArea;
+        Z[2] = (Z[2] - Z[0]) * invTriArea;
+        A[1] = (A[1] - A[0]) * invTriArea;
+        A[2] = (A[2] - A[0]) * invTriArea;
+        B[1] = (B[1] - B[0]) * invTriArea;
+        B[2] = (B[2] - B[0]) * invTriArea;
 
         MinX = Max(Floor(Min(Min(X[0], X[1]), X[2]) / PACK_WIDTH) * PACK_WIDTH, MinX);
         MinY = Max(Floor(Min(Min(Y[0], Y[1]), Y[2]) / PACK_HEIGHT) * PACK_HEIGHT, MinY);
@@ -761,12 +766,12 @@ void Draw__TriangleTexturedShadedVerts3D(bitmap Target, const bitmap Texture, ve
         MaxY = Min(Ceil(Max(Max(Y[0], Y[1]), Y[2])), MaxY);
 
         {
-            __m256 z8[3] = { _mm256_set1_ps(z[0]), _mm256_set1_ps(z[1]), _mm256_set1_ps(z[2]) };
-            __m256 a8[3] = { _mm256_set1_ps(a[0]), _mm256_set1_ps(a[1]), _mm256_set1_ps(a[2]) };
-            __m256 b8[3] = { _mm256_set1_ps(b[0]), _mm256_set1_ps(b[1]), _mm256_set1_ps(b[2]) };
-            __m256 s8[3] = { _mm256_set1_ps(s[0]), _mm256_set1_ps(s[1]), _mm256_set1_ps(s[2]) };
-            __m256 u8[3] = { _mm256_set1_ps(u[0]), _mm256_set1_ps(u[1]), _mm256_set1_ps(u[2]) };
-            __m256 v8[3] = { _mm256_set1_ps(v[0]), _mm256_set1_ps(v[1]), _mm256_set1_ps(v[2]) };
+            __m256 Z8[3] = { _mm256_set1_ps(Z[0]), _mm256_set1_ps(Z[1]), _mm256_set1_ps(Z[2]) };
+            __m256 A8[3] = { _mm256_set1_ps(A[0]), _mm256_set1_ps(A[1]), _mm256_set1_ps(A[2]) };
+            __m256 B8[3] = { _mm256_set1_ps(B[0]), _mm256_set1_ps(B[1]), _mm256_set1_ps(B[2]) };
+            __m256 S8[3] = { _mm256_set1_ps(S[0]), _mm256_set1_ps(S[1]), _mm256_set1_ps(S[2]) };
+            __m256 U8[3] = { _mm256_set1_ps(U[0]), _mm256_set1_ps(U[1]), _mm256_set1_ps(U[2]) };
+            __m256 V8[3] = { _mm256_set1_ps(V[0]), _mm256_set1_ps(V[1]), _mm256_set1_ps(V[2]) };
         
             __m256 F12_dx8 = _mm256_set1_ps(F12_dx);
             __m256 F20_dx8 = _mm256_set1_ps(F20_dx);
@@ -798,9 +803,9 @@ void Draw__TriangleTexturedShadedVerts3D(bitmap Target, const bitmap Texture, ve
             F20_dy8 = _mm256_mul_ps(F20_dy8, _mm256_set1_ps(PACK_HEIGHT));
             F01_dy8 = _mm256_mul_ps(F01_dy8, _mm256_set1_ps(PACK_HEIGHT));
 
-            __m256 zz_dx = _mm256_add_ps(_mm256_mul_ps(F20_dx8, z8[1]), _mm256_mul_ps(F01_dx8, z8[2]));
-            __m256 aa_dx = _mm256_add_ps(_mm256_mul_ps(F20_dx8, a8[1]), _mm256_mul_ps(F01_dx8, a8[2]));
-            __m256 bb_dx = _mm256_add_ps(_mm256_mul_ps(F20_dx8, b8[1]), _mm256_mul_ps(F01_dx8, b8[2]));
+            __m256 ZZ_dx = _mm256_add_ps(_mm256_mul_ps(F20_dx8, Z8[1]), _mm256_mul_ps(F01_dx8, Z8[2]));
+            __m256 AA_dx = _mm256_add_ps(_mm256_mul_ps(F20_dx8, A8[1]), _mm256_mul_ps(F01_dx8, A8[2]));
+            __m256 BB_dx = _mm256_add_ps(_mm256_mul_ps(F20_dx8, B8[1]), _mm256_mul_ps(F01_dx8, B8[2]));
 
             i32 iMinX = F32_FloatToI32(MinX);
             i32 iMinY = F32_FloatToI32(MinY);
@@ -816,61 +821,62 @@ void Draw__TriangleTexturedShadedVerts3D(bitmap Target, const bitmap Texture, ve
                 __m256 Beta  = F20_Row;
                 __m256 Gamma = F01_Row;
 
-                __m256 zz = _mm256_add_ps(_mm256_add_ps(z8[0], _mm256_mul_ps(Beta, z8[1])), _mm256_mul_ps(Gamma, z8[2]));
-                __m256 aa = _mm256_add_ps(_mm256_add_ps(a8[0], _mm256_mul_ps(Beta, a8[1])), _mm256_mul_ps(Gamma, a8[2]));
-                __m256 bb = _mm256_add_ps(_mm256_add_ps(b8[0], _mm256_mul_ps(Beta, b8[1])), _mm256_mul_ps(Gamma, b8[2]));
+                __m256 ZZ = _mm256_add_ps(_mm256_add_ps(Z8[0], _mm256_mul_ps(Beta, Z8[1])), _mm256_mul_ps(Gamma, Z8[2]));
+                __m256 AA = _mm256_add_ps(_mm256_add_ps(A8[0], _mm256_mul_ps(Beta, A8[1])), _mm256_mul_ps(Gamma, A8[2]));
+                __m256 BB = _mm256_add_ps(_mm256_add_ps(B8[0], _mm256_mul_ps(Beta, B8[1])), _mm256_mul_ps(Gamma, B8[2]));
 
                 __m256 dither = Bayer[(y>>1)&1];
 
                 for(i32 x = iMinX; x < iMaxX; x += PACK_WIDTH)
                 {
-                    __m256i mask = _mm256_srai_epi32(_mm256_castps_si256(_mm256_or_ps(_mm256_or_ps(Alpha, Beta), Gamma)), 32);
-                    if (!_mm256_test_all_ones(mask))
+                    __m256i Mask = _mm256_srai_epi32(_mm256_castps_si256(_mm256_or_ps(_mm256_or_ps(Alpha, Beta), Gamma)), 32);
+                    if (!_mm256_test_all_ones(Mask))
                     {
-                        __m256 zzz = _mm256_div_ps(One, zz);
-                        __m256 aaa = _mm256_mul_ps(aa, zzz);
-                        __m256 bbb = _mm256_mul_ps(bb, zzz);
-                        __m256 ccc = _mm256_sub_ps(One, _mm256_add_ps(aaa, bbb));
+                        // interpolation factors
+                        __m256 ZZZ = _mm256_div_ps(One, ZZ);
+                        __m256 AAA = _mm256_mul_ps(AA, ZZZ);
+                        __m256 BBB = _mm256_mul_ps(BB, ZZZ);
+                        __m256 CCC = _mm256_sub_ps(One, _mm256_add_ps(AAA, BBB));
 
                         // interpolate
-                        __m256 uuu = _mm256_add_ps(_mm256_add_ps(_mm256_mul_ps(u8[0], aaa), _mm256_mul_ps(u8[1], bbb)), _mm256_mul_ps(u8[2], ccc));
-                        __m256 vvv = _mm256_add_ps(_mm256_add_ps(_mm256_mul_ps(v8[0], aaa), _mm256_mul_ps(v8[1], bbb)), _mm256_mul_ps(v8[2], ccc));
-                        __m256 sss = _mm256_add_ps(_mm256_add_ps(_mm256_mul_ps(s8[0], aaa), _mm256_mul_ps(s8[1], bbb)), _mm256_mul_ps(s8[2], ccc));
+                        __m256 UUU = _mm256_add_ps(_mm256_add_ps(_mm256_mul_ps(U8[0], AAA), _mm256_mul_ps(U8[1], BBB)), _mm256_mul_ps(U8[2], CCC));
+                        __m256 VVV = _mm256_add_ps(_mm256_add_ps(_mm256_mul_ps(V8[0], AAA), _mm256_mul_ps(V8[1], BBB)), _mm256_mul_ps(V8[2], CCC));
+                        __m256 SSS = _mm256_add_ps(_mm256_add_ps(_mm256_mul_ps(S8[0], AAA), _mm256_mul_ps(S8[1], BBB)), _mm256_mul_ps(S8[2], CCC));
 
-                        sss = _mm256_add_ps(_mm256_mul_ps(sss, ssize), dither);
+                        SSS = _mm256_add_ps(_mm256_mul_ps(SSS, SSize), dither);
 
-                        __m256i iuuu = _mm256_and_si256(_mm256_cvttps_epi32(uuu), umask);
-                        __m256i ivvv = _mm256_and_si256(_mm256_cvttps_epi32(vvv), vmask);
-                        __m256i isss = _mm256_and_si256(_mm256_cvttps_epi32(sss), smask);
+                        __m256i iUUU = _mm256_and_si256(_mm256_cvttps_epi32(UUU), UMask);
+                        __m256i iVVV = _mm256_and_si256(_mm256_cvttps_epi32(VVV), VMask);
+                        __m256i iSSS = _mm256_and_si256(_mm256_cvttps_epi32(SSS), SMask);
 
-                        __m256i iuv8 = _mm256_add_epi32(iuuu, _mm256_mullo_epi32(vmul, ivvv));
+                        __m256i iUV8 = _mm256_add_epi32(iUUU, _mm256_mullo_epi32(VMul, iVVV));
 
                         // gather
                         color *Dst0 = Target.Pixels + Index;
                         color *Dst1 = Dst0 + Target.Pitch;
-                        __m256i dst = _mm256_set_m128i(_mm_loadu_si32(Dst1), _mm_loadu_si32(Dst0));
-                        dst = _mm256_shuffle_epi8(dst, _mm256_set_epi8(3,3,3,3,2,2,2,2,1,1,1,1,0,0,0,0,3,3,3,3,2,2,2,2,1,1,1,1,0,0,0,0));
+                        __m256i Dst = _mm256_set_m128i(_mm_loadu_si32(Dst1), _mm_loadu_si32(Dst0));
+                        Dst = _mm256_shuffle_epi8(Dst, _mm256_set_epi8(3,3,3,3,2,2,2,2,1,1,1,1,0,0,0,0,3,3,3,3,2,2,2,2,1,1,1,1,0,0,0,0));
 
                         // shade
-                        __m256i tex = _mm256_i32gather_epi32((const int *)Texture.Pixels, iuv8, 1);
-                        tex = _mm256_and_si256(tex, _mm256_set1_epi32(0xF8));
-                        mask = _mm256_or_si256(mask, _mm256_cmpeq_epi32(tex, _mm256_setzero_si256()));
-                        tex = _mm256_or_si256(tex, isss);
-                        dst = _mm256_blendv_epi8(tex, dst, mask);
+                        __m256i Tex = _mm256_i32gather_epi32((const int *)Texture.Pixels, iUV8, 1);
+                        Tex = _mm256_and_si256(Tex, _mm256_set1_epi32(0xF8));
+                        Mask = _mm256_or_si256(Mask, _mm256_cmpeq_epi32(Tex, _mm256_setzero_si256()));
+                        Tex = _mm256_or_si256(Tex, iSSS);
+                        Dst = _mm256_blendv_epi8(Tex, Dst, Mask);
 
                         // scatter
-                        dst = _mm256_shuffle_epi8(dst, _mm256_set_epi8(0,0,0,0,0,0,0,0,0,0,0,0,12,8,4,0,0,0,0,0,0,0,0,0,0,0,0,0,12,8,4,0));
-                        _mm_storeu_si32(Dst0, _mm256_castsi256_si128(dst));
-                        _mm_storeu_si32(Dst1, _mm256_extracti128_si256(dst, 1));
+                        Dst = _mm256_shuffle_epi8(Dst, _mm256_set_epi8(0,0,0,0,0,0,0,0,0,0,0,0,12,8,4,0,0,0,0,0,0,0,0,0,0,0,0,0,12,8,4,0));
+                        _mm_storeu_si32(Dst0, _mm256_castsi256_si128(Dst));
+                        _mm_storeu_si32(Dst1, _mm256_extracti128_si256(Dst, 1));
                     }
 
                     Index += PACK_WIDTH;
                     Alpha = _mm256_add_ps(Alpha, F12_dx8);
                     Beta  = _mm256_add_ps(Beta,  F20_dx8);
                     Gamma = _mm256_add_ps(Gamma, F01_dx8);
-                    zz = _mm256_add_ps(zz, zz_dx);
-                    aa = _mm256_add_ps(aa, aa_dx);
-                    bb = _mm256_add_ps(bb, bb_dx);
+                    ZZ = _mm256_add_ps(ZZ, ZZ_dx);
+                    AA = _mm256_add_ps(AA, AA_dx);
+                    BB = _mm256_add_ps(BB, BB_dx);
                 }
 
                 RowIndex += PACK_HEIGHT * Target.Pitch;
@@ -925,8 +931,8 @@ void Draw_QuadTexturedVerts(bitmap Target, bitmap Texture, vertex A, vertex B, v
 //
 
 #define RASTERIZER_TILE_COUNT 4
-#define RASTERIZER_TILE_WIDTH (SCREEN_WIDTH / RASTERIZER_TILE_COUNT)
-#define RASTERIZER_TILE_HEIGHT SCREEN_HEIGHT
+#define RASTERIZER_TILE_WIDTH ((SCREEN_WIDTH) / (RASTERIZER_TILE_COUNT))
+#define RASTERIZER_TILE_HEIGHT (SCREEN_HEIGHT)
 
 typedef struct rasterizer_tile
 {
