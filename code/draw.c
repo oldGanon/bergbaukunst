@@ -1482,7 +1482,7 @@ static void Rasterizer__DrawCall(rasterizer_tile *Tile, const rasterizer_draw_ca
     Rasterizer__Flush(Tile);
 }
 
-DWORD Rasterizer_TileThreadProc(void *Parameter)
+DWORD Rasterizer_TileThreadProc(LPVOID Parameter)
 {
     u64 TileId = (u64)Parameter;
     rasterizer *Rasterizer = &GlobalRasterizer;

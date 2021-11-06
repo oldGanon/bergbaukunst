@@ -53,7 +53,7 @@ typedef struct pink_noise_generator
 } pink_noise_generator;
 
 global sine_wave_generator SineWave;
-global pink_noise_generator PinkNoise = { .Rng = 1 };
+global pink_noise_generator PinkNoise;
 
 #define AUDIO_SAMPLES_PER_SECOND 48000
 
@@ -81,7 +81,7 @@ void Audio_SineWaveSamples(sine_wave_generator *Generator, i16 *SampleBuffer, u3
         Generator->Sin -= dSin;
         Generator->Cos -= dCos;
 
-        i16 Sample = (i16)Clamp(Generator->Sin*32767.0f,-32767.0f,32767.0f);
+        i16 Sample = (i16)(Clamp(Generator->Sin*32767.0f,-32767.0f,32768.0f));
         *SampleBuffer++ = Sample;
         *SampleBuffer++ = Sample;
     }

@@ -9,7 +9,7 @@ set CompilerFlags=%DebugFlags% -c -nologo -TC -std:c11 -arch:AVX2 -GS- -Gs999999
 
 set DebugFlags=-debug -pdb:msvc.pdb -map:msvc.map -subsystem:console
 set ReleaseFlags=-subsystem:windows -incremental:no
-set LinkerFlags=%DebugFlags% -nologo -stack:0x100000,0x100000 -out:%NAME%.exe -opt:ref %NOCRT% user32.lib gdi32.lib Ws2_32.lib data.res
+set LinkerFlags=%DebugFlags% -nologo -stack:0x100000,0x100000 -out:%NAME%.exe -opt:ref %NOCRT% user32.lib gdi32.lib Ws2_32.lib Ole32.lib data.res
 
 cd %~dp0
 cd ..

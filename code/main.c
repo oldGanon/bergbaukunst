@@ -124,7 +124,8 @@ void Win32_DestroyBitmap(struct bitmap);
 struct palette Win32_LoadPalette(const char *);
 void Win32_SetPalette(const struct palette *);
 
-global bool GlobalRunning;
+global volatile bool GlobalRunning;
+global volatile bool GlobalFocus;
 
 #include "audio.c"
 #include "draw.c"
@@ -146,7 +147,6 @@ global bool GlobalRunning;
 #include <wingdi.h>
 #include <dsound.h>
 
-global bool GlobalFocus;
 global bitmap GlobalBackbuffer;
 global WINDOWPLACEMENT GlobalWindowPosition;
 
@@ -340,151 +340,158 @@ Win32_ToggleFullscreen(HWND Window)
 // AUDIO
 //
 
-#if !defined(DIRECTSOUND)
+#define COBJMACROS
+#include <mmdeviceapi.h>
+#include <audioclient.h>
+global HANDLE GlobalAudioEvent;
+global IMMDeviceEnumerator *GlobalIMMDeviceEnumerator;
+global IAudioClient *GlobalAudioClient;
+global IAudioRenderClient *GlobalAudioRenderClient;
 
-typedef HRESULT WINAPI DIRECT_SOUND_CREATE(LPCGUID, LPDIRECTSOUND *, LPUNKNOWN);
-
-global HMODULE GlobalDSoundLibrary;
-global LPDIRECTSOUNDBUFFER GlobalAudioBuffer;
-global DWORD GlobalAudioCursor;
-
-#define AUDIO_BYTES_PER_SAMPLE 4
-#define AUDIO_BUFFER_SIZE ((AUDIO_SAMPLES_PER_SECOND * AUDIO_BYTES_PER_SAMPLE) / 10)
-
-void Win32_ClearAudioBuffer(void)
+void Win32_AudioPlay(void)
 {
-    VOID *Region1; DWORD Region1Size;
-    VOID *Region2; DWORD Region2Size;
-    HRESULT Error = IDirectSoundBuffer_Lock(GlobalAudioBuffer, 0, 0,
-                                            &Region1, &Region1Size,
-                                            &Region2, &Region2Size,
-                                            DSBLOCK_ENTIREBUFFER);
-    if (FAILED(Error)) return;
-    memset(Region1, 0, Region1Size);
-    IDirectSoundBuffer_Unlock(GlobalAudioBuffer, Region1, Region1Size, Region2, Region2Size);
+    if (GlobalAudioClient)
+        IAudioClient_Start(GlobalAudioClient);
 }
 
-void Win32_GatherSamples(void)
+void Win32_AudioPause(void)
 {
-    DWORD PlayCursor;
-    DWORD WriteCursor;
-    HRESULT Error = IDirectSoundBuffer_GetCurrentPosition(GlobalAudioBuffer, &PlayCursor, &WriteCursor);
-    if (SUCCEEDED(Error))
+    if (GlobalAudioClient)
+        IAudioClient_Stop(GlobalAudioClient);
+}
+
+void Win32_InitAudio(void)
+{
+    const CLSID CLSID_MMDeviceEnumerator_ = { 0xbcde0395, 0xe52f, 0x467c,{ 0x8e, 0x3d, 0xc4, 0x57, 0x92, 0x91, 0x69, 0x2e } };
+    const IID IID_IMMDeviceEnumerator_ = { 0xa95664d2, 0x9614, 0x4f35,{ 0xa7, 0x46, 0xde, 0x8d, 0xb6, 0x36, 0x17, 0xe6 } };
+    const IID IID_IAudioClient_ = { 0x1cb9ad4c, 0xdbfa, 0x4c32,{ 0xb1, 0x78, 0xc2, 0xf5, 0x68, 0xa7, 0x03, 0xb2 } };
+    const IID IID_IAudioRenderClient_ = { 0xf294acfc, 0x3146, 0x4483,{ 0xa7, 0xbf, 0xad, 0xdc, 0xa7, 0xc2, 0x60, 0xe2 } };
+
+    HRESULT Result = CoInitialize(0);
+    if (FAILED(Result)) return; // TODO: Diagnostic
+
+    Result = CoCreateInstance(&CLSID_MMDeviceEnumerator_, 0, CLSCTX_INPROC_SERVER, &IID_IMMDeviceEnumerator_, (LPVOID *)&GlobalIMMDeviceEnumerator);
+    if (FAILED(Result)) return; // TODO: Diagnostic
+
+    IMMDevice *Device;
+    Result = IMMDeviceEnumerator_GetDefaultAudioEndpoint(GlobalIMMDeviceEnumerator, eRender, eMultimedia, &Device);
+    if (FAILED(Result)) return; // TODO: Diagnostic
+
+    Result = IMMDevice_Activate(Device, &IID_IAudioClient_, CLSCTX_ALL, 0, (LPVOID *)&GlobalAudioClient);
+    IMMDevice_Release(Device);
+    if (FAILED(Result)) return; // TODO: Diagnostic
+
+    WAVEFORMATEX *WaveFormat;
+    Result = IAudioClient_GetMixFormat(GlobalAudioClient, &WaveFormat);
+    if (FAILED(Result)) return; // TODO: Diagnostic
+
+    REFERENCE_TIME DefaultPeriod;
+    Result = IAudioClient_GetDevicePeriod(GlobalAudioClient, &DefaultPeriod, 0);
+    if (FAILED(Result)) return; // TODO: Diagnostic
+
+    DWORD StreamFlags = AUDCLNT_STREAMFLAGS_EVENTCALLBACK;
+    if ((WaveFormat->wFormatTag != WAVE_FORMAT_PCM) ||
+        (WaveFormat->nChannels != 2) ||
+        (WaveFormat->nSamplesPerSec != AUDIO_SAMPLES_PER_SECOND) ||
+        (WaveFormat->wBitsPerSample != 16) ||
+        (WaveFormat->cbSize != 0))
     {
-        if ((WriteCursor <= PlayCursor && (GlobalAudioCursor < WriteCursor || PlayCursor < GlobalAudioCursor)) ||
-            (WriteCursor >= PlayCursor && (GlobalAudioCursor < WriteCursor && PlayCursor < GlobalAudioCursor)))
-        {
-            GlobalAudioCursor = WriteCursor;
-            Win32_ClearAudioBuffer();
-        }
+        StreamFlags |= (AUDCLNT_STREAMFLAGS_AUTOCONVERTPCM | AUDCLNT_STREAMFLAGS_SRC_DEFAULT_QUALITY);
 
-        DWORD BytesToWrite;
-        if (GlobalAudioCursor <= PlayCursor)
-            BytesToWrite = PlayCursor - GlobalAudioCursor;
-        else
-            BytesToWrite = PlayCursor + (AUDIO_BUFFER_SIZE - GlobalAudioCursor);
-        
-        VOID *Region1; DWORD Region1Size;
-        VOID *Region2; DWORD Region2Size;
-        Error = IDirectSoundBuffer_Lock(GlobalAudioBuffer, GlobalAudioCursor, BytesToWrite,
-                                        &Region1, &Region1Size,
-                                        &Region2, &Region2Size, 0);
-        if (SUCCEEDED(Error))
-        {
-            memset(Region1, 0, Region1Size);
-            Audio_WriteSamples((i16 *)Region1, Region1Size / AUDIO_BYTES_PER_SAMPLE);
-
-            if (Region2 && Region2Size)
-            {
-                memset(Region2, 0, Region2Size);
-                Audio_WriteSamples((i16 *)Region2, Region2Size / AUDIO_BYTES_PER_SAMPLE);
-            }
-
-            GlobalAudioCursor += (Region1Size + Region2Size);
-            GlobalAudioCursor %= AUDIO_BUFFER_SIZE;
-
-            IDirectSoundBuffer_Unlock(GlobalAudioBuffer, Region1, Region1Size, Region2, Region2Size);
-        }
+        WaveFormat->wFormatTag = WAVE_FORMAT_PCM;
+        WaveFormat->nChannels = 2;
+        WaveFormat->nSamplesPerSec = AUDIO_SAMPLES_PER_SECOND;
+        WaveFormat->wBitsPerSample = 16;
+        WaveFormat->nBlockAlign = (WaveFormat->nChannels * WaveFormat->wBitsPerSample) / 8;
+        WaveFormat->nAvgBytesPerSec = WaveFormat->nSamplesPerSec * WaveFormat->nBlockAlign;
+        WaveFormat->cbSize = 0;
     }
-}
 
-void Win32_InitAudio(void)
-{
-    GlobalDSoundLibrary = LoadLibraryA("dsound.dll");
-    if (!GlobalDSoundLibrary) return; // TODO: Diagnostic
+    Result = IAudioClient_Initialize(GlobalAudioClient, AUDCLNT_SHAREMODE_SHARED, StreamFlags, 0, 0, WaveFormat, 0);
+    if (FAILED(Result)) return; // TODO: Diagnostic
 
-    DIRECT_SOUND_CREATE *DirectSoundCreate = (DIRECT_SOUND_CREATE *)
-        GetProcAddress(GlobalDSoundLibrary, "DirectSoundCreate");
-    if (!DirectSoundCreate) return; // TODO: Diagnostic
+    GlobalAudioEvent = CreateEventA(0, false, false, 0);
+    Result = IAudioClient_SetEventHandle(GlobalAudioClient, GlobalAudioEvent);
+    if (FAILED(Result)) return; // TODO: Diagnostic
 
-    LPDIRECTSOUND DirectSound;
-    HRESULT Error = DirectSoundCreate(0, &DirectSound, 0);
-    if (FAILED(Error)) return; // TODO: Diagnostic
+    Result = IAudioClient_GetService(GlobalAudioClient, &IID_IAudioRenderClient_, (LPVOID *)&GlobalAudioRenderClient);
+    if (FAILED(Result)) return; // TODO: Diagnostic
 
-    WAVEFORMATEX WaveFormat = { 0 };
-    WaveFormat.wFormatTag = WAVE_FORMAT_PCM;
-    WaveFormat.nChannels = 2;
-    WaveFormat.nSamplesPerSec = AUDIO_SAMPLES_PER_SECOND;
-    WaveFormat.wBitsPerSample = 16;
-    WaveFormat.nBlockAlign = (WaveFormat.nChannels * WaveFormat.wBitsPerSample) / 8;
-    WaveFormat.nAvgBytesPerSec = WaveFormat.nSamplesPerSec * WaveFormat.nBlockAlign;
-    WaveFormat.cbSize = 0;
-
-    Error = IDirectSound_SetCooperativeLevel(DirectSound, GlobalWindow, DSSCL_PRIORITY);
-    if (FAILED(Error)) return; // TODO: Diagnostic
-
-    DSBUFFERDESC BufferDescription = {
-        .dwSize = sizeof(DSBUFFERDESC),
-        .dwFlags = DSBCAPS_PRIMARYBUFFER
-    };
-
-    LPDIRECTSOUNDBUFFER PrimaryBuffer;
-    Error = IDirectSound_CreateSoundBuffer(DirectSound, &BufferDescription, &PrimaryBuffer, 0);
-    if (FAILED(Error)) return; // TODO: Diagnostic
-
-    Error = IDirectSoundBuffer_SetFormat(PrimaryBuffer, &WaveFormat);
-    if (FAILED(Error)) return; // TODO: Diagnostic
-
-    DSBUFFERDESC BufferDescription2 = {
-        .dwSize = sizeof(DSBUFFERDESC),
-        .dwFlags = DSBCAPS_GETCURRENTPOSITION2 | DSBCAPS_GLOBALFOCUS,
-        .dwBufferBytes = AUDIO_BUFFER_SIZE,
-        .lpwfxFormat = &WaveFormat
-    };
-    Error = IDirectSound_CreateSoundBuffer(DirectSound, &BufferDescription2, &GlobalAudioBuffer, 0);
-    if (FAILED(Error)) return; // TODO: Diagnostic
-
-    DSBCAPS Caps = { sizeof(DSBCAPS) };
-    Error = IDirectSoundBuffer_GetCaps(GlobalAudioBuffer, &Caps);
-    if(FAILED(Error)) return; // TODO: Diagnostic
-
-    if (!(Caps.dwFlags & DSBCAPS_GETCURRENTPOSITION2)) return; // TODO: Diagnostic
-
-    Win32_ClearAudioBuffer();
-    IDirectSoundBuffer_Play(GlobalAudioBuffer, 0, 0, DSBPLAY_LOOPING);
+    Result = IAudioClient_Start(GlobalAudioClient);
+    if (FAILED(Result)) return; // TODO: Diagnostic
 }
 
 void Win32_DestroyAudio(void)
 {
-    if (GlobalDSoundLibrary)
-        FreeLibrary(GlobalDSoundLibrary);
+    IAudioRenderClient_Release(GlobalAudioRenderClient);
+    GlobalAudioRenderClient = 0;
+
+    IAudioClient_Release(GlobalAudioClient);
+    GlobalAudioClient = 0;
+
+    CloseHandle(GlobalAudioEvent);
+    GlobalAudioEvent = 0;
+
+    IMMDeviceEnumerator_Release(GlobalIMMDeviceEnumerator);
+    GlobalIMMDeviceEnumerator = 0;
+
+    CoUninitialize();
 }
 
-#else
+typedef HANDLE (*av_set_mm_thread_characteristics_a)(LPCSTR,LPDWORD);
+typedef BOOL (*av_revert_mm_thread_characteristics)(HANDLE);
 
-void Win32_GatherSamples(void)
+DWORD Win32_AudioThreadProc(LPVOID Parameter)
 {
-}
+    SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_TIME_CRITICAL);
 
-void Win32_InitAudio(void)
-{
-}
+    HMODULE avrtdll = LoadLibraryA("avrt.dll");
+    av_set_mm_thread_characteristics_a AvSetMmThreadCharacteristicsA = 0;
+    av_revert_mm_thread_characteristics AvRevertMmThreadCharacteristics = 0;
+    if (avrtdll) {
+        AvSetMmThreadCharacteristicsA = (av_set_mm_thread_characteristics_a)GetProcAddress(avrtdll, "AvSetMmThreadCharacteristicsA");
+        AvRevertMmThreadCharacteristics = (av_revert_mm_thread_characteristics)GetProcAddress(avrtdll, "AvRevertMmThreadCharacteristics");
+    }
 
-void Win32_DestroyAudio(void)
-{
-}
+    DWORD Index = 0;
+    HANDLE Task = 0;
+    if (AvSetMmThreadCharacteristicsA)
+        Task = AvSetMmThreadCharacteristicsA("Pro Audio", &Index);
 
-#endif
+    HRESULT Result = CoInitialize(0);
+    if (FAILED(Result)) return 1; // TODO: Diagnostic
+
+    u32 BufferSize;
+    Result = IAudioClient_GetBufferSize(GlobalAudioClient, &BufferSize);
+    if (FAILED(Result)) return 1; // TODO: Diagnostic
+
+    while (GlobalRunning)
+    {
+        DWORD WaitResult = WaitForSingleObject(GlobalAudioEvent, 200);
+        if (WaitResult != WAIT_OBJECT_0) continue;
+
+        u32 Padding;
+        Result = IAudioClient_GetCurrentPadding(GlobalAudioClient, &Padding);
+        if (FAILED(Result)) break; // TODO: Diagnostic
+
+        u8 *SampleBuffer;
+        u32 SampleCount = BufferSize - Padding;
+        IAudioRenderClient_GetBuffer(GlobalAudioRenderClient, SampleCount, &SampleBuffer);
+        Audio_WriteSamples((i16 *)SampleBuffer, SampleCount);
+        IAudioRenderClient_ReleaseBuffer(GlobalAudioRenderClient, SampleCount, 0);
+    }
+
+    CoUninitialize();
+
+    if (avrtdll)
+    {
+        if (Task && AvRevertMmThreadCharacteristics)
+            AvRevertMmThreadCharacteristics(Task);
+        FreeLibrary(avrtdll);
+    }
+
+    return 0;
+}
 
 //
 // TIME
@@ -583,8 +590,7 @@ LRESULT CALLBACK Win32_WindowCallback(HWND Window, UINT Message, WPARAM WParam, 
         {
             Win32_LockMouse(false);
             GlobalFocus = false;
-            if (GlobalAudioBuffer) 
-                IDirectSoundBuffer_Stop(GlobalAudioBuffer);
+            Win32_AudioPause();
         } break;
 
         case WM_EXITSIZEMOVE:
@@ -592,8 +598,7 @@ LRESULT CALLBACK Win32_WindowCallback(HWND Window, UINT Message, WPARAM WParam, 
         {
             Win32_LockMouse(true);
             GlobalFocus = true;
-            if(GlobalAudioBuffer) 
-                IDirectSoundBuffer_Play(GlobalAudioBuffer, 0, 0, DSBPLAY_LOOPING);
+            Win32_AudioPlay();
         } break;
 
         default:
@@ -649,8 +654,9 @@ int Win32_ClientMain(const char *Ip)
     };
 
     // AUDIO
-    Win32_InitAudio();
     Audio_Init();
+    Win32_InitAudio();
+    HANDLE AudioThread = CreateThread(0, 0,  Win32_AudioThreadProc, 0, 0, 0);
     
     // GRAPHICS
 #if (RASTERIZER_TILE_COUNT > 1)
@@ -812,9 +818,6 @@ int Win32_ClientMain(const char *Ip)
             Win32_DisplayBitmap(DeviceContext);
             ReleaseDC(GlobalWindow, DeviceContext);
 
-            // AUDIO
-            Win32_GatherSamples();
-
             // SLEEP
             // Sleep(1);
         }
@@ -859,7 +862,7 @@ int Win32_ServerMain(void)
     return 0;
 }
 
-DWORD Win32_ServerMainThreadProc(void *Parameter)
+DWORD Win32_ServerMainThreadProc(LPVOID Parameter)
 {
     return Win32_ServerMain();
 }
