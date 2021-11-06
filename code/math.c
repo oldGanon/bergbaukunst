@@ -99,6 +99,7 @@ inline f32 F32_Sqrt(f32 A) { return _mm_cvtss_f32(_mm_sqrt_ss(_mm_set_ss(A)));}
 inline f32 F32_Lerp(f32 A, f32 B, f32 t) { return _mm_cvtss_f32(_mm_add_ss(_mm_mul_ss(_mm_sub_ss(_mm_set_ss(1),_mm_set_ss(t)),_mm_set_ss(A)),_mm_mul_ss(_mm_set_ss(t),_mm_set_ss(B)))); }
 inline f32 F32_Fract(f32 A) { __m128 mA = _mm_set_ss(A); return _mm_cvtss_f32(_mm_sub_ss(mA, _mm_floor_ps(mA))); }
 inline f32 F32_Inverse(f32 A) { return _mm_cvtss_f32(_mm_div_ss(_mm_set_ss(1), _mm_set_ss(A)));}
+inline f32 F32_Saturate(f32 A)   { return _mm_cvtss_f32(_mm_min_ss(_mm_max_ss(_mm_set_ss(A), _mm_set_ss(0)), _mm_set_ss(1))); }
 
 inline f32 F32_SmoothStep(f32 A)
 {
@@ -206,6 +207,7 @@ inline vec2 Vec2_Lerp(vec2 A, vec2 B, f32 t) { __m128 T = _mm_set1_ps(t); STORE_
 inline vec2 Vec3_Lerp2(vec2 A, vec2 B, vec2 t) { __m128 T = LOAD_VEC2(t); STORE_VEC2(A, _mm_add_ps(_mm_mul_ps(_mm_sub_ps(_mm_set1_ps(1.0f),T),LOAD_VEC2(A)),_mm_mul_ps(T,LOAD_VEC2(B)))); return A; }
 inline vec2 Vec2_Fract(vec2 A) { __m128 mA = LOAD_VEC2(A); STORE_VEC2(A, _mm_sub_ps(mA, _mm_floor_ps(mA))); return A; }
 inline vec2 Vec2_Inverse(vec2 A) { STORE_VEC2(A, _mm_div_ps(_mm_set1_ps(1), LOAD_VEC2(A))); return A; }
+inline vec2 Vec2_Saturate(vec2 A)   { STORE_VEC2(A, _mm_min_ps(_mm_max_ps(LOAD_VEC2(A), _mm_set1_ps(0)), _mm_set1_ps(1))); return A; }
 
 inline vec2 Vec2_SmoothStep(vec2 A)
 {
@@ -319,6 +321,7 @@ inline vec3 Vec3_Lerp(vec3 A, vec3 B, f32 t) { __m128 T = _mm_set1_ps(t); STORE_
 inline vec3 Vec3_Lerp3(vec3 A, vec3 B, vec3 t) { __m128 T = LOAD_VEC3(t); STORE_VEC3(A, _mm_add_ps(_mm_mul_ps(_mm_sub_ps(_mm_set1_ps(1.0f),T),LOAD_VEC3(A)),_mm_mul_ps(T,LOAD_VEC3(B)))); return A; }
 inline vec3 Vec3_Fract(vec3 A) { __m128 m = LOAD_VEC3(A); STORE_VEC3(A, _mm_sub_ps(m, _mm_floor_ps(m))); return A; }
 inline vec3 Vec3_Inverse(vec3 A) { STORE_VEC3(A, _mm_div_ps(_mm_set1_ps(1), LOAD_VEC3(A))); return A; }
+inline vec3 Vec3_Saturate(vec3 A)   { STORE_VEC3(A, _mm_min_ps(_mm_max_ps(LOAD_VEC3(A), _mm_set1_ps(0)), _mm_set1_ps(1))); return A; }
 
 inline vec3 Vec3_SmoothStep(vec3 A)
 {
@@ -635,6 +638,12 @@ inline ivec3 Vec3_FloorToIVec3(vec3 A) { ivec3 B; STORE_IVEC3(B, _mm_cvtps_epi32
     f32: F32_Inverse, \
     vec2: Vec2_Inverse, \
     vec3: Vec3_Inverse \
+)(A)
+
+#define Saturate(A) _Generic((A), \
+    f32: F32_Saturate, \
+    vec2: Vec2_Saturate, \
+    vec3: Vec3_Saturate \
 )(A)
 
 #define SmoothStep(A) _Generic((A), \

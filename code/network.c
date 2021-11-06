@@ -1,4 +1,21 @@
 
+struct network_server;
+void Network_ServerSendMessage(struct network_server *Server, u32 ClientId, msg *Message);
+bool Network_ServerGetMessage(struct network_server *Server, u32 ClientId, msg *Message);
+u32 Network_ServerAcceptClient(struct network_server *Server);
+void Network_ServerShutdown(struct network_server *Server);
+bool Network_ServerInit(struct network_server *Server, const char *Port);
+
+struct network_client;
+void Network_ClientSendMessage(struct network_client *Client, msg *Message);
+bool Network_ClientGetMessage(struct network_client *Client, msg *Message);
+void Network_ClientDisconnect(struct network_client *Client);
+bool Network_ClientInit(struct network_client *Client, const char *Domain, const char *Port);
+
+/******************/
+/* IMPLEMENTATION */
+/******************/
+
 #include <winsock2.h>
 #include <ws2tcpip.h>
 
@@ -18,25 +35,10 @@ typedef struct network_server
     network_socket Sockets[NETWORK_SERVER_SOCKET_COUNT];
 } network_server;
 
-void Network_ServerSendMessage(network_server *Server, u32 ClientId, msg *Message);
-bool Network_ServerGetMessage(network_server *Server, u32 ClientId, msg *Message);
-u32 Network_ServerAcceptClient(network_server *Server);
-void Network_ServerShutdown(network_server *Server);
-bool Network_ServerInit(network_server *Server, const char *Port);
-
 typedef struct network_client
 {
     network_socket Server;
 } network_client;
-
-void Network_ClientSendMessage(network_client *Client, msg *Message);
-bool Network_ClientGetMessage(network_client *Client, msg *Message);
-void Network_ClientDisconnect(network_client *Client);
-bool Network_ClientInit(network_client *Client, const char *Domain, const char *Port);
-
-/******************/
-/* IMPLEMENTATION */
-/******************/
 
 inline void Network_DisconnectMessage(int Error, msg *Message)
 {

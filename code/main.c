@@ -340,12 +340,16 @@ Win32_ToggleFullscreen(HWND Window)
 // AUDIO
 //
 
-typedef HRESULT WINAPI DIRECT_SOUND_CREATE(LPCGUID, LPDIRECTSOUND *, LPUNKNOWN);
-global LPDIRECTSOUNDBUFFER GlobalAudioBuffer;
+#if !defined(DIRECTSOUND)
 
-#define AUDIO_SAMPLES_PER_SECOND 48000
+typedef HRESULT WINAPI DIRECT_SOUND_CREATE(LPCGUID, LPDIRECTSOUND *, LPUNKNOWN);
+
+global HMODULE GlobalDSoundLibrary;
+global LPDIRECTSOUNDBUFFER GlobalAudioBuffer;
+global DWORD GlobalAudioCursor;
+
 #define AUDIO_BYTES_PER_SAMPLE 4
-#define AUDIO_BUFFER_SIZE ((AUDIO_SAMPLES_PER_SECOND * AUDIO_BYTES_PER_SAMPLE) / 15)
+#define AUDIO_BUFFER_SIZE ((AUDIO_SAMPLES_PER_SECOND * AUDIO_BYTES_PER_SAMPLE) / 10)
 
 void Win32_ClearAudioBuffer(void)
 {
@@ -360,17 +364,62 @@ void Win32_ClearAudioBuffer(void)
     IDirectSoundBuffer_Unlock(GlobalAudioBuffer, Region1, Region1Size, Region2, Region2Size);
 }
 
-void Win32_InitDSound()
+void Win32_GatherSamples(void)
 {
-    HMODULE DSoundLibrary = LoadLibraryA("dsound.dll");
-    if (!DSoundLibrary) return; // TODO: Diagnostic
+    DWORD PlayCursor;
+    DWORD WriteCursor;
+    HRESULT Error = IDirectSoundBuffer_GetCurrentPosition(GlobalAudioBuffer, &PlayCursor, &WriteCursor);
+    if (SUCCEEDED(Error))
+    {
+        if ((WriteCursor <= PlayCursor && (GlobalAudioCursor < WriteCursor || PlayCursor < GlobalAudioCursor)) ||
+            (WriteCursor >= PlayCursor && (GlobalAudioCursor < WriteCursor && PlayCursor < GlobalAudioCursor)))
+        {
+            GlobalAudioCursor = WriteCursor;
+            Win32_ClearAudioBuffer();
+        }
+
+        DWORD BytesToWrite;
+        if (GlobalAudioCursor <= PlayCursor)
+            BytesToWrite = PlayCursor - GlobalAudioCursor;
+        else
+            BytesToWrite = PlayCursor + (AUDIO_BUFFER_SIZE - GlobalAudioCursor);
+        
+        VOID *Region1; DWORD Region1Size;
+        VOID *Region2; DWORD Region2Size;
+        Error = IDirectSoundBuffer_Lock(GlobalAudioBuffer, GlobalAudioCursor, BytesToWrite,
+                                        &Region1, &Region1Size,
+                                        &Region2, &Region2Size, 0);
+        if (SUCCEEDED(Error))
+        {
+            memset(Region1, 0, Region1Size);
+            Audio_WriteSamples((i16 *)Region1, Region1Size / AUDIO_BYTES_PER_SAMPLE);
+
+            if (Region2 && Region2Size)
+            {
+                memset(Region2, 0, Region2Size);
+                Audio_WriteSamples((i16 *)Region2, Region2Size / AUDIO_BYTES_PER_SAMPLE);
+            }
+
+            GlobalAudioCursor += (Region1Size + Region2Size);
+            GlobalAudioCursor %= AUDIO_BUFFER_SIZE;
+
+            IDirectSoundBuffer_Unlock(GlobalAudioBuffer, Region1, Region1Size, Region2, Region2Size);
+        }
+    }
+}
+
+void Win32_InitAudio(void)
+{
+    GlobalDSoundLibrary = LoadLibraryA("dsound.dll");
+    if (!GlobalDSoundLibrary) return; // TODO: Diagnostic
 
     DIRECT_SOUND_CREATE *DirectSoundCreate = (DIRECT_SOUND_CREATE *)
-        GetProcAddress(DSoundLibrary, "DirectSoundCreate");
+        GetProcAddress(GlobalDSoundLibrary, "DirectSoundCreate");
+    if (!DirectSoundCreate) return; // TODO: Diagnostic
 
     LPDIRECTSOUND DirectSound;
     HRESULT Error = DirectSoundCreate(0, &DirectSound, 0);
-    if (!DirectSoundCreate || FAILED(Error)) return; // TODO: Diagnostic
+    if (FAILED(Error)) return; // TODO: Diagnostic
 
     WAVEFORMATEX WaveFormat = { 0 };
     WaveFormat.wFormatTag = WAVE_FORMAT_PCM;
@@ -415,50 +464,27 @@ void Win32_InitDSound()
     IDirectSoundBuffer_Play(GlobalAudioBuffer, 0, 0, DSBPLAY_LOOPING);
 }
 
-void Win32_GatherSamples(DWORD AudioCursor)
+void Win32_DestroyAudio(void)
 {
-    DWORD PlayCursor;
-    DWORD WriteCursor;
-    HRESULT Error = IDirectSoundBuffer_GetCurrentPosition(GlobalAudioBuffer, &PlayCursor, &WriteCursor);
-    if (SUCCEEDED(Error))
-    {
-        if ((WriteCursor <= PlayCursor && (AudioCursor < WriteCursor || PlayCursor < AudioCursor)) ||
-            (WriteCursor >= PlayCursor && (AudioCursor < WriteCursor && PlayCursor < AudioCursor)))
-        {
-            AudioCursor = WriteCursor;
-            Win32_ClearAudioBuffer();
-        }
-
-        DWORD BytesToWrite;
-        if (AudioCursor <= PlayCursor)
-            BytesToWrite = PlayCursor - AudioCursor;
-        else
-            BytesToWrite = PlayCursor + (AUDIO_BUFFER_SIZE - AudioCursor);
-        
-        VOID *Region1; DWORD Region1Size;
-        VOID *Region2; DWORD Region2Size;
-        Error = IDirectSoundBuffer_Lock(GlobalAudioBuffer, 0, 0,
-                                        &Region1, &Region1Size,
-                                        &Region2, &Region2Size,
-                                        DSBLOCK_ENTIREBUFFER);
-        if (SUCCEEDED(Error))
-        {
-            memset(Region1, 0, Region1Size);
-            Audio_WriteSamples((i16 *)Region1, Region1Size / AUDIO_BYTES_PER_SAMPLE);
-
-            if (Region2 && Region2Size)
-            {
-                memset(Region2, 0, Region2Size);
-                Audio_WriteSamples((i16 *)Region2, Region2Size / AUDIO_BYTES_PER_SAMPLE);
-            }
-
-            AudioCursor += (Region1Size + Region2Size);
-            AudioCursor %= AUDIO_BUFFER_SIZE;
-
-            IDirectSoundBuffer_Unlock(GlobalAudioBuffer, Region1, Region1Size, Region2, Region2Size);
-        }
-    }
+    if (GlobalDSoundLibrary)
+        FreeLibrary(GlobalDSoundLibrary);
 }
+
+#else
+
+void Win32_GatherSamples(void)
+{
+}
+
+void Win32_InitAudio(void)
+{
+}
+
+void Win32_DestroyAudio(void)
+{
+}
+
+#endif
 
 //
 // TIME
@@ -623,8 +649,8 @@ int Win32_ClientMain(const char *Ip)
     };
 
     // AUDIO
-    DWORD AudioCursor = 0;
-    Win32_InitDSound();
+    Win32_InitAudio();
+    Audio_Init();
     
     // GRAPHICS
 #if (RASTERIZER_TILE_COUNT > 1)
@@ -787,13 +813,15 @@ int Win32_ClientMain(const char *Ip)
             ReleaseDC(GlobalWindow, DeviceContext);
 
             // AUDIO
-            Win32_GatherSamples(AudioCursor);
+            Win32_GatherSamples();
 
             // SLEEP
             // Sleep(1);
         }
     }
 
+
+    Win32_DestroyAudio();
     free(Client);
 
     return 0;
