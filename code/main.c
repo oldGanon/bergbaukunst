@@ -343,21 +343,27 @@ Win32_ToggleFullscreen(HWND Window)
 #define COBJMACROS
 #include <mmdeviceapi.h>
 #include <audioclient.h>
-global HANDLE GlobalAudioEvent;
-global IMMDeviceEnumerator *GlobalIMMDeviceEnumerator;
-global IAudioClient *GlobalAudioClient;
-global IAudioRenderClient *GlobalAudioRenderClient;
+
+typedef struct win32_audio_state
+{
+    IMMDeviceEnumerator *IMMDeviceEnumerator;
+    IAudioClient *Client;
+    IAudioRenderClient *RenderClient;
+    HANDLE Event;
+} win32_audio_state;
+
+global win32_audio_state GlobalAudioState;
 
 void Win32_AudioPlay(void)
 {
-    if (GlobalAudioClient)
-        IAudioClient_Start(GlobalAudioClient);
+    if (GlobalAudioState.Client)
+        IAudioClient_Start(GlobalAudioState.Client);
 }
 
 void Win32_AudioPause(void)
 {
-    if (GlobalAudioClient)
-        IAudioClient_Stop(GlobalAudioClient);
+    if (GlobalAudioState.Client)
+        IAudioClient_Stop(GlobalAudioState.Client);
 }
 
 void Win32_InitAudio(void)
@@ -370,23 +376,23 @@ void Win32_InitAudio(void)
     HRESULT Result = CoInitialize(0);
     if (FAILED(Result)) return; // TODO: Diagnostic
 
-    Result = CoCreateInstance(&CLSID_MMDeviceEnumerator_, 0, CLSCTX_INPROC_SERVER, &IID_IMMDeviceEnumerator_, (LPVOID *)&GlobalIMMDeviceEnumerator);
+    Result = CoCreateInstance(&CLSID_MMDeviceEnumerator_, 0, CLSCTX_INPROC_SERVER, &IID_IMMDeviceEnumerator_, (LPVOID *)&GlobalAudioState.IMMDeviceEnumerator);
     if (FAILED(Result)) return; // TODO: Diagnostic
 
     IMMDevice *Device;
-    Result = IMMDeviceEnumerator_GetDefaultAudioEndpoint(GlobalIMMDeviceEnumerator, eRender, eMultimedia, &Device);
+    Result = IMMDeviceEnumerator_GetDefaultAudioEndpoint(GlobalAudioState.IMMDeviceEnumerator, eRender, eMultimedia, &Device);
     if (FAILED(Result)) return; // TODO: Diagnostic
 
-    Result = IMMDevice_Activate(Device, &IID_IAudioClient_, CLSCTX_ALL, 0, (LPVOID *)&GlobalAudioClient);
+    Result = IMMDevice_Activate(Device, &IID_IAudioClient_, CLSCTX_ALL, 0, (LPVOID *)&GlobalAudioState.Client);
     IMMDevice_Release(Device);
     if (FAILED(Result)) return; // TODO: Diagnostic
 
     WAVEFORMATEX *WaveFormat;
-    Result = IAudioClient_GetMixFormat(GlobalAudioClient, &WaveFormat);
+    Result = IAudioClient_GetMixFormat(GlobalAudioState.Client, &WaveFormat);
     if (FAILED(Result)) return; // TODO: Diagnostic
 
     REFERENCE_TIME DefaultPeriod;
-    Result = IAudioClient_GetDevicePeriod(GlobalAudioClient, &DefaultPeriod, 0);
+    Result = IAudioClient_GetDevicePeriod(GlobalAudioState.Client, &DefaultPeriod, 0);
     if (FAILED(Result)) return; // TODO: Diagnostic
 
     DWORD StreamFlags = AUDCLNT_STREAMFLAGS_EVENTCALLBACK;
@@ -407,33 +413,28 @@ void Win32_InitAudio(void)
         WaveFormat->cbSize = 0;
     }
 
-    Result = IAudioClient_Initialize(GlobalAudioClient, AUDCLNT_SHAREMODE_SHARED, StreamFlags, 0, 0, WaveFormat, 0);
+    Result = IAudioClient_Initialize(GlobalAudioState.Client, AUDCLNT_SHAREMODE_SHARED, StreamFlags, 0, 0, WaveFormat, 0);
     if (FAILED(Result)) return; // TODO: Diagnostic
 
-    GlobalAudioEvent = CreateEventA(0, false, false, 0);
-    Result = IAudioClient_SetEventHandle(GlobalAudioClient, GlobalAudioEvent);
+    GlobalAudioState.Event = CreateEventA(0, false, false, 0);
+    Result = IAudioClient_SetEventHandle(GlobalAudioState.Client, GlobalAudioState.Event);
     if (FAILED(Result)) return; // TODO: Diagnostic
 
-    Result = IAudioClient_GetService(GlobalAudioClient, &IID_IAudioRenderClient_, (LPVOID *)&GlobalAudioRenderClient);
+    Result = IAudioClient_GetService(GlobalAudioState.Client, &IID_IAudioRenderClient_, (LPVOID *)&GlobalAudioState.RenderClient);
     if (FAILED(Result)) return; // TODO: Diagnostic
 
-    Result = IAudioClient_Start(GlobalAudioClient);
+    Result = IAudioClient_Start(GlobalAudioState.Client);
     if (FAILED(Result)) return; // TODO: Diagnostic
 }
 
 void Win32_DestroyAudio(void)
 {
-    IAudioRenderClient_Release(GlobalAudioRenderClient);
-    GlobalAudioRenderClient = 0;
-
-    IAudioClient_Release(GlobalAudioClient);
-    GlobalAudioClient = 0;
-
-    CloseHandle(GlobalAudioEvent);
-    GlobalAudioEvent = 0;
-
-    IMMDeviceEnumerator_Release(GlobalIMMDeviceEnumerator);
-    GlobalIMMDeviceEnumerator = 0;
+    IAudioRenderClient_Release(GlobalAudioState.RenderClient);
+    IAudioClient_Release(GlobalAudioState.Client);
+    CloseHandle(GlobalAudioState.Event);
+    IMMDeviceEnumerator_Release(GlobalAudioState.IMMDeviceEnumerator);
+    
+    GlobalAudioState = (win32_audio_state){ 0 };
 
     CoUninitialize();
 }
@@ -462,23 +463,23 @@ DWORD Win32_AudioThreadProc(LPVOID Parameter)
     if (FAILED(Result)) return 1; // TODO: Diagnostic
 
     u32 BufferSize;
-    Result = IAudioClient_GetBufferSize(GlobalAudioClient, &BufferSize);
+    Result = IAudioClient_GetBufferSize(GlobalAudioState.Client, &BufferSize);
     if (FAILED(Result)) return 1; // TODO: Diagnostic
 
     while (GlobalRunning)
     {
-        DWORD WaitResult = WaitForSingleObject(GlobalAudioEvent, 200);
+        DWORD WaitResult = WaitForSingleObject(GlobalAudioState.Event, 200);
         if (WaitResult != WAIT_OBJECT_0) continue;
 
         u32 Padding;
-        Result = IAudioClient_GetCurrentPadding(GlobalAudioClient, &Padding);
+        Result = IAudioClient_GetCurrentPadding(GlobalAudioState.Client, &Padding);
         if (FAILED(Result)) break; // TODO: Diagnostic
 
         u8 *SampleBuffer;
-        u32 SampleCount = BufferSize - Padding;
-        IAudioRenderClient_GetBuffer(GlobalAudioRenderClient, SampleCount, &SampleBuffer);
+        u32 SampleCount = (BufferSize - Padding) & ~15;
+        IAudioRenderClient_GetBuffer(GlobalAudioState.RenderClient, SampleCount, &SampleBuffer);
         Audio_WriteSamples((i16 *)SampleBuffer, SampleCount);
-        IAudioRenderClient_ReleaseBuffer(GlobalAudioRenderClient, SampleCount, 0);
+        IAudioRenderClient_ReleaseBuffer(GlobalAudioState.RenderClient, SampleCount, 0);
     }
 
     CoUninitialize();
@@ -823,8 +824,10 @@ int Win32_ClientMain(const char *Ip)
         }
     }
 
-
+    // AUDIO
+    WaitForSingleObject(AudioThread, INFINITE);
     Win32_DestroyAudio();
+
     free(Client);
 
     return 0;

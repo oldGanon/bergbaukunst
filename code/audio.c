@@ -37,12 +37,19 @@ typedef struct sound
 
 typedef struct sine_wave_generator
 {
+    u32 Counter;
     f32 Frequency;
+    f32 dFrequency;
     f32 Sin;
     f32 Cos;
     f32 Alpha;
     f32 Beta;
 } sine_wave_generator;
+
+typedef struct white_noise_generator
+{
+    u16 Rng;
+} white_noise_generator;
 
 typedef struct pink_noise_generator
 {
@@ -52,12 +59,22 @@ typedef struct pink_noise_generator
     i16 Octaves[16];
 } pink_noise_generator;
 
+typedef struct brown_noise_generator
+{
+    u16 Counter;
+    i16 State;
+    u16 Rng;
+    i16 Octaves[16];
+} brown_noise_generator;
+
 global sine_wave_generator SineWave;
+global white_noise_generator WhiteNoise;
 global pink_noise_generator PinkNoise;
+global brown_noise_generator BrownNoise;
 
 #define AUDIO_SAMPLES_PER_SECOND 48000
 
-sine_wave_generator Audio_SineWave(f32 Frequency)
+sine_wave_generator Audio_SineWaveGenerator(f32 Frequency, f32 dFrequency)
 {
     f32 Alpha = Sin((    MATH_PI / AUDIO_SAMPLES_PER_SECOND) * Frequency);
     f32 Beta  = Sin((2 * MATH_PI / AUDIO_SAMPLES_PER_SECOND) * Frequency);
@@ -65,6 +82,7 @@ sine_wave_generator Audio_SineWave(f32 Frequency)
 
     return (sine_wave_generator){
         .Frequency = Frequency,
+        .dFrequency = dFrequency,
         .Sin = 0,
         .Cos = 1,
         .Alpha = Alpha,
@@ -76,16 +94,28 @@ void Audio_SineWaveSamples(sine_wave_generator *Generator, i16 *SampleBuffer, u3
 {
     for (u32 i = 0; i < SampleCount; ++i)
     {
+        if ((Generator->dFrequency != 0) && 
+            (Generator->Counter++ == AUDIO_SAMPLES_PER_SECOND / 20))
+        {
+            Generator->Counter = 0;
+            Generator->Frequency += Generator->dFrequency / 20;
+            Generator->Alpha = Sin((    MATH_PI / AUDIO_SAMPLES_PER_SECOND) * Generator->Frequency);
+            Generator->Beta  = Sin((2 * MATH_PI / AUDIO_SAMPLES_PER_SECOND) * Generator->Frequency);
+            Generator->Alpha = 2 * Generator->Alpha * Generator->Alpha;
+        }
+
         f32 dSin = (Generator->Alpha * Generator->Sin) - (Generator->Beta * Generator->Cos);
         f32 dCos = (Generator->Alpha * Generator->Cos) + (Generator->Beta * Generator->Sin);
         Generator->Sin -= dSin;
         Generator->Cos -= dCos;
 
-        i16 Sample = (i16)(Clamp(Generator->Sin*32767.0f,-32767.0f,32768.0f));
+        i16 Sample = (i16)(Clamp(Generator->Sin*32767.0f,-32768.0f,32767.0f));
         *SampleBuffer++ = Sample;
         *SampleBuffer++ = Sample;
     }
 }
+
+
 
 inline u16 xorshift16_Step(u16 x)
 {
@@ -95,9 +125,31 @@ inline u16 xorshift16_Step(u16 x)
     return x;
 }
 
-pink_noise_generator Audio_PinkNoise(void)
+white_noise_generator Audio_WhiteNoiseGenerator(void)
 {
-    return  (pink_noise_generator){ .Rng = __rdtsc() & 0xFFFF };
+    u16 Rng = __rdtsc() & 0xFFFF;
+    return  (white_noise_generator){
+        .Rng = Rng ? Rng : 1
+    };
+}
+
+void Audio_whiteNoiseSamples(white_noise_generator *Generator, i16 *SampleBuffer, u32 SampleCount)
+{
+    while (SampleCount--)
+    {
+        Generator->Rng = xorshift16_Step(Generator->Rng);
+        i16 Noise = (i16)Generator->Rng;
+        *SampleBuffer++ = Noise;
+        *SampleBuffer++ = Noise;
+    }
+}
+
+pink_noise_generator Audio_PinkNoiseGenerator(void)
+{
+    u16 Rng = __rdtsc() & 0xFFFF;
+    return  (pink_noise_generator){
+        .Rng = Rng ? Rng : 1
+    };
 }
 
 void Audio_PinkNoiseSamples(pink_noise_generator *Generator, i16 *SampleBuffer, u32 SampleCount)
@@ -127,16 +179,41 @@ void Audio_PinkNoiseSamples(pink_noise_generator *Generator, i16 *SampleBuffer, 
     }
 }
 
+brown_noise_generator Audio_BrownNoiseGenerator(void)
+{
+    u16 Rng = __rdtsc() & 0xFFFF;
+    return  (brown_noise_generator){
+        .Rng = Rng ? Rng : 1
+    };
+}
+
+void Audio_BrownNoiseSamples(brown_noise_generator *Generator, i16 *SampleBuffer, u32 SampleCount)
+{
+    for (u64 i = 0; i < SampleCount; ++i)
+    {
+        Generator->Rng = xorshift16_Step(Generator->Rng);
+        i16 Noise = Generator->Rng & 0x80;
+        if (Noise) Generator->State += 0x7F;
+        else       Generator->State -= 0x7F;
+        i16 Sample = Generator->State;
+        *SampleBuffer++ = Sample;
+        *SampleBuffer++ = Sample;
+    }
+}
+
 void Audio_WriteSamples(i16 *SampleBuffer, u32 SampleCount)
 {
-    // Audio_SineWaveSamples(&SineWave, SampleBuffer, SampleCount);
+    Audio_SineWaveSamples(&SineWave, SampleBuffer, SampleCount);
     // Audio_PinkNoiseSamples(&PinkNoise, SampleBuffer, SampleCount);
+    // Audio_BrownNoiseSamples(&BrownNoise, SampleBuffer, SampleCount);
 }
 
 void Audio_Init(void)
 {
-    SineWave = Audio_SineWave(400.0f);
-    PinkNoise = Audio_PinkNoise();
+    SineWave = Audio_SineWaveGenerator(400, 0);
+    WhiteNoise = Audio_WhiteNoiseGenerator();
+    PinkNoise = Audio_PinkNoiseGenerator();
+    BrownNoise = Audio_BrownNoiseGenerator();
 }
 
 /*
