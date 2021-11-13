@@ -164,6 +164,17 @@ inline i32 I32_Clamp(i32 A, i32 min, i32 max) { return I32_Min(I32_Max(A, min), 
 inline i32 I32_Modulo(i32 N, i32 D) { return N % D; }
 
 /***********/
+/*   U16   */
+/***********/
+inline u16 U16_Abs(u16 A) { return A; }
+inline u16 U16_Sign(u16 A) { return 1; }
+// inline u16 U16_Negate(u16 A) { /* IMPOSSIBLE */ }
+inline u16 U16_Max(u16 A, u16 B) { return _mm_cvtsi128_si32(_mm_max_epu16(_mm_cvtsi32_si128(A),_mm_cvtsi32_si128(B))) & 0xFFFF; }
+inline u16 U16_Min(u16 A, u16 B) { return _mm_cvtsi128_si32(_mm_min_epu16(_mm_cvtsi32_si128(A),_mm_cvtsi32_si128(B))) & 0xFFFF; }
+inline u16 U16_Clamp(u16 A, u16 min, u16 max) { return U16_Min(U16_Max(A, min), max); }
+inline u16 U16_Modulo(u16 N, u16 D) { return N % D; }
+
+/***********/
 /*   U32   */
 /***********/
 inline u32 U32_Abs(u32 A) { return A; }
@@ -562,6 +573,7 @@ inline ivec3 Vec3_FloorToIVec3(vec3 A) { ivec3 B; STORE_IVEC3(B, _mm_cvtps_epi32
 #define Min(A,B) _Generic((A), \
     f32: F32_Min, \
     i32: I32_Min, \
+    u16: U16_Min, \
     u32: U32_Min, \
     vec2: Vec2_Min, \
     vec3: Vec3_Min \
@@ -570,6 +582,7 @@ inline ivec3 Vec3_FloorToIVec3(vec3 A) { ivec3 B; STORE_IVEC3(B, _mm_cvtps_epi32
 #define Max(A,B) _Generic((A), \
     f32: F32_Max, \
     i32: I32_Max, \
+    u16: U16_Max, \
     u32: U32_Max, \
     vec2: Vec2_Max, \
     vec3: Vec3_Max \
@@ -578,6 +591,7 @@ inline ivec3 Vec3_FloorToIVec3(vec3 A) { ivec3 B; STORE_IVEC3(B, _mm_cvtps_epi32
 #define Clamp(A,B,C) _Generic((A), \
     f32: F32_Clamp, \
     i32: I32_Clamp, \
+    u16: U16_Clamp, \
     u32: U32_Clamp, \
     vec2: Vec2_Clamp, \
     vec3: Vec3_Clamp \

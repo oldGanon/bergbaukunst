@@ -344,26 +344,26 @@ Win32_ToggleFullscreen(HWND Window)
 #include <mmdeviceapi.h>
 #include <audioclient.h>
 
-typedef struct win32_audio_state
+typedef struct win32_wasapi_state
 {
     IMMDeviceEnumerator *IMMDeviceEnumerator;
     IAudioClient *Client;
     IAudioRenderClient *RenderClient;
     HANDLE Event;
-} win32_audio_state;
+} win32_wasapi_state;
 
-global win32_audio_state GlobalAudioState;
+global win32_wasapi_state GlobalWasapiState;
 
 void Win32_AudioPlay(void)
 {
-    if (GlobalAudioState.Client)
-        IAudioClient_Start(GlobalAudioState.Client);
+    if (GlobalWasapiState.Client)
+        IAudioClient_Start(GlobalWasapiState.Client);
 }
 
 void Win32_AudioPause(void)
 {
-    if (GlobalAudioState.Client)
-        IAudioClient_Stop(GlobalAudioState.Client);
+    if (GlobalWasapiState.Client)
+        IAudioClient_Stop(GlobalWasapiState.Client);
 }
 
 void Win32_InitAudio(void)
@@ -376,23 +376,23 @@ void Win32_InitAudio(void)
     HRESULT Result = CoInitialize(0);
     if (FAILED(Result)) return; // TODO: Diagnostic
 
-    Result = CoCreateInstance(&CLSID_MMDeviceEnumerator_, 0, CLSCTX_INPROC_SERVER, &IID_IMMDeviceEnumerator_, (LPVOID *)&GlobalAudioState.IMMDeviceEnumerator);
+    Result = CoCreateInstance(&CLSID_MMDeviceEnumerator_, 0, CLSCTX_INPROC_SERVER, &IID_IMMDeviceEnumerator_, (LPVOID *)&GlobalWasapiState.IMMDeviceEnumerator);
     if (FAILED(Result)) return; // TODO: Diagnostic
 
     IMMDevice *Device;
-    Result = IMMDeviceEnumerator_GetDefaultAudioEndpoint(GlobalAudioState.IMMDeviceEnumerator, eRender, eMultimedia, &Device);
+    Result = IMMDeviceEnumerator_GetDefaultAudioEndpoint(GlobalWasapiState.IMMDeviceEnumerator, eRender, eMultimedia, &Device);
     if (FAILED(Result)) return; // TODO: Diagnostic
 
-    Result = IMMDevice_Activate(Device, &IID_IAudioClient_, CLSCTX_ALL, 0, (LPVOID *)&GlobalAudioState.Client);
+    Result = IMMDevice_Activate(Device, &IID_IAudioClient_, CLSCTX_ALL, 0, (LPVOID *)&GlobalWasapiState.Client);
     IMMDevice_Release(Device);
     if (FAILED(Result)) return; // TODO: Diagnostic
 
     WAVEFORMATEX *WaveFormat;
-    Result = IAudioClient_GetMixFormat(GlobalAudioState.Client, &WaveFormat);
+    Result = IAudioClient_GetMixFormat(GlobalWasapiState.Client, &WaveFormat);
     if (FAILED(Result)) return; // TODO: Diagnostic
 
     REFERENCE_TIME DefaultPeriod;
-    Result = IAudioClient_GetDevicePeriod(GlobalAudioState.Client, &DefaultPeriod, 0);
+    Result = IAudioClient_GetDevicePeriod(GlobalWasapiState.Client, &DefaultPeriod, 0);
     if (FAILED(Result)) return; // TODO: Diagnostic
 
     DWORD StreamFlags = AUDCLNT_STREAMFLAGS_EVENTCALLBACK;
@@ -413,28 +413,28 @@ void Win32_InitAudio(void)
         WaveFormat->cbSize = 0;
     }
 
-    Result = IAudioClient_Initialize(GlobalAudioState.Client, AUDCLNT_SHAREMODE_SHARED, StreamFlags, 0, 0, WaveFormat, 0);
+    Result = IAudioClient_Initialize(GlobalWasapiState.Client, AUDCLNT_SHAREMODE_SHARED, StreamFlags, 0, 0, WaveFormat, 0);
     if (FAILED(Result)) return; // TODO: Diagnostic
 
-    GlobalAudioState.Event = CreateEventA(0, false, false, 0);
-    Result = IAudioClient_SetEventHandle(GlobalAudioState.Client, GlobalAudioState.Event);
+    GlobalWasapiState.Event = CreateEventA(0, false, false, 0);
+    Result = IAudioClient_SetEventHandle(GlobalWasapiState.Client, GlobalWasapiState.Event);
     if (FAILED(Result)) return; // TODO: Diagnostic
 
-    Result = IAudioClient_GetService(GlobalAudioState.Client, &IID_IAudioRenderClient_, (LPVOID *)&GlobalAudioState.RenderClient);
+    Result = IAudioClient_GetService(GlobalWasapiState.Client, &IID_IAudioRenderClient_, (LPVOID *)&GlobalWasapiState.RenderClient);
     if (FAILED(Result)) return; // TODO: Diagnostic
 
-    Result = IAudioClient_Start(GlobalAudioState.Client);
+    Result = IAudioClient_Start(GlobalWasapiState.Client);
     if (FAILED(Result)) return; // TODO: Diagnostic
 }
 
 void Win32_DestroyAudio(void)
 {
-    IAudioRenderClient_Release(GlobalAudioState.RenderClient);
-    IAudioClient_Release(GlobalAudioState.Client);
-    CloseHandle(GlobalAudioState.Event);
-    IMMDeviceEnumerator_Release(GlobalAudioState.IMMDeviceEnumerator);
+    IAudioRenderClient_Release(GlobalWasapiState.RenderClient);
+    IAudioClient_Release(GlobalWasapiState.Client);
+    CloseHandle(GlobalWasapiState.Event);
+    IMMDeviceEnumerator_Release(GlobalWasapiState.IMMDeviceEnumerator);
     
-    GlobalAudioState = (win32_audio_state){ 0 };
+    GlobalWasapiState = (win32_wasapi_state){ 0 };
 
     CoUninitialize();
 }
@@ -463,23 +463,23 @@ DWORD Win32_AudioThreadProc(LPVOID Parameter)
     if (FAILED(Result)) return 1; // TODO: Diagnostic
 
     u32 BufferSize;
-    Result = IAudioClient_GetBufferSize(GlobalAudioState.Client, &BufferSize);
+    Result = IAudioClient_GetBufferSize(GlobalWasapiState.Client, &BufferSize);
     if (FAILED(Result)) return 1; // TODO: Diagnostic
 
     while (GlobalRunning)
     {
-        DWORD WaitResult = WaitForSingleObject(GlobalAudioState.Event, 200);
+        DWORD WaitResult = WaitForSingleObject(GlobalWasapiState.Event, 200);
         if (WaitResult != WAIT_OBJECT_0) continue;
 
         u32 Padding;
-        Result = IAudioClient_GetCurrentPadding(GlobalAudioState.Client, &Padding);
+        Result = IAudioClient_GetCurrentPadding(GlobalWasapiState.Client, &Padding);
         if (FAILED(Result)) break; // TODO: Diagnostic
 
         u8 *SampleBuffer;
         u32 SampleCount = (BufferSize - Padding) & ~15;
-        IAudioRenderClient_GetBuffer(GlobalAudioState.RenderClient, SampleCount, &SampleBuffer);
+        IAudioRenderClient_GetBuffer(GlobalWasapiState.RenderClient, SampleCount, &SampleBuffer);
         Audio_WriteSamples((i16 *)SampleBuffer, SampleCount);
-        IAudioRenderClient_ReleaseBuffer(GlobalAudioState.RenderClient, SampleCount, 0);
+        IAudioRenderClient_ReleaseBuffer(GlobalWasapiState.RenderClient, SampleCount, 0);
     }
 
     CoUninitialize();
@@ -729,6 +729,15 @@ int Win32_ClientMain(const char *Ip)
                     bool IsDown = (((Message.lParam >> 31) & 1) == 0);
                     bool AltDown = (Message.lParam & (1 << 29)) != 0;
                     
+                    if (IsDown && AltDown && Code == 'S')
+                    {
+                        Audio_PlaySound((sound) {
+                            .Envelope = Audio_EnvelopeGenerator(0.5f, 0.0f, 0.0f, 0.5f, 0.0f, 0.0f),
+                            .Phase = Audio_PhaseGenerator(400, 0),
+                            // .Generator = Audio_SineWaveGenerator(500, 100),
+                        });
+                    }
+
                     if (IsDown && AltDown)
                     {
                         if (Code == VK_F4) GlobalRunning = false;
