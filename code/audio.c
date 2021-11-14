@@ -2,6 +2,7 @@
 #define AUDIO_SAMPLES_PER_SECOND 48000
 #define AUDIO_SECOND_PER_SAMPLE (1.0f / AUDIO_SAMPLES_PER_SECOND)
 #define AUDIO_SWEEP_UPDATES_PER_SECOND 100
+#define AUDIO_FILTER_SIZE 256
 
 typedef struct envelope_generator
 {
@@ -70,11 +71,25 @@ typedef struct wave_generator
     };
 } wave_generator;
 
+enum filter_type
+{
+    FILTER_NONE = 0,
+    FILTER_LOWPASS,
+};
+
+typedef struct filter
+{
+    u16 Type;
+    i16 Coefficients[AUDIO_FILTER_SIZE];
+    i16 Samples[AUDIO_FILTER_SIZE];
+} filter;
+
 typedef struct sound
 {
     envelope_generator Envelope;
     phase_generator Phase;
     wave_generator Wave;
+    filter Filter;
 } sound;
 
 typedef struct sound_list
@@ -92,399 +107,13 @@ typedef struct audio_state
     sound_list *volatile FirstFreeSound;
     
     sound_list Sounds[AUDIO_MAX_SOUNDS];
+
+    i16 WhiteNoise[65535];
+    i16 PinkNoise[65535];
+    i16 BrownNoise[65535];
 } audio_state;
 
 global audio_state GlobalAudioState;
-
-#if 0
-
-generator Audio_SineWaveGenerator(f32 Frequency, f32 dFrequency)
-{
-    f32 Alpha = Sin((    MATH_PI / AUDIO_SAMPLES_PER_SECOND) * Frequency);
-    f32 Beta  = Sin((2 * MATH_PI / AUDIO_SAMPLES_PER_SECOND) * Frequency);
-    Alpha = 2 * Alpha * Alpha;
-
-    return (generator){
-        .Type = SINE_WAVE_GENERATOR,
-        .SineWave = {
-            .Frequency = Clamp(Frequency, 20.0f, 20000.0f),
-            .dFrequency = dFrequency,
-            .Sin = 0,
-            .Cos = 1,
-            .Alpha = Alpha,
-            .Beta = Beta,
-        }
-    };
-}
-
-
-void Audio_SineWaveSamples(sine_wave_generator *Generator, i16 *SampleBuffer, u32 SampleCount)
-{
-    while (SampleCount--)
-    {
-        if ((Generator->dFrequency != 0.0f) &&
-            (Generator->Counter++ == AUDIO_SAMPLES_PER_SECOND / AUDIO_SWEEP_UPDATES_PER_SECOND))
-        {
-            Generator->Counter = 0;
-            Generator->Frequency += Generator->dFrequency * (1.0f / AUDIO_SWEEP_UPDATES_PER_SECOND);
-            Generator->Frequency = Clamp(Generator->Frequency, 20.0f, 20000.0f);
-            
-            Generator->Alpha = Sin((    MATH_PI / AUDIO_SAMPLES_PER_SECOND) * Generator->Frequency);
-            Generator->Beta  = Sin((2 * MATH_PI / AUDIO_SAMPLES_PER_SECOND) * Generator->Frequency);
-            Generator->Alpha = 2 * Generator->Alpha * Generator->Alpha;
-        }
-
-        f32 dSin = (Generator->Alpha * Generator->Sin) - (Generator->Beta * Generator->Cos);
-        f32 dCos = (Generator->Alpha * Generator->Cos) + (Generator->Beta * Generator->Sin);
-        Generator->Sin -= dSin;
-        Generator->Cos -= dCos;
-
-        i16 Sample = (i16)(Clamp(Generator->Sin*32767.0f,-32768.0f,32767.0f));
-        *SampleBuffer++ = Sample;
-    }
-}
-
-generator Audio_TriangleWaveGenerator(f32 Frequency, f32 dFrequency)
-{
-    Frequency = Clamp(Frequency, 20.0f, 20000.0f);
-    u16 dState = (u16)(Frequency * (65535.0f / AUDIO_SAMPLES_PER_SECOND));
-
-    return (generator){
-        .Type = TRIANGLE_WAVE_GENERATOR,
-        .TriangleWave = {
-            .Frequency = Frequency,
-            .dFrequency = dFrequency,
-            .State = 0,
-            .dState = dState,
-        }
-    };
-}
-
-void Audio_TriangleWaveSamples(triangle_wave_generator *Generator, i16 *SampleBuffer, u32 SampleCount)
-{
-    while (SampleCount--)
-    {
-        if ((Generator->dFrequency != 0.0f) && 
-            (Generator->Counter++ == AUDIO_SAMPLES_PER_SECOND / AUDIO_SWEEP_UPDATES_PER_SECOND))
-        {
-            Generator->Counter = 0;
-            Generator->Frequency += Generator->dFrequency * (1.0f / AUDIO_SWEEP_UPDATES_PER_SECOND);
-            Generator->Frequency = Clamp(Generator->Frequency, 20.0f, 20000.0f);
-            
-            Generator->dState = (u16)(Generator->Frequency * (65535.0f / AUDIO_SAMPLES_PER_SECOND));
-        }
-
-        Generator->State += Generator->dState;
-        i16 Sample = Generator->State;
-        if (Generator->State > 0x3FFF && Generator->State < 0xBFFF)
-            Sample = 0x7FFF - Sample;
-        *SampleBuffer++ = Sample;
-    }
-}
-
-generator Audio_SawtoothWaveGenerator(f32 Frequency, f32 dFrequency)
-{
-    Frequency = Clamp(Frequency, 20.0f, 20000.0f);
-    u16 dState = (u16)(Frequency * (65535.0f / AUDIO_SAMPLES_PER_SECOND));
-
-    return (generator){
-        .Type = SAWTOOTH_WAVE_GENERATOR,
-        .SawtoothWave = {
-            .Frequency = Frequency,
-            .dFrequency = dFrequency,
-            .State = 0,
-            .dState = dState,
-        }
-    };
-}
-
-void Audio_SawtoothWaveSamples(sawtooth_wave_generator *Generator, i16 *SampleBuffer, u32 SampleCount)
-{
-    while (SampleCount--)
-    {
-        if ((Generator->dFrequency != 0.0f) &&
-            (Generator->Counter++ == AUDIO_SAMPLES_PER_SECOND / AUDIO_SWEEP_UPDATES_PER_SECOND))
-        {
-            Generator->Counter = 0;
-            Generator->Frequency += Generator->dFrequency * (1.0f / AUDIO_SWEEP_UPDATES_PER_SECOND);
-            Generator->Frequency = Clamp(Generator->Frequency, 20.0f, 20000.0f);
-            
-            Generator->dState = (u16)(Generator->Frequency * (65535.0f / AUDIO_SAMPLES_PER_SECOND));
-        }
-
-        Generator->State += Generator->dState;
-        i16 Sample = Generator->State;
-        *SampleBuffer++ = Sample;
-    }
-}
-
-generator Audio_SquareWaveGenerator(f32 Frequency, f32 dFrequency, f32 Duty, f32 dDuty)
-{
-    Frequency = Clamp(Frequency, 20.0f, 20000.0f);
-    Duty = Clamp(Duty, 0.0f, 1.0f);
-    u16 dState = (u16)(Frequency * (65535.0f / AUDIO_SAMPLES_PER_SECOND));
-
-    return (generator){
-        .Type = SQUARE_WAVE_GENERATOR,
-        .SquareWave = {
-            .Frequency = Frequency,
-            .dFrequency = dFrequency,
-            .State = 0,
-            .dState = dState,
-            .Duty = (u16)(0x4000 * Duty),
-            .dDuty = (i16)(0x4000 * dDuty),
-        }
-    };
-}
-
-void Audio_SquareWaveSamples(square_wave_generator *Generator, i16 *SampleBuffer, u32 SampleCount)
-{
-    while (SampleCount--)
-    {
-        if ((Generator->dFrequency != 0.0f) &&
-            (Generator->Counter++ == AUDIO_SAMPLES_PER_SECOND / AUDIO_SWEEP_UPDATES_PER_SECOND))
-        {
-            Generator->Counter = 0;
-            Generator->Frequency += Generator->dFrequency * (1.0f / AUDIO_SWEEP_UPDATES_PER_SECOND);
-            Generator->Frequency = Clamp(Generator->Frequency, 20.0f, 20000.0f);
-            
-            Generator->dState = (u16)(Generator->Frequency * (65535.0f / AUDIO_SAMPLES_PER_SECOND));
-
-            Generator->Duty += (u16)(Generator->dDuty * (1.0f / AUDIO_SWEEP_UPDATES_PER_SECOND));
-            Generator->Duty = Clamp(Generator->Duty, 0, 0x4000);
-        }
-
-        Generator->State += Generator->dState;
-        u16 Sample = 0x8000;
-        if (Generator->State < Generator->Duty)
-            Sample = 0x7FFF;
-        *SampleBuffer++ = Sample;
-    }
-}
-
-inline u16 xorshift16_Step(u16 x)
-{
-    x ^= x << 7;
-    x ^= x >> 9;
-    x ^= x << 8;
-    return x;
-}
-
-generator Audio_WhiteNoiseGenerator(void)
-{
-    u16 Rng = __rdtsc() & 0xFFFF;
-    return (generator) {
-        .Type = WHITE_NOISE_GENERATOR,
-        .WhiteNoise = {
-            .Rng = Rng ? Rng : 1
-        }
-    };
-}
-
-void Audio_WhiteNoiseSamples(white_noise_generator *Generator, i16 *SampleBuffer, u32 SampleCount)
-{
-    while (SampleCount--)
-    {
-        Generator->Rng = xorshift16_Step(Generator->Rng);
-        i16 Noise = (i16)Generator->Rng;
-        *SampleBuffer++ = Noise;
-    }
-}
-
-generator Audio_PinkNoiseGenerator(void)
-{
-    u16 Rng = __rdtsc() & 0xFFFF;
-    return (generator) {
-        .Type = PINK_NOISE_GENERATOR,
-        .PinkNoise = {
-            .Rng = Rng ? Rng : 1
-        }
-    };
-}
-
-void Audio_PinkNoiseSamples(pink_noise_generator *Generator, i16 *SampleBuffer, u32 SampleCount)
-{
-    while (SampleCount--)
-    {
-        Generator->Rng = xorshift16_Step(Generator->Rng);
-        i16 Noise = ((i16)Generator->Rng) >> 4;
-
-        Generator->Rng = xorshift16_Step(Generator->Rng);
-        i16 OctaveNoise = ((i16)Generator->Rng) >> 4;
-
-        DWORD k = 0;
-        Generator->Counter += 2;
-        if (_BitScanForward(&k, Generator->Counter))
-        {
-            Generator->State -= Generator->Octaves[k];
-            Generator->State += OctaveNoise;
-            Generator->Octaves[k] = OctaveNoise;
-        }
-
-        i16 Sample = Generator->State + Noise;
-        assert((i32)Generator->State + (i32)Noise <= 32767);
-        assert((i32)Generator->State + (i32)Noise >= -32768);
-        *SampleBuffer++ = Sample;
-    }
-}
-
-generator Audio_BrownNoiseGenerator(void)
-{
-    u16 Rng = __rdtsc() & 0xFFFF;
-    return (generator) {
-        .Type = BROWN_NOISE_GENERATOR,
-        .BrownNoise = {
-            .Rng = Rng ? Rng : 1
-        }
-    };
-}
-
-void Audio_BrownNoiseSamples(brown_noise_generator *Generator, i16 *SampleBuffer, u32 SampleCount)
-{
-    while (SampleCount--)
-    {
-        Generator->Rng = xorshift16_Step(Generator->Rng);
-        i16 Noise = Generator->Rng & 0x80;
-        if (Noise) Generator->State += 0x7F;
-        else       Generator->State -= 0x7F;
-        i16 Sample = Generator->State;
-        *SampleBuffer++ = Sample;
-    }
-}
-
-void Audio_GeneratorSamples(generator *Generator, i16 *SampleBuffer, u32 SampleCount)
-{
-    switch (Generator->Type)
-    {
-        case SINE_WAVE_GENERATOR:
-        {
-            Audio_SineWaveSamples(&Generator->SineWave, SampleBuffer, SampleCount);
-        } break;
-
-        case TRIANGLE_WAVE_GENERATOR:
-        {
-            Audio_TriangleWaveSamples(&Generator->TriangleWave, SampleBuffer, SampleCount);
-        } break;
-
-        case SAWTOOTH_WAVE_GENERATOR:
-        {
-            Audio_SawtoothWaveSamples(&Generator->SawtoothWave, SampleBuffer, SampleCount);
-        } break;
-
-        case SQUARE_WAVE_GENERATOR:
-        {
-            Audio_SquareWaveSamples(&Generator->SquareWave, SampleBuffer, SampleCount);
-        } break;
-
-        case WHITE_NOISE_GENERATOR:
-        {
-            Audio_WhiteNoiseSamples(&Generator->WhiteNoise, SampleBuffer, SampleCount);
-        } break;
-
-        case PINK_NOISE_GENERATOR:
-        {
-            Audio_PinkNoiseSamples(&Generator->PinkNoise, SampleBuffer, SampleCount);
-        } break;
-
-        case BROWN_NOISE_GENERATOR:
-        {
-            Audio_BrownNoiseSamples(&Generator->BrownNoise, SampleBuffer, SampleCount);
-        } break;
-    }
-}
-
-envelope Audio_Envelope(f32 AttackVolume, f32 SustainVolume, f32 Attack, f32 Decay, f32 Sustain, f32 Release)
-{
-    return (envelope) {
-        .AttackVolume  = (u16)(Clamp(AttackVolume,  0, 1) * 0xFFFF),
-        .SustainVolume = (u16)(Clamp(SustainVolume, 0, 1) * 0xFFFF),
-        .Attack        = (u16)(Clamp(Attack,        0, 1) * 0xFFFF),
-        .Decay         = (u16)(Clamp(Decay,         0, 1) * 0xFFFF),
-        .Sustain       = (u16)(Clamp(Sustain,       0, 1) * 0xFFFF),
-        .Release       = (u16)(Clamp(Release,       0, 1) * 0xFFFF),
-    };
-}
-
-bool Audio_EnvelopeSamples(envelope *Envelope, u16 *SampleBuffer, u32 SampleCount)
-{
-    bool Ended = false;
-
-    while (SampleCount--)
-    {
-        u32 Counter = ++Envelope->Counter;
-
-        if (Counter < Envelope->Attack)
-        {
-            Counter *= Envelope->AttackVolume;
-            Counter /= Envelope->Attack;
-            *SampleBuffer++ = Counter & 0xFFFF;
-            continue;
-        }
-
-        Counter -= Envelope->Attack;
-        if (Counter < Envelope->Decay)
-        {
-            Counter *= Envelope->AttackVolume - Envelope->SustainVolume;
-            Counter /= Envelope->Decay;
-            *SampleBuffer++ = (Envelope->AttackVolume - Counter) & 0xFFFF;
-            continue;
-        }
-        
-        Counter -= Envelope->Decay;
-        if (Counter < Envelope->Sustain)
-        {
-            *SampleBuffer++ = Envelope->SustainVolume;
-            continue;
-        }
-
-        Counter -= Envelope->Sustain;
-        if (Counter < Envelope->Release)
-        {
-            Counter *= Envelope->SustainVolume;
-            Counter /= Envelope->Release;
-            *SampleBuffer++ = (Envelope->SustainVolume - Counter) & 0xFFFF;
-            continue;
-        }
-
-        *SampleBuffer++ = 0;
-        Ended = true;
-    }
-
-    return Ended;
-}
-
-void Audio_WriteSamples(i16 *SampleBuffer, u32 SampleCount)
-{
-    u8 TempSampleBuffer[32];
-
-    for (u32 i = 0; i < SampleCount >> 4; ++i)
-    {
-        __m256i Samples = _mm256_setzero_si256();
-
-        for (sound_list *SoundList = GlobalAudioState.FirstUsedSound; SoundList; SoundList = SoundList->Next)
-        {
-            sound *Sound = &SoundList->Sound;
-
-            Audio_EnvelopeSamples(&Sound->Envelope, (u16 *)TempSampleBuffer, 16);
-            __m256i EnvelopeSamples = _mm256_loadu_si256((__m256i *)TempSampleBuffer);
-
-            Audio_GeneratorSamples(&Sound->Generator, (i16 *)TempSampleBuffer, 16);
-            __m256i GeneratorSamples = _mm256_loadu_si256((__m256i *)TempSampleBuffer);
-
-            Samples = _mm256_adds_epi16(Samples, _mm256_mulhi_epi16(EnvelopeSamples, GeneratorSamples));
-        }
-
-        __m256i Samples0 = _mm256_cvtepu16_epi32(_mm256_castsi256_si128(Samples));
-        Samples0 = _mm256_or_si256(Samples0, _mm256_slli_epi32(Samples0, 16));
-        _mm256_storeu_si256((__m256i *)&SampleBuffer[i*32], Samples0);
-
-        __m256i Samples1 = _mm256_cvtepu16_epi32(_mm256_extracti128_si256(Samples, 1));
-        Samples1 = _mm256_or_si256(Samples1, _mm256_slli_epi32(Samples1, 16));
-        _mm256_storeu_si256((__m256i *)&SampleBuffer[i*32+16], Samples1);
-    }
-}
-
-#else
 
 envelope_generator Audio_EnvelopeGenerator(f32 AttackVolume, f32 SustainVolume, f32 Attack, f32 Decay, f32 Sustain, f32 Release)
 {
@@ -557,6 +186,14 @@ phase_generator Audio_PhaseGenerator(f32 Frequency, f32 dFrequency)
     };
 }
 
+phase_generator Audio_NoisePhaseGenerator(void)
+{
+    return (phase_generator) {
+        .Frequency = 1,
+        .dFrequency = 0,
+    };
+}
+
 u16 Audio_PhaseSample(phase_generator *Phase)
 {
     Phase->Frequency += Phase->dFrequency;
@@ -564,8 +201,14 @@ u16 Audio_PhaseSample(phase_generator *Phase)
     return Phase->Phase;
 }
 
-i16 Sin_U16(u16 x)
+wave_generator Audio_SineWaveGenerator(void)
 {
+    return (wave_generator){ .Type = SINE_WAVE_GENERATOR };
+}
+
+i16 Audio_SineWaveSample(u16 Phase)
+{
+    u16 x = Phase;
     i16 s = ((i16)x >> 16);
     x &= 0x7FFF;
 
@@ -588,9 +231,9 @@ i16 Sin_U16(u16 x)
     return y ^ s;
 }
 
-i16 Audio_SineWaveSample(u16 Phase)
+wave_generator Audio_TriangleWaveGenerator(void)
 {
-    return Sin_U16(Phase);
+    return (wave_generator){ .Type = TRIANGLE_WAVE_GENERATOR };
 }
 
 i16 Audio_TriangleWaveSample(u16 Phase)
@@ -600,9 +243,19 @@ i16 Audio_TriangleWaveSample(u16 Phase)
     return Phase;
 }
 
+wave_generator Audio_SawtoothWaveGenerator(void)
+{
+    return (wave_generator){ .Type = SAWTOOTH_WAVE_GENERATOR };
+}
+
 i16 Audio_SawtoothWaveSample(u16 Phase)
 {
     return Phase;
+}
+
+wave_generator Audio_SquareWaveGenerator(void)
+{
+    return (wave_generator){ .Type = SQUARE_WAVE_GENERATOR };
 }
 
 i16 Audio_SquareWaveSample(square_wave_generator *Wave, u16 Phase)
@@ -614,6 +267,36 @@ i16 Audio_SquareWaveSample(square_wave_generator *Wave, u16 Phase)
     return Sample;
 }
 
+wave_generator Audio_WhiteNoiseGenerator(void)
+{
+    return (wave_generator){ .Type = WHITE_NOISE_GENERATOR };
+}
+
+i16 Audio_WhiteNoiseSample(u16 Phase)
+{
+    return GlobalAudioState.WhiteNoise[Phase];
+}
+
+wave_generator Audio_PinkNoiseGenerator(void)
+{
+    return (wave_generator){ .Type = PINK_NOISE_GENERATOR };
+}
+
+i16 Audio_PinkNoiseSample(u16 Phase)
+{
+    return GlobalAudioState.PinkNoise[Phase];
+}
+
+wave_generator Audio_BrownNoiseGenerator(void)
+{
+    return (wave_generator){ .Type = BROWN_NOISE_GENERATOR };
+}
+
+i16 Audio_BrownNoiseSample(u16 Phase)
+{
+    return GlobalAudioState.BrownNoise[Phase];
+}
+
 i16 Audio_WaveSample(wave_generator *Wave, u16 Phase)
 {
     switch (Wave->Type)
@@ -622,11 +305,66 @@ i16 Audio_WaveSample(wave_generator *Wave, u16 Phase)
         case TRIANGLE_WAVE_GENERATOR: return Audio_TriangleWaveSample(Phase); break;
         case SAWTOOTH_WAVE_GENERATOR: return Audio_SawtoothWaveSample(Phase); break;
         case SQUARE_WAVE_GENERATOR:   return Audio_SquareWaveSample(&Wave->Square, Phase); break;
-        // case WHITE_NOISE_GENERATOR:   return Audio_WhiteNoiseSample(Phase); break;
-        // case PINK_NOISE_GENERATOR:    return Audio_PinkNoiseSample(Phase); break;
-        // case BROWN_NOISE_GENERATOR:   return Audio_BrownNoiseSample(Phase); break;
+        case WHITE_NOISE_GENERATOR:   return Audio_WhiteNoiseSample(Phase); break;
+        case PINK_NOISE_GENERATOR:    return Audio_PinkNoiseSample(Phase); break;
+        case BROWN_NOISE_GENERATOR:   return Audio_BrownNoiseSample(Phase); break;
     }
     return 0;
+}
+
+f32 Sinc(f32 x)
+{
+    if (x == 0.0f) return 1.0f;
+    return Sin(x) / x;
+}
+
+filter Audio_BandpassFilter(f32 MinCutOff, f32 MaxCutOff)
+{
+    filter Filter = { 0 };
+
+    f32 MinCutOffSamples = MinCutOff / AUDIO_SAMPLES_PER_SECOND;
+    f32 MaxCutOffSamples = MaxCutOff / AUDIO_SAMPLES_PER_SECOND;
+    for (u32 n = 0; n < AUDIO_FILTER_SIZE; ++n)
+    {
+        u32 x = n + 1;
+        f32 Window = 0.42f - 0.5f * Cos(x * (MATH_PI / AUDIO_FILTER_SIZE)) + 0.08f * Cos(x * (2.0f * MATH_PI / AUDIO_FILTER_SIZE));
+        f32 Max = MaxCutOffSamples * Sinc((AUDIO_FILTER_SIZE - x) * 2.0f * MATH_PI * MaxCutOffSamples);
+        f32 Min = MinCutOffSamples * Sinc((AUDIO_FILTER_SIZE - x) * 2.0f * MATH_PI * MinCutOffSamples);
+        Filter.Coefficients[n] = (u16)(Window * (Max - Min) * 0xFFFF);
+    }
+
+    return Filter;
+}
+
+filter Audio_LowpassFilter(f32 CutOff)
+{
+    filter Filter = { .Type = FILTER_LOWPASS };
+
+    f32 CutOffSamples = CutOff / AUDIO_SAMPLES_PER_SECOND;
+    for (u32 n = 0; n < AUDIO_FILTER_SIZE; ++n)
+    {
+        u32 x = n + 1;
+        f32 Window = 0.42f - 0.5f * Cos(x * (MATH_PI / AUDIO_FILTER_SIZE)) + 0.08f * Cos(x * (2.0f * MATH_PI / AUDIO_FILTER_SIZE));
+        f32 LowPass = CutOffSamples * Sinc((AUDIO_FILTER_SIZE - x) * 2.0f * MATH_PI * CutOffSamples);
+        Filter.Coefficients[n] = (i16)((Window * LowPass) * 0xFFFF);
+    }
+
+    return Filter;
+}
+
+i16 Audio_Filter(filter *Filter, i16 Sample)
+{
+    if (Filter->Type == FILTER_NONE)
+        return Sample;
+
+    for (u32 i = 0; i < AUDIO_FILTER_SIZE - 1; ++i)
+        Filter->Samples[i] = Filter->Samples[i + 1];
+    Filter->Samples[AUDIO_FILTER_SIZE - 1] = Sample;
+
+    i16 Result = 0;
+    for (u32 i = 0; i < AUDIO_FILTER_SIZE; ++i)
+        Result += (Filter->Coefficients[i] * Filter->Samples[i]) >> 16;
+    return Result;
 }
 
 void Audio_WriteSamples(i16 *SampleBuffer, u32 SampleCount)
@@ -642,14 +380,13 @@ void Audio_WriteSamples(i16 *SampleBuffer, u32 SampleCount)
             u16 Envelope = Audio_EnvelopeSample(&Sound->Envelope);
             u16 Phase = Audio_PhaseSample(&Sound->Phase);
             i16 Wave = Audio_WaveSample(&Sound->Wave, Phase);
-            Sample += (Envelope * Wave) >> 16;
+            i16 Filtered = Audio_Filter(&Sound->Filter, Wave);
+            Sample += (Envelope * Filtered) >> 16;
         }
         *SampleBuffer++ = Sample;
         *SampleBuffer++ = Sample;
     }
 }
-
-#endif
 
 void Audio_PlaySound(sound Sound)
 {
@@ -674,6 +411,73 @@ void Audio_PlaySound(sound Sound)
     } while (InterlockedCompareExchangePointer(&GlobalAudioState.FirstUsedSound, NewSound, FirstUsedSound) != FirstUsedSound);
 }
 
+inline u16 xorshift16_Step(u16 x)
+{
+    x ^= x << 7;
+    x ^= x >> 9;
+    x ^= x << 8;
+    return x;
+}
+
+void Audio_GenerateWhiteNoise(i16 *SampleBuffer, u32 SampleCount)
+{
+    u16 Rng = 0x119E;
+
+    while (SampleCount--)
+    {
+        Rng = xorshift16_Step(Rng);
+        i16 Noise = (i16)Rng;
+        *SampleBuffer++ = Noise;
+    }
+}
+
+void Audio_GeneratePinkNoise(i16 *SampleBuffer, u32 SampleCount)
+{
+    u16 Counter = 0;
+    i16 State = 0;
+    u16 Rng0 = 0x119E;
+    u16 Rng1 =  0xEE61;
+    i16 Octaves[16] = { 0 };
+
+    while (SampleCount--)
+    {
+        Rng0 = xorshift16_Step(Rng0);
+        i16 Noise = ((i16)Rng0) >> 4;
+
+        Rng1 = xorshift16_Step(Rng1);
+        i16 OctaveNoise = ((i16)Rng1) >> 4;
+
+        DWORD k = 0;
+        if (_BitScanForward(&k, ++Counter))
+        {
+            State -= Octaves[k];
+            State += OctaveNoise;
+            Octaves[k] = OctaveNoise;
+        }
+
+        i16 Sample = State + Noise;
+        assert((i32)State + (i32)Noise <= 32767);
+        assert((i32)State + (i32)Noise >= -32768);
+        *SampleBuffer++ = Sample;
+    }
+}
+
+void Audio_GenerateBrownNoise(i16 *SampleBuffer, u32 SampleCount)
+{
+    i16 State = 0;
+    u16 Rng = 0x119E;
+
+    while (SampleCount--)
+    {
+        Rng = xorshift16_Step(Rng);
+        i16 Noise = Rng & 0x80;
+        if (Noise) State += 0x7F;
+        else       State -= 0x7F;
+        i16 Sample = State;
+        *SampleBuffer++ = Sample;
+    }
+}
+
 void Audio_Init(void)
 {
     GlobalAudioState.FirstUsedSound = 0;
@@ -681,6 +485,10 @@ void Audio_Init(void)
     for (u32 i = 0; i < AUDIO_MAX_SOUNDS - 1; ++i)
         GlobalAudioState.Sounds[i].Next = &GlobalAudioState.Sounds[i+1];
     GlobalAudioState.Sounds[AUDIO_MAX_SOUNDS-1].Next = 0;
+
+    Audio_GenerateWhiteNoise(GlobalAudioState.WhiteNoise, 65535);
+    Audio_GeneratePinkNoise(GlobalAudioState.PinkNoise, 65535);
+    Audio_GenerateBrownNoise(GlobalAudioState.BrownNoise, 65535);
 }
 
 /*

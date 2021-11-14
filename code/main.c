@@ -732,9 +732,14 @@ int Win32_ClientMain(const char *Ip)
                     if (IsDown && AltDown && Code == 'S')
                     {
                         Audio_PlaySound((sound) {
-                            .Envelope = Audio_EnvelopeGenerator(0.5f, 0.0f, 0.0f, 0.5f, 0.0f, 0.0f),
-                            .Phase = Audio_PhaseGenerator(400, 0),
-                            // .Generator = Audio_SineWaveGenerator(500, 100),
+                            // .Envelope = Audio_EnvelopeGenerator(0.5f, 0.0f, 0.0f, 0.5f, 0.0f, 0.0f),
+                            // .Phase = Audio_PhaseGenerator(400, 0),
+                            // .Wave = Audio_SineWaveGenerator(),
+
+                            .Envelope = Audio_EnvelopeGenerator(1.0f, 1.0f, 0.0f, 1.0f, 1.0f, 0.0f),
+                            .Phase = Audio_NoisePhaseGenerator(),
+                            .Wave = Audio_WhiteNoiseGenerator(),
+                            .Filter = Audio_LowpassFilter(400),
                         });
                     }
 
