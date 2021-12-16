@@ -826,7 +826,7 @@ void Draw__TriangleTexturedShadedVerts3D(bitmap Target, const bitmap Texture, ve
                 __m256 AA = _mm256_add_ps(_mm256_add_ps(A8[0], _mm256_mul_ps(Beta, A8[1])), _mm256_mul_ps(Gamma, A8[2]));
                 __m256 BB = _mm256_add_ps(_mm256_add_ps(B8[0], _mm256_mul_ps(Beta, B8[1])), _mm256_mul_ps(Gamma, B8[2]));
 
-                __m256 dither = Bayer[(y>>1)&1];
+                __m256 Dither = Bayer[(y>>1)&1];
 
                 for(i32 x = iMinX; x < iMaxX; x += PACK_WIDTH)
                 {
@@ -844,7 +844,7 @@ void Draw__TriangleTexturedShadedVerts3D(bitmap Target, const bitmap Texture, ve
                         __m256 VVV = _mm256_add_ps(_mm256_add_ps(_mm256_mul_ps(V8[0], AAA), _mm256_mul_ps(V8[1], BBB)), _mm256_mul_ps(V8[2], CCC));
                         __m256 SSS = _mm256_add_ps(_mm256_add_ps(_mm256_mul_ps(S8[0], AAA), _mm256_mul_ps(S8[1], BBB)), _mm256_mul_ps(S8[2], CCC));
 
-                        SSS = _mm256_add_ps(_mm256_mul_ps(SSS, SSize), dither);
+                        SSS = _mm256_add_ps(_mm256_mul_ps(SSS, SSize), Dither);
 
                         __m256i iUUU = _mm256_and_si256(_mm256_cvttps_epi32(UUU), UMask);
                         __m256i iVVV = _mm256_and_si256(_mm256_cvttps_epi32(VVV), VMask);

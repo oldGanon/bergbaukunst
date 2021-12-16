@@ -19,7 +19,7 @@ typedef struct phase_generator
 {
     u16 Phase;
     u16 Frequency;
-    u16 dFrequency;
+    i16 dFrequency;
 } phase_generator;
 
 typedef enum wave_generator_type
@@ -169,7 +169,7 @@ u16 Audio_EnvelopeSample(envelope_generator *Envelope)
     {
         Counter *= -Envelope->SustainVolume;
         Counter /= Envelope->Release;
-        Counter += 0;
+        Counter += Envelope->SustainVolume;
         return Counter & 0xFFFF;
     }
 
@@ -182,7 +182,7 @@ phase_generator Audio_PhaseGenerator(f32 Frequency, f32 dFrequency)
 
     return (phase_generator) {
         .Frequency = (u16)(Frequency * (AUDIO_SECOND_PER_SAMPLE * 0xFFFF)),
-        .dFrequency = (u16)(dFrequency * (AUDIO_SECOND_PER_SAMPLE * 0xFFFF)),
+        .dFrequency = (i16)(dFrequency * (AUDIO_SECOND_PER_SAMPLE * 0x7FFF)),
     };
 }
 

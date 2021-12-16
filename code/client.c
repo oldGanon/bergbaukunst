@@ -149,8 +149,8 @@ void Client_Draw(client *Client, bitmap Target, f32 DeltaTime)
     if (Client->Hitboxes)
         View_DrawEntityBoxes(&Client->View, Target, Client->Camera);
 
-    Draw_String(Target, Client->Font, COLOR_WHITE, (ivec2){8,8}, "Ver: 0.001a");
-    ivec2 Position = Draw_String(Target, Client->Font, COLOR_WHITE, (ivec2){8,16}, "Fps: ");
+    // Draw_String(Target, Client->Font, COLOR_WHITE, (ivec2){8,8}, "Ver: 0.001a");
+    ivec2 Position = Draw_String(Target, Client->Font, COLOR_WHITE, (ivec2){8,8}, "Fps: ");
     Draw_Number(Target, Client->Font, COLOR_WHITE, Position, Client->Fps);
 
     View_DrawLineBox(Target, Client->Camera, (box){{0},{CHUNK_WIDTH,CHUNK_WIDTH,CHUNK_HEIGHT}});

@@ -271,7 +271,7 @@
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <IgnoreAllDefaultLibraries>true</IgnoreAllDefaultLibraries>
-      <AdditionalDependencies>kernel32.lib;user32.lib;gdi32.lib;Ws2_32.lib</AdditionalDependencies>
+      <AdditionalDependencies>kernel32.lib;user32.lib;gdi32.lib;Ws2_32.lib;Ole32.lib</AdditionalDependencies>
       <GenerateMapFile>true</GenerateMapFile>
       <AdditionalOptions />
       <MapFileName>$(OutDir)$(ProjectName).map</MapFileName>
@@ -358,7 +358,7 @@
       <ManifestFile />
       <MapFileName>
       </MapFileName>
-      <AdditionalDependencies>kernel32.lib;user32.lib;gdi32.lib;Ws2_32.lib</AdditionalDependencies>
+      <AdditionalDependencies>kernel32.lib;user32.lib;gdi32.lib;Ws2_32.lib;Ole32.lib</AdditionalDependencies>
       <DataExecutionPrevention />
       <EnableUAC />
       <LinkErrorReporting />
