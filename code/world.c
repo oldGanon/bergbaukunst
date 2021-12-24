@@ -115,13 +115,16 @@ typedef struct world
 //     DOWN,  // -z
 // } world_direction;
 
+void Entity_Move(entity* Entity, vec3 MobToPlayer, f32 Distance, world* World);
+
+
 void World_Init(world *World)
 {
     World->ChunkMap = ChunkMap_Create();
     World->EntityManager = EntityManager_Create();
     World->Generator = WorldGen_Create(__rdtsc());
     
-    entity Test = (entity){ .Type = ENTITY_MOB, .Position = (vec3){ 0,0,70 } };
+    entity Test = (entity){ .Type = ENTITY_MOB, .Position = (vec3){ 0,0,120 }, .Leben = 3 };
     Entity_Spawn(&World->EntityManager, Test);
 }
 
@@ -192,14 +195,14 @@ void World_Update(world *World)
             {
                 FOREACH_ENTITY_OF_TYPE(PlayerId, Manager, ENTITY_PLAYER)
                 {
-                    entity *Player = EntityManager_GetEntity(&World->EntityManager, PlayerId);
+                    entity* Player = EntityManager_GetEntity(&World->EntityManager, PlayerId);
                     vec3 MobToPlayer = Vec3_Sub(Player->Position, Entity->Position);
+
+                    // move Mobs
                     f32 Distance = Vec3_Length(MobToPlayer);
-                    if(Distance < 10)
-                    {
-                        Entity->Yaw += 0.1f;
-                        EntityManager_EntityDirty(&World->EntityManager, EntityId);
-                    }
+                    Entity_Move(Entity, MobToPlayer, Distance, World);
+                    EntityManager_EntityDirty(&World->EntityManager, EntityId);
+                    break;
                 }
             } break;
         }
@@ -242,4 +245,70 @@ f32 World_TraceRay(world *World, vec3 RayOrigin, vec3 RayDirection, f32 RayLengt
 vec3 World_CheckMoveBox(world *World, box Box, vec3 Move)
 {
     return Phys_CheckMoveBox(World_GetBlock, World, Box, Move);
+}
+
+void Entity_Move(entity *Entity, vec3 MobToPlayer, f32 Distance, world *World)
+{
+#define GRAVITY_MOB         250.0f
+#define JUMP_SPEED_MOB      26.0f
+#define GROUND_SPEED_MOB    200.0f
+#define AIR_SPEED_MOB       20.0f
+#define GROUND_FRICTION_MOB 15.0f
+#define AIR_FRICTION_MOB    2.0f
+
+    bool PlayerNear = false;
+    vec3 VecEntityWishMove = (vec3){ 0 };
+
+    if (Distance < 15.0f)
+    {
+        Entity->Yaw += 0.05f;
+        if (Distance < 10.0f)
+        {
+            VecEntityWishMove = Vec3_Normalize((vec3) { MobToPlayer.x, MobToPlayer.y, 0 });
+            PlayerNear = true;
+        }
+    }
+
+    // Acceleration
+    Entity->Acceleration = Vec3_Zero();
+    f32 WishSpeed = (Entity->OnGround) ? GROUND_SPEED_MOB : AIR_SPEED_MOB;
+    Entity->Acceleration = Vec3_Mul(VecEntityWishMove, Vec3_Set1(WishSpeed));
+
+    // Gravity
+    Entity->Acceleration.z -= GRAVITY_MOB;
+
+    if (Entity->OnGround)
+    {
+        // Friction
+        vec3 Friction = Vec3_Mul(Entity->Velocity, Vec3_Set1(-GROUND_FRICTION_MOB));
+        Entity->Acceleration = Vec3_Add(Entity->Acceleration, Friction);
+
+        // Jump
+        if (Entity->Jump && Entity->OnGround)
+        {
+            Entity->Jump = false;
+            if (Entity->Velocity.z < JUMP_SPEED_MOB)
+                Entity->Velocity.z = JUMP_SPEED_MOB;
+        }
+        Entity->OnGround = false;
+    }
+    else
+    {
+        // Air Friction
+        vec3 Friction = Vec3_Mul(Entity->Velocity, Vec3_Set1(-AIR_FRICTION_MOB));
+        Entity->Acceleration = Vec3_Add(Entity->Acceleration, Friction);
+    }
+
+    // Move
+    vec3 AddVelocity = Vec3_Mul(Entity->Acceleration, Vec3_Set1(0.01f));
+    Entity->Velocity = Vec3_Add(Entity->Velocity, AddVelocity);
+    vec3 AddPosition = Vec3_Mul(Entity->Velocity, Vec3_Set1(0.01f));
+
+    vec3 Move = World_CheckMoveBox(World, Entity_Box(Entity), AddPosition);
+    if (Abs(Move.x) < Abs(AddPosition.x)) Entity->Velocity.x = 0;
+    if (Abs(Move.y) < Abs(AddPosition.y)) Entity->Velocity.y = 0;
+    if (Abs(Move.z) < Abs(AddPosition.z)) Entity->Velocity.z = 0;
+    if (Move.z > AddPosition.z) Entity->OnGround = true;
+    if (PlayerNear && Entity->OnGround && (Entity->Velocity.x == 0 || Entity->Velocity.y == 0)) Entity->Jump = true;
+    Entity->Position = Vec3_Add(Entity->Position, Move);
 }

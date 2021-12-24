@@ -472,8 +472,8 @@ void Mob_AddBlockMesh(quad_mesh *Mesh, f32 Height, f32 Width)
 
 void Mob_AddMesh(quad_mesh *Mesh)
 {
-    f32 Height = 5.0f;
-    f32 Width = 5.0f;
+    f32 Height = 1.0f;
+    f32 Width = 1.0f;
     Mesh_Clear(Mesh);
     Mob_AddBlockMesh(Mesh, Height, Width);
 }

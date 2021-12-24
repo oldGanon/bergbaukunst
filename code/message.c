@@ -14,6 +14,7 @@ enum msg_type
     /* CLIENT MESSAGES */
     MSG_PLACE_BLOCK,
     MSG_BREAK_BLOCK,
+    MSG_ENTITY_HURT,
 };
 
 typedef struct msg_header
@@ -75,6 +76,12 @@ typedef struct msg_break_block
     u32 BlockFace;
 } msg_break_block;
 
+typedef struct msg_entity_hurt
+{
+    u32 ID;
+    entity Entity;
+} msg_entity_hurt;
+
 /* */
 
 typedef struct msg
@@ -93,6 +100,7 @@ typedef struct msg
 
         msg_place_block PlaceBlock;
         msg_break_block BreakBlock;
+        msg_entity_hurt EntityHurt;
     };
 } msg;
 
@@ -108,6 +116,7 @@ u64 Message_GetSize(msg *Message)
         case MSG_SET_ENTITY:    return sizeof(msg_header) + sizeof(msg_set_entity);
         case MSG_PLACE_BLOCK:   return sizeof(msg_header) + sizeof(msg_place_block);
         case MSG_BREAK_BLOCK:   return sizeof(msg_header) + sizeof(msg_break_block);
+        case MSG_ENTITY_HURT:   return sizeof(msg_header) + sizeof(msg_entity_hurt);
         default: return 0;
     }
 }
@@ -196,4 +205,13 @@ void Message_BreakBlock(msg *Message, ivec3 Position)
     Message->Header.Size = sizeof(msg_header) + sizeof(msg_break_block);
 
     Message->BreakBlock.Position = Position;
+}
+
+void Message_EntityHurt(msg* Message, u32 ID, entity *Entity)
+{
+    Message->Header.Type = MSG_ENTITY_HURT;
+    Message->Header.Size = sizeof(msg_header) + sizeof(msg_entity_hurt);
+
+    Message->EntityHurt.Entity = *Entity;
+    Message->EntityHurt.ID = ID;
 }

@@ -10,7 +10,13 @@ typedef struct entity
 {
     u32 Type;
     vec3 Position;
+    vec3 Velocity;
+    vec3 Acceleration;
+    bool OnGround;
+    bool Jump;
     f32 Yaw, Pitch;
+    i32 Leben;
+
 } entity;
 
 /******************/
@@ -33,8 +39,8 @@ box Entity_Box(const entity *Entity)
         case ENTITY_MOB:
         {
             Box = (box) {
-                .Min = (vec3) {-1.0f,-1.0f,-1.0f},
-                .Max = (vec3) { 1.0f, 1.0f, 1.0f},
+                .Min = (vec3) {-0.5f,-0.5f,-0.5f},
+                .Max = (vec3) { 0.5f, 0.5f, 0.5f},
             };
         } break;
 

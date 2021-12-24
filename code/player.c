@@ -100,14 +100,52 @@ void Player_Input(player *Player, client *Client, input Input, f32 DeltaTime)
 
     if (Input.Punch && (Player->Cooldown == 0))
     {
-        trace_result TraceResult;
-        if (View_TraceRay(&Client->View, Player->Position, Player_ViewDirection(Player), Reach, &TraceResult) < Reach)
+        //Hit Enemy
+        f32 DistanceEntity;
+        view_entity *ClosestEntity;
+        u32 EntityID;
+
+        for (u32 i = 0; i < Client->View.EntityTable.Capacity; ++i)
         {
-            ivec3 PunchPosition = TraceResult.BlockPosition;
+            view_entity* Entity = &Client->View.EntityTable.Entities[i];
+
+            if (Entity->Base.Type == ENTITY_MOB)
+            {
+                f32 DistanceRayToEntity = Box_TraceRay(Player->Position, Player_ViewDirection(Player), Entity_Box(&Entity->Base));
+                if (DistanceRayToEntity > 0 && DistanceRayToEntity < Reach)
+                {
+                    ClosestEntity = Entity;
+                    EntityID = i;
+                    DistanceEntity = DistanceRayToEntity;
+                }
+            }
+        }
+
+
+        trace_result TraceResult;
+        f32 DistanceBlock = View_TraceRay(&Client->View, Player->Position, Player_ViewDirection(Player), Reach, &TraceResult);
+
+
+        if(DistanceEntity != 0  && DistanceEntity < DistanceBlock)
+        {
+            vec3 DirFromPlayer = Player_ViewDirection(Player);
+            vec3 DirFromPlayerXY = Vec3_Normalize((vec3) { DirFromPlayer.x, DirFromPlayer.y, 0 });
+            ClosestEntity->Base.Velocity = (vec3){ DirFromPlayerXY.x * 30, DirFromPlayer.y * 30, 30 };
 
             msg Message;
-            Message_BreakBlock(&Message, PunchPosition);
+            Message_EntityHurt(&Message, EntityID, &ClosestEntity->Base);
             Network_ClientSendMessage(&Client->Client, &Message);
+        }
+        else
+        {
+            if (DistanceBlock < Reach)
+            {
+                ivec3 PunchPosition = TraceResult.BlockPosition;
+
+                msg Message;
+                Message_BreakBlock(&Message, PunchPosition);
+                Network_ClientSendMessage(&Client->Client, &Message);
+            }
         }
         Player->Cooldown = 0.125f;
     }
@@ -171,6 +209,23 @@ void Player_Update(player *Player, client *Client, f32 DeltaTime)
             Player->OnGround = false;
         }
 
+        // Check Collision With Mob
+        for (u32 i = 0; i < Client->View.EntityTable.Capacity; ++i)
+        {
+            view_entity* Entity = &Client->View.EntityTable.Entities[i];
+
+            if (Entity->Base.Type == ENTITY_MOB)
+            {
+                if (Box_Intersect(Entity_Box(&Entity->Base), Player_Box(Player)))
+                {   
+                    vec3 MobToPlayer = Vec3_Sub(Player->Position, Entity->Base.Position);
+                    vec3 Knockback = Vec3_Normalize((vec3) { MobToPlayer.x, MobToPlayer.y, 0});
+                    Player->Velocity = (vec3) {Knockback.x*8, Knockback.y*8, 8};
+
+                }
+            }
+        }
+
         // Move
         vec3 AddVelocity = Vec3_Mul(Player->Acceleration, Vec3_Set1(DeltaTime));
         Player->Velocity = Vec3_Add(Player->Velocity, AddVelocity);
@@ -190,3 +245,5 @@ void Player_Draw(player *Player, const client *Client, camera *Camera, f32 Delta
     Camera_SetPosition(Camera, Position);
     Camera_SetRotation(Camera, Player->Yaw, Player->Pitch);
 }
+
+

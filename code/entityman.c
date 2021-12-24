@@ -59,6 +59,15 @@ void Entity_Destroy(world_entity_manager *Manager, u32 EntityId)
     Manager->Entities[EntityId] = (world_entity) { 0 };
 }
 
+void Entity_DestroySetDirty(world_entity_manager* Manager, u32 EntityId)
+{
+    if ((EntityId == 0) || (EntityId > Manager->Capacity)) return;
+
+    Manager->Entities[EntityId] = (world_entity){ 0 };
+    world_entity* Entity = &Manager->Entities[EntityId];
+    Entity->Flags = ENTITY_DIRTY;
+}
+
 u32 EntityManager_First(world_entity_manager *Manager)
 {
     for (u32 i = 1; i <= Manager->Capacity; ++i)
