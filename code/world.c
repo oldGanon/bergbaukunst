@@ -115,7 +115,7 @@ typedef struct world
 //     DOWN,  // -z
 // } world_direction;
 
-void Entity_Move(entity* Entity, vec3 MobToPlayer, f32 Distance, world* World);
+void Mob_Update(entity* Entity, vec3 MobToPlayer, f32 Distance, world* World);
 
 
 void World_Init(world *World)
@@ -124,7 +124,7 @@ void World_Init(world *World)
     World->EntityManager = EntityManager_Create();
     World->Generator = WorldGen_Create(__rdtsc());
     
-    entity Test = (entity){ .Type = ENTITY_MOB, .Position = (vec3){ 0,0,120 }, .Leben = 3 };
+    entity Test = (entity){ .Type = ENTITY_MOB, .Position = (vec3){ 0,0,120 }, .Health = 3 };
     Entity_Spawn(&World->EntityManager, Test);
 }
 
@@ -195,14 +195,13 @@ void World_Update(world *World)
             {
                 FOREACH_ENTITY_OF_TYPE(PlayerId, Manager, ENTITY_PLAYER)
                 {
-                    entity* Player = EntityManager_GetEntity(&World->EntityManager, PlayerId);
+                    entity *Player = EntityManager_GetEntity(&World->EntityManager, PlayerId);
                     vec3 MobToPlayer = Vec3_Sub(Player->Position, Entity->Position);
 
                     // move Mobs
                     f32 Distance = Vec3_Length(MobToPlayer);
-                    Entity_Move(Entity, MobToPlayer, Distance, World);
-                    EntityManager_EntityDirty(&World->EntityManager, EntityId);
-                    break;
+                    Mob_Update(Entity, MobToPlayer, Distance, World);
+                    EntityManager_EntitySetDirty(&World->EntityManager, EntityId);
                 }
             } break;
         }
@@ -247,7 +246,24 @@ vec3 World_CheckMoveBox(world *World, box Box, vec3 Move)
     return Phys_CheckMoveBox(World_GetBlock, World, Box, Move);
 }
 
-void Entity_Move(entity *Entity, vec3 MobToPlayer, f32 Distance, world *World)
+
+
+vec3 Entity_CheckMove(entity *Entity, world *World, vec3 Move)
+{
+    return World_CheckMoveBox(World, Entity_Box(Entity), Move);
+}
+
+void Entity_Move(entity *Entity, world *World, vec3 Move)
+{
+    vec3 CheckMove = World_CheckMoveBox(World, Entity_Box(Entity), Move);
+    if (Abs(CheckMove.x) < Abs(Move.x)) Entity->Velocity.x = 0;
+    if (Abs(CheckMove.y) < Abs(Move.y)) Entity->Velocity.y = 0;
+    if (Abs(CheckMove.z) < Abs(Move.z)) Entity->Velocity.z = 0;
+    if (CheckMove.z > Move.z) Entity->OnGround = true;
+    Entity->Position = Vec3_Add(Entity->Position, CheckMove);
+}
+
+void Mob_Update(entity *Entity, vec3 MobToPlayer, f32 Distance, world *World)
 {
 #define GRAVITY_MOB         250.0f
 #define JUMP_SPEED_MOB      26.0f
@@ -304,11 +320,8 @@ void Entity_Move(entity *Entity, vec3 MobToPlayer, f32 Distance, world *World)
     Entity->Velocity = Vec3_Add(Entity->Velocity, AddVelocity);
     vec3 AddPosition = Vec3_Mul(Entity->Velocity, Vec3_Set1(0.01f));
 
-    vec3 Move = World_CheckMoveBox(World, Entity_Box(Entity), AddPosition);
-    if (Abs(Move.x) < Abs(AddPosition.x)) Entity->Velocity.x = 0;
-    if (Abs(Move.y) < Abs(AddPosition.y)) Entity->Velocity.y = 0;
-    if (Abs(Move.z) < Abs(AddPosition.z)) Entity->Velocity.z = 0;
-    if (Move.z > AddPosition.z) Entity->OnGround = true;
-    if (PlayerNear && Entity->OnGround && (Entity->Velocity.x == 0 || Entity->Velocity.y == 0)) Entity->Jump = true;
-    Entity->Position = Vec3_Add(Entity->Position, Move);
+    Entity_Move(Entity, World, AddPosition);
+
+    if (PlayerNear && Entity->OnGround && (Entity->Velocity.x == 0 || Entity->Velocity.y == 0))
+        Entity->Jump = true;
 }

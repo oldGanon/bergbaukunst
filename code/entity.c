@@ -15,8 +15,7 @@ typedef struct entity
     bool OnGround;
     bool Jump;
     f32 Yaw, Pitch;
-    i32 Leben;
-
+    i32 Health;
 } entity;
 
 /******************/

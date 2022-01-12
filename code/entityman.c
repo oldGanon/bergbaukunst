@@ -11,7 +11,7 @@ void EntityManager_Destroy(world_entity_manager *Manager);
 u32 Entity_Spawn(world_entity_manager *Manager, entity Entity);
 void Entity_Destroy(world_entity_manager *Manager, u32 EntityId);
 entity *EntityManager_GetEntity(world_entity_manager *Manager, u32 EntityId);
-void EntityManager_EntityDirty(world_entity_manager *Manager, u32 EntityId);
+void EntityManager_EntitySetDirty(world_entity_manager *Manager, u32 EntityId);
 
 /******************/
 /* IMPLEMENTATION */
@@ -54,18 +54,24 @@ u32 Entity_Spawn(world_entity_manager *Manager, entity Entity)
     return 0;
 }
 
-void Entity_Destroy(world_entity_manager *Manager, u32 EntityId)
+entity *EntityManager_GetEntity(world_entity_manager *Manager, u32 EntityId)
 {
-    Manager->Entities[EntityId] = (world_entity) { 0 };
+    if ((EntityId == 0) || (EntityId > Manager->Capacity)) return 0;
+    return &Manager->Entities[EntityId].Base;
 }
 
-void Entity_DestroySetDirty(world_entity_manager* Manager, u32 EntityId)
+void EntityManager_EntitySetDirty(world_entity_manager *Manager, u32 EntityId)
 {
     if ((EntityId == 0) || (EntityId > Manager->Capacity)) return;
+    world_entity *Entity = &Manager->Entities[EntityId];
+    if (Entity->Base.Type == ENTITY_NONE) return;
+    Entity->Flags |= ENTITY_DIRTY;
+}
 
-    Manager->Entities[EntityId] = (world_entity){ 0 };
-    world_entity* Entity = &Manager->Entities[EntityId];
-    Entity->Flags = ENTITY_DIRTY;
+void Entity_Destroy(world_entity_manager *Manager, u32 EntityId)
+{
+    if ((EntityId == 0) || (EntityId > Manager->Capacity)) return;
+    Manager->Entities[EntityId] = (world_entity) { .Flags = ENTITY_DIRTY };
 }
 
 u32 EntityManager_First(world_entity_manager *Manager)
@@ -114,18 +120,3 @@ u32 EntityManager_NextType(world_entity_manager *Manager, u32 EntityId, u32 Enti
     for (u32 ENTITY_ID = EntityManager_FirstType((MANAGER), (ENTITY_TYPE)); \
          ENTITY_ID <= EntityManager_Last((MANAGER)); \
          ENTITY_ID = EntityManager_NextType((MANAGER), (ENTITY_ID), (ENTITY_TYPE)))
-
-
-entity *EntityManager_GetEntity(world_entity_manager *Manager, u32 EntityId)
-{
-    if ((EntityId == 0) || (EntityId > Manager->Capacity)) return 0;
-    return &Manager->Entities[EntityId].Base;
-}
-
-void EntityManager_EntityDirty(world_entity_manager *Manager, u32 EntityId)
-{
-    if ((EntityId == 0) || (EntityId > Manager->Capacity)) return;
-    world_entity *Entity = &Manager->Entities[EntityId];
-    if (Entity->Base.Type == ENTITY_NONE) return;
-    Entity->Flags |= ENTITY_DIRTY;
-}

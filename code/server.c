@@ -195,21 +195,20 @@ void Server_ClientBreakBlock(server *Server, u32 ClientId, const msg_break_block
     block Block = (block){ .Id = BLOCK_ID_AIR };
     World_SetBlock(&Server->World, BreakBlock->Position, Block);
 }
-void Server_ClientEntityHurt(server* Server, u32 ClientId, const msg_entity_hurt *EntityHurt)
+void Server_ClientPunchEntity(server* Server, u32 ClientId, const msg_punch_entity *PunchEntity)
 {
     world_entity_manager *Manager = &Server->World.EntityManager;
-    entity* Entity = EntityManager_GetEntity(Manager, EntityHurt->ID);
-    if(Entity->Leben == 1)
-    {
-        Entity_DestroySetDirty(Manager, EntityHurt->ID);
-    }
-    else
-    {
-        Entity->Velocity = EntityHurt->Entity.Velocity;
-        Entity->Leben -= 1;
-    }
-    EntityManager_EntityDirty(Manager, EntityHurt->ID);
+    entity* Entity = EntityManager_GetEntity(Manager, PunchEntity->ID);
+    
+    i32 Damage = 1;
 
+    Entity->Health -= Damage;
+    if(Entity->Health <= 0)
+    {
+        Entity_Destroy(Manager, PunchEntity->ID);
+    }
+    
+    EntityManager_EntitySetDirty(Manager, PunchEntity->ID);
 }
 
 void Server_Update(server *Server)
@@ -227,7 +226,7 @@ void Server_Update(server *Server)
 
                 case MSG_PLACE_BLOCK:  Server_ClientPlaceBlock(Server, i, &Message.PlaceBlock); break;
                 case MSG_BREAK_BLOCK:  Server_ClientBreakBlock(Server, i, &Message.BreakBlock); break;
-                case MSG_ENTITY_HURT:  Server_ClientEntityHurt(Server, i, &Message.EntityHurt); break;
+                case MSG_PUNCH_ENTITY: Server_ClientPunchEntity(Server, i, &Message.PunchEntity); break;
                 default: break;
             }
         }
@@ -264,9 +263,6 @@ void Server_Update(server *Server)
             Server_SendChunkMessage(Server, Chunk, &Message);
         }
     }
-
-
-
 
     // handle new connections
     u32 NewClient = Network_ServerAcceptClient(&Server->Server);
