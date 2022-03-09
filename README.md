@@ -20,4 +20,4 @@ I personally used it as a practice project for network programming using sockets
 
 Another goal was using minimal dependencies, as such the C standard library is not linked. Microsoft Windows APIs are used to interact with the operating system for window creation, threads, audio, memory, timing, sockets, and user input.
 
-[screenshot]: data/screenshot/0.png "Screenshot"
+[screenshot]: data/screenshots/0.png "Screenshot"
