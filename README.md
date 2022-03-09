@@ -1,4 +1,4 @@
-# BERGBAUKUNST 
+# BergBauKunst 
 
 ![screenshot][screenshot]
 
