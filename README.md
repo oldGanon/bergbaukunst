@@ -1,6 +1,6 @@
 # BERGBAUKUNST 
 
-![Screenshot][screenshot]
+![screenshot][screenshot]
 
 ---
 
